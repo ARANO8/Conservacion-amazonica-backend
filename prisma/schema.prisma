@@ -1,0 +1,269 @@
+// --------------------------------------------------------
+// CONFIGURACIÓN E INFRAESTRUCTURA
+// --------------------------------------------------------
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------------------------------------
+// ENUMS (Listas Desplegables del Sistema)
+// --------------------------------------------------------
+
+// Jerarquía del POA (Basado en FORM-4)
+enum ActivityType {
+  OG // Objetivo de Gestión (Nivel 1)
+  OE // Objetivo Específico (Nivel 2)
+  OP // Operación (Nivel 3)
+  AC // Actividad (Nivel 4 - Aquí está el dinero)
+}
+
+// Estado del Flujo de Solicitud (Workflow)
+enum RequestStatus {
+  DRAFT               // Borrador
+  REVIEW_SUPERVISOR   // En revisión por Jefe Inmediato
+  REVIEW_DIRECTOR     // En revisión por Director de Área
+  REVIEW_FINANCE      // En revisión por Contabilidad (Fondos)
+  APPROVED            // Aprobado para Desembolso
+  REJECTED            // Rechazado (Ver motivo)
+  DISBURSED           // Dinero entregado (En ejecución)
+  COMPLETED           // Rendición finalizada y cerrada
+}
+
+// Tipos de Gasto para Impuestos (Basado en REND. FONDOS BS)
+enum ExpenseType {
+  INVOICE             // Con Factura (Sin retención)
+  RETENTION_GOODS     // Bienes (IUE 5% + IT 3%)
+  RETENTION_SERVICES  // Servicios (IUE 12.5% + IT 3%)
+  NO_DEDUCTIBLE       // Gasto sin factura asumido por empleado
+}
+
+enum Currency {
+  BS
+  USD
+}
+
+// --------------------------------------------------------
+// MÓDULO 1: RECURSOS HUMANOS Y ACCESO (Source: REC HUM.xlsx)
+// --------------------------------------------------------
+
+model Role {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique // Ej: "ADMIN", "SOLICITANTE", "APROBADOR_FINANCIERO"
+  users       User[]
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  email       String    @unique
+  password    String    // Hash
+  fullName    String
+  position    String?   // Cargo (Ej: "ESPECIALISTA EN SIG")
+  area        String?   // Componente (Ej: "CIENCIA Y TECNOLOGÍA")
+  
+  isActive    Boolean   @default(true)
+  
+  // Jerarquía de Aprobación (Self-Relation)
+  supervisorId Int?
+  supervisor   User?    @relation("Hierarchy", fields: [supervisorId], references: [id])
+  subordinates User[]   @relation("Hierarchy")
+
+  roleId      Int
+  role        Role      @relation(fields: [roleId], references: [id])
+
+  // Relaciones con el sistema
+  requests    Request[] // Solicitudes hechas por mí
+  approvals   RequestHistory[] // Solicitudes que aprobé
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// --------------------------------------------------------
+// MÓDULO 2: PLANIFICACIÓN (POA) (Source: FORM-4 & FORM-6)
+// --------------------------------------------------------
+
+// Fuente de Financiamiento (Ej: RAINFOREST, BID, SUECIA)
+model FinancingSource {
+  id          String   @id @default(uuid())
+  code        String   @unique // Ej: "BID-PV"
+  name        String   // Ej: "Banco Interamericano de Desarrollo"
+  
+  budgets     Budget[]
+}
+
+// Partida Presupuestaria (Ej: 39500 - ÚTILES DE ESCRITORIO)
+model BudgetLine {
+  id          String   @id @default(uuid())
+  code        String   @unique // Ej: "39500"
+  name        String
+  category    String?  // Ej: "MATERIALES Y SUMINISTROS"
+  
+  budgets     Budget[]
+  requestItems RequestItem[]
+}
+
+// La Estructura del Árbol (OG -> OE -> OP -> AC)
+model Activity {
+  id          String       @id @default(uuid())
+  code        String       // Ej: "1.1.1.1" o "1111"
+  name        String       @db.Text // Descripción larga del Excel
+  type        ActivityType
+  
+  // Relación recursiva (Padre e Hijos)
+  parentId    String?
+  parent      Activity?    @relation("ActivityHierarchy", fields: [parentId], references: [id])
+  children    Activity[]   @relation("ActivityHierarchy")
+
+  // Solo las actividades nivel AC tienen presupuesto
+  budgets     Budget[]
+  requests    Request[]
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+// La "Bolsa de Dinero" (Cruce: Actividad + Fuente + Partida)
+model Budget {
+  id                String          @id @default(uuid())
+  
+  amountAssigned    Decimal         @db.Decimal(15, 2) // Presupuesto Inicial (FORM-6)
+  amountExecuted    Decimal         @default(0) @db.Decimal(15, 2) // Lo gastado real
+  amountCompromised Decimal         @default(0) @db.Decimal(15, 2) // Lo solicitado pero no rendido
+
+  // Relaciones
+  activityId        String
+  activity          Activity        @relation(fields: [activityId], references: [id])
+  
+  sourceId          String
+  financingSource   FinancingSource @relation(fields: [sourceId], references: [id])
+  
+  budgetLineId      String
+  budgetLine        BudgetLine      @relation(fields: [budgetLineId], references: [id])
+
+  @@unique([activityId, sourceId, budgetLineId]) // Evita duplicados
+}
+
+// --------------------------------------------------------
+// MÓDULO 3: EJECUCIÓN (Source: Solicitud de Fondos)
+// --------------------------------------------------------
+
+model Request {
+  id              String        @id @default(uuid())
+  code            String        @unique @default(cuid()) // Ej: "SOL-2026-001"
+  status          RequestStatus @default(DRAFT)
+  
+  date            DateTime      @default(now())
+  motive          String        @db.Text // "Motivo Solicitud" del Excel
+  place           String?       // "Lugar"
+  
+  currency        Currency      @default(BS)
+  totalAmount     Decimal       @db.Decimal(15, 2)
+  
+  // Datos Bancarios (Para el desembolso)
+  bankName        String?
+  accountNumber   String?
+  checkNumber     String?       // Cheque TR4500 (Del Excel)
+
+  // Relaciones
+  requesterId     Int
+  requester       User          @relation(fields: [requesterId], references: [id])
+  
+  activityId      String
+  activity        Activity      @relation(fields: [activityId], references: [id])
+
+  items           RequestItem[]
+  quotes          Quote[]       // Cotizaciones (Anexo 11)
+  history         RequestHistory[]
+  rendition       Rendition?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// Detalle de la Solicitud (Filas del formulario)
+model RequestItem {
+  id              String      @id @default(uuid())
+  description     String
+  quantity        Int
+  unitCost        Decimal     @db.Decimal(15, 2)
+  totalCost       Decimal     @db.Decimal(15, 2)
+  
+  requestId       String
+  request         Request     @relation(fields: [requestId], references: [id])
+  
+  // A qué partida afecta este ítem específico
+  budgetLineId    String?
+  budgetLine      BudgetLine? @relation(fields: [budgetLineId], references: [id])
+}
+
+// Cotizaciones (Regla de las 3 cotizaciones)
+model Quote {
+  id              String   @id @default(uuid())
+  supplierName    String
+  amount          Decimal  @db.Decimal(15, 2)
+  isSelected      Boolean  @default(false)
+  fileUrl         String?  // PDF de la cotización
+  
+  requestId       String
+  request         Request  @relation(fields: [requestId], references: [id])
+}
+
+// Historial de Aprobaciones (Auditoría)
+model RequestHistory {
+  id              String        @id @default(uuid())
+  status          RequestStatus // El estado al que cambió
+  observation     String?       @db.Text
+  date            DateTime      @default(now())
+  
+  requestId       String
+  request         Request       @relation(fields: [requestId], references: [id])
+  
+  actorId         Int
+  actor           User          @relation(fields: [actorId], references: [id])
+}
+
+// --------------------------------------------------------
+// MÓDULO 4: RENDICIÓN E IMPUESTOS (Source: REND. FONDOS BS)
+// --------------------------------------------------------
+
+model Rendition {
+  id              String    @id @default(uuid())
+  code            String    @unique // Código interno de rendición
+  renditionDate   DateTime  @default(now())
+  
+  totalExpenses   Decimal   @db.Decimal(15, 2)
+  balance         Decimal   @db.Decimal(15, 2) // Saldo (A favor o en contra)
+  
+  requestId       String    @unique
+  request         Request   @relation(fields: [requestId], references: [id])
+  
+  expenses        Expense[]
+}
+
+model Expense {
+  id              String      @id @default(uuid())
+  date            DateTime
+  invoiceNumber   String?     // Nro Factura
+  description     String
+  amount          Decimal     @db.Decimal(15, 2)
+  
+  type            ExpenseType @default(INVOICE)
+  
+  // Campos calculados automáticamente (Del Excel RENDICIÓN)
+  taxRcIva        Decimal     @default(0) @db.Decimal(10, 2)
+  taxIue          Decimal     @default(0) @db.Decimal(10, 2)
+  taxIt           Decimal     @default(0) @db.Decimal(10, 2)
+  
+  totalDeclared   Decimal     @db.Decimal(15, 2) // Monto total con impuestos
+  
+  renditionId     String
+  rendition       Rendition   @relation(fields: [renditionId], references: [id])
+  
+  // Archivo de respaldo (Foto factura)
+  receiptUrl      String?
+}

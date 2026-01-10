@@ -1,0 +1,79 @@
+CODIGO,DETALLE
+11100, Haberes Básicos
+11200, Bono de Antigüedad
+11300, Bonificaciones
+11400, Aguinaldos
+11500, Primas y Bono de Producción
+11600, Asignaciones Familiares
+12100, Personal Eventual
+13110, Régimen de Corto Plazo (Salud)
+13120, Prima de Riesgo Profesional Régimen de Largo Plazo 
+13130, Aporte Patronal Fondo Solidario Régimen de Largo Plazo
+13200, Aporte Patronal para Vivienda
+14000, Otros
+21100, Comunicaciones
+21200, Energía Eléctrica
+21300, Agua
+21400, Telefonía
+21500, Gas Domiciliario
+21600, Internet
+22110, Pasajes al Interior del País
+22120, Pasajes al Exterior del País
+22210, Viáticos por Viajes al Interior del País. 
+22220,Viáticos por Viajes al Exterior del País.
+22300, Fletes y Almacenamiento
+22400, Gastos de Instalación
+22500, Seguros
+22600, Transporte de Personal y otros
+23100, Alquiler de Inmuebles
+23200, Alquiler de Equipos y Maquinarias
+23300, Alquiler de Tierras y Terrenos
+23400, Otros Alquileres
+24110, Mantenimiento y Reparación de Inmuebles
+24120," Mantenimiento y Reparación de Vehículos, Maquinaria y Equipos"
+24130, Mantenimiento y Reparación de Muebles y Enseres
+25300, Comisiones y Gastos Bancarios
+25400," Lavandería, Limpieza e Higiene"
+25500, Publicidad
+25600," Servicios de Imprenta, Fotocopiado y Fotográficos"
+25700, Capacitación del Personal
+25900, Servicios Manuales
+26200, Gastos Judiciales
+26300, Derechos sobre Bienes Intangibles
+26700, Servicios de Laboratorios Especializados
+26930, Pago por Trabajos Dirigidos y Pasantías
+31110, Gastos por   Refrigerios   
+31300," Productos Agrícolas, Pecuarios y Forestales"
+32100, Papel
+32200, Productos de Artes Gráficas
+32300," Libros, Manuales y Revistas"
+32400, Textos de Enseñanza
+32500, Periódicos y Boletines
+33100," Hilados, Telas, Fibras y Algodón"
+33200, Confecciones Textiles
+33300, Prendas de Vestir
+33400, Calzados
+34100," Combustibles, Lubricantes y Derivados "
+34200, Productos Químicos y Farmacéuticos
+34300, Llantas y Neumáticos
+34400, Productos de Cuero y Caucho
+34800, Herramientas Menores
+39100, Material de Limpieza e Higiene
+39200, Material Deportivo y Recreativo
+39300, Utensilios de Cocina y Comedor
+39500, Útiles de Escritorio y Oficina
+39600," Útiles Educacionales, Culturales y de Capacitación"
+39700, Útiles y Materiales Eléctricos
+39800, Otros Repuestos y Accesorios
+39900, Otros Materiales y Suministros
+43110, Equipo de Oficina y Muebles
+43120, Equipo de Computación
+43200, Maquinaria y Equipo de Producción
+43310, Vehículos Livianos para Funciones Administrativas
+43400, Equipo Médico y de Laboratorio
+43500, Equipo de Comunicación
+43600, Equipo Educacional y Recreativo
+43700, Otra Maquinaria y Equipo
+25210, Consultorías por Producto
+25230, Auditorías Externas
+70000, Transferencias

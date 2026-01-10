@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: amazonica_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: amazonica_db
+    ports:
+      - "5432:5432"
+    volumes:
+      # Usamos un volumen nombrado con la flag :Z (Obligatorio para Podman/SELinux)
+      - db_data:/var/lib/postgresql/data:Z
+    
+    # Healthcheck: Para saber si la BD está lista antes de que NestJS intente conectar
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d amazonica_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# Definición del volumen persistente
+volumes:
+  db_data:
