@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateRequestDto } from './dto/create-request.dto';
-import { RequestStatus } from '@prisma/client';
+import {
+  CreateRequestDto,
+  CreateRequestItemDto,
+} from './dto/create-request.dto';
+import { Prisma, RequestStatus } from '@prisma/client';
 import { RequestUser } from './interfaces/request-user.interface';
 
 @Injectable()
@@ -13,14 +16,14 @@ export class RequestsService {
 
     // Calculate total amount in backend as per requirement
     const totalAmount = items.reduce(
-      (sum, item) => sum + Number(item.amount),
+      (sum: number, item: CreateRequestItemDto) => sum + Number(item.amount),
       0,
     );
 
     // Generate unique code
     const code = `REQ-${Date.now()}`;
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       const request = await tx.request.create({
         data: {
           ...requestData,
@@ -29,7 +32,7 @@ export class RequestsService {
           requesterId: userId,
           status: RequestStatus.DRAFT,
           items: {
-            create: items.map((item) => ({
+            create: items.map((item: CreateRequestItemDto) => ({
               amount: item.amount,
               description: item.description,
               budgetLineId: item.budgetLineId,

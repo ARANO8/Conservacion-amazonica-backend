@@ -16,7 +16,15 @@ import {
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
-import { RequestUser } from './interfaces/request-user.interface';
+import { Request as ExpressRequest } from 'express';
+
+interface RequestWithUser extends ExpressRequest {
+  user: {
+    userId: number;
+    email: string;
+    role: string;
+  };
+}
 
 @ApiTags('Requests')
 @ApiBearerAuth()
@@ -29,7 +37,7 @@ export class RequestsController {
   @ApiOperation({ summary: 'Create a new request' })
   @ApiResponse({ status: 201, description: 'Request created successfully.' })
   create(
-    @Request() req: { user: RequestUser },
+    @Request() req: RequestWithUser,
     @Body() createRequestDto: CreateRequestDto,
   ) {
     // req.user comes from JwtStrategy.validate() -> { userId, email, role }
@@ -43,7 +51,7 @@ export class RequestsController {
     status: 200,
     description: 'Return all requests (filtered by role).',
   })
-  findAll(@Request() req: { user: RequestUser }) {
+  findAll(@Request() req: RequestWithUser) {
     return this.requestsService.findAll(req.user);
   }
 
