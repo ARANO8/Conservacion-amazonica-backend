@@ -35,8 +35,8 @@ export class RequestsService {
             create: items.map((item: CreateRequestItemDto) => ({
               amount: item.amount,
               description: item.description,
-              budgetLineId: item.budgetLineId,
-              financingSourceId: item.financingSourceId,
+              budgetLine: { connect: { id: item.budgetLineId } },
+              financingSource: { connect: { id: item.financingSourceId } },
             })),
           },
         },
