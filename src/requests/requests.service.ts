@@ -12,9 +12,10 @@ export class RequestsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(userId: number, createRequestDto: CreateRequestDto) {
-    const { items, ...requestData } = createRequestDto;
+    const { items, viaticos, ...requestData } = createRequestDto;
 
     // Calculate total amount in backend as per requirement
+    // Using the 'amount' field from the item which represents the total for that line
     const totalAmount = items.reduce(
       (sum: number, item: CreateRequestItemDto) => sum + Number(item.amount),
       0,
@@ -33,15 +34,32 @@ export class RequestsService {
           status: RequestStatus.DRAFT,
           items: {
             create: items.map((item: CreateRequestItemDto) => ({
-              amount: item.amount,
               description: item.description,
+              quantity: item.quantity,
+              unitCost: item.unitCost,
+              totalAmount: item.amount, // Mapping DTO 'amount' directly to DB 'totalAmount'
+              detail: item.detail,
+              documentNumber: item.documentNumber,
               budgetLine: { connect: { id: item.budgetLineId } },
               financingSource: { connect: { id: item.financingSourceId } },
             })),
           },
+          travelExpenses: viaticos
+            ? {
+                create: viaticos.map((v) => ({
+                  concept: v.concept,
+                  city: v.city,
+                  destination: v.destination,
+                  transportType: v.transportType,
+                  days: v.days,
+                  peopleCount: v.peopleCount,
+                })),
+              }
+            : undefined,
         },
         include: {
           items: true,
+          travelExpenses: true,
         },
       });
       return request;
@@ -78,6 +96,7 @@ export class RequestsService {
             financingSource: true,
           },
         },
+        travelExpenses: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -100,6 +119,7 @@ export class RequestsService {
             financingSource: true,
           },
         },
+        travelExpenses: true,
         approver: {
           select: {
             id: true,
