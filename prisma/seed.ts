@@ -31,7 +31,10 @@ interface EmployeeRow {
 /**
  * Carga y parsea un archivo CSV de forma genérica.
  */
-function loadCsv<T>(fileName: string, options: any = {}): T[] {
+function loadCsv<T>(
+  fileName: string,
+  options: Record<string, unknown> = {},
+): T[] {
   const filePath = path.join(DATA_PATH, fileName);
   if (!fs.existsSync(filePath)) {
     console.warn(`⚠️ Archivo no encontrado: ${fileName}`);

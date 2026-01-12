@@ -76,8 +76,9 @@ model User {
   role        Role      @relation(fields: [roleId], references: [id])
 
   // Relaciones con el sistema
-  requests    Request[] // Solicitudes hechas por mí
-  approvals   RequestHistory[] // Solicitudes que aprobé
+  requests         Request[] @relation("Requester")
+  approvedRequests Request[] @relation("Approver")
+  approvals        RequestHistory[] // Solicitudes que aprobé (Historical audit)
   
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -94,6 +95,7 @@ model FinancingSource {
   name        String   // Ej: "Banco Interamericano de Desarrollo"
   
   budgets     Budget[]
+  requestItems RequestItem[]
 }
 
 // Partida Presupuestaria (Ej: 39500 - ÚTILES DE ESCRITORIO)
@@ -121,7 +123,7 @@ model Activity {
 
   // Solo las actividades nivel AC tienen presupuesto
   budgets     Budget[]
-  requests    Request[]
+  // requests    Request[] // Removed direct relation for now as per new spec focusing on simple requests first
 
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -154,51 +156,45 @@ model Budget {
 
 model Request {
   id              String        @id @default(uuid())
-  code            String        @unique @default(cuid()) // Ej: "SOL-2026-001"
+  code            String        @unique // Ej: "SOL-001"
+  title           String
+  description     String        @db.Text
+  totalAmount     Decimal       @db.Decimal(15, 2)
   status          RequestStatus @default(DRAFT)
   
-  date            DateTime      @default(now())
-  motive          String        @db.Text // "Motivo Solicitud" del Excel
-  place           String?       // "Lugar"
-  
-  currency        Currency      @default(BS)
-  totalAmount     Decimal       @db.Decimal(15, 2)
-  
-  // Datos Bancarios (Para el desembolso)
-  bankName        String?
-  accountNumber   String?
-  checkNumber     String?       // Cheque TR4500 (Del Excel)
-
   // Relaciones
   requesterId     Int
-  requester       User          @relation(fields: [requesterId], references: [id])
+  requester       User          @relation("Requester", fields: [requesterId], references: [id])
   
-  activityId      String
-  activity        Activity      @relation(fields: [activityId], references: [id])
+  approverId      Int?
+  approver        User?         @relation("Approver", fields: [approverId], references: [id])
 
   items           RequestItem[]
-  quotes          Quote[]       // Cotizaciones (Anexo 11)
-  history         RequestHistory[]
-  rendition       Rendition?
-
+  
+  // Legacy/Optional for now
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
+
+  // Keeping these for history/audit but making them optional or implicit
+  history         RequestHistory[]
+  rendition       Rendition?
+  quotes          Quote[]
 }
 
 // Detalle de la Solicitud (Filas del formulario)
 model RequestItem {
   id              String      @id @default(uuid())
   description     String
-  quantity        Int
-  unitCost        Decimal     @db.Decimal(15, 2)
-  totalCost       Decimal     @db.Decimal(15, 2)
+  amount          Decimal     @db.Decimal(15, 2)
   
   requestId       String
   request         Request     @relation(fields: [requestId], references: [id])
   
-  // A qué partida afecta este ítem específico
-  budgetLineId    String?
-  budgetLine      BudgetLine? @relation(fields: [budgetLineId], references: [id])
+  budgetLineId    String
+  budgetLine      BudgetLine  @relation(fields: [budgetLineId], references: [id])
+
+  financingSourceId String
+  financingSource   FinancingSource @relation(fields: [financingSourceId], references: [id])
 }
 
 // Cotizaciones (Regla de las 3 cotizaciones)
