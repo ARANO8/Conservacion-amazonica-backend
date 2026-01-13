@@ -105,21 +105,49 @@ function loadPoaCsv(fileName: string): PoaActivityRow[] {
   }));
 }
 
-function generateEmail(fullName: string): string {
-  const cleanName = fullName
+function generateEmail(fullName: string, usedEmails: Set<string>): string {
+  const normalized = fullName
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/ñ/g, 'n')
+    .replace(/ü/g, 'u')
     .trim();
 
-  const parts = cleanName.split(/\s+/);
-  if (parts.length < 2)
-    return `${cleanName.replace(/\s/g, '.')}@conservacion.org`;
+  const parts = normalized.split(/\s+/);
+  if (parts.length < 1) return 'info@conservacion.gob.bo';
 
   const firstName = parts[0];
-  const lastName = parts[1]; // Primer apellido
-  return `${firstName}.${lastName}@conservacion.org`;
+  let firstSurname = '';
+
+  // Lógica: 2 palabras -> última, 3 o 4 palabras -> penúltima
+  if (parts.length === 2) {
+    firstSurname = parts[1];
+  } else if (parts.length >= 3) {
+    firstSurname = parts[parts.length - 2];
+  } else {
+    firstSurname = parts[0];
+  }
+
+  const baseInitials = firstName[0];
+  let email = `${baseInitials}${firstSurname}@conservacion.gob.bo`;
+
+  // Control de unicidad (si el correo ya existe, intentamos con la segunda letra o un contador)
+  if (usedEmails.has(email)) {
+    if (firstName.length > 1) {
+      email = `${firstName[0]}${firstName[1]}${firstSurname}@conservacion.gob.bo`;
+    }
+
+    let counter = 2;
+    const baseWithTwoLetters = email.split('@')[0];
+    while (usedEmails.has(email)) {
+      email = `${baseWithTwoLetters}${counter}@conservacion.gob.bo`;
+      counter++;
+    }
+  }
+
+  usedEmails.add(email);
+  return email;
 }
 
 async function main() {
@@ -260,6 +288,7 @@ async function main() {
   // 4.2 Empleados desde CSV
   // Nota: Usamos 'employees2.csv' porque ese fue el que subiste con datos completos
   const employeeRecords = loadCsv<EmployeeRow>('employees.csv');
+  const usedEmails = new Set<string>(['admin@admin.com']);
 
   for (const row of employeeRecords) {
     const fullName = row.NOMBRE?.trim();
@@ -268,7 +297,7 @@ async function main() {
 
     if (!fullName) continue;
 
-    const email = generateEmail(fullName);
+    const email = generateEmail(fullName, usedEmails);
 
     // Lógica simple de roles basada en el cargo
     const isDirector = position?.toUpperCase().includes('DIRECTOR');
