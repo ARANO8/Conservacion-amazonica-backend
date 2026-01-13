@@ -10,6 +10,7 @@ import { CatalogsService } from './catalogs.service';
 import { BudgetLineEntity } from './entities/budget-line.entity';
 import { FinancingSourceEntity } from './entities/financing-source.entity';
 import { UserCatalogEntity } from './entities/user-catalog.entity';
+import { PoaActivityEntity } from './entities/poa-activity.entity';
 
 @ApiTags('Catalogs')
 @ApiBearerAuth()
@@ -49,5 +50,16 @@ export class CatalogsController {
   })
   async findAllUsers(): Promise<UserCatalogEntity[]> {
     return this.catalogsService.findAllUsers();
+  }
+
+  @Get('poa-activities')
+  @ApiOperation({ summary: 'Get all POA activities' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of POA activities ordered by code.',
+    type: [PoaActivityEntity],
+  })
+  async findAllPoaActivities(): Promise<PoaActivityEntity[]> {
+    return this.catalogsService.findAllPoaActivities();
   }
 }

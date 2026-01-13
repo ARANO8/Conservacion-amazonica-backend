@@ -46,10 +46,33 @@ export class CatalogsService {
     });
 
     return users.map((user) => ({
-      id: user.id.toString(), // User ID is Int in schema, but UserCatalogEntity expects string/UUID-like. Wait, schema says User.id is Int.
+      id: user.id, // User ID is now String in schema
       name: user.fullName,
       position: user.position,
       area: user.area,
     }));
+  }
+
+  async findAllPoaActivities() {
+    return this.prisma.poaActivity.findMany({
+      select: {
+        id: true,
+        code: true,
+        og: true,
+        oe: true,
+        op: true,
+        ac: true,
+        project: true,
+        group: true,
+        poaBudgetLine: true,
+        activityCode: true,
+        description: true,
+        unitCost: true,
+        totalCost: true,
+      },
+      orderBy: {
+        code: 'asc',
+      },
+    });
   }
 }

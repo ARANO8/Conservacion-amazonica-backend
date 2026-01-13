@@ -11,7 +11,7 @@ import { RequestUser } from './interfaces/request-user.interface';
 export class RequestsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: number, createRequestDto: CreateRequestDto) {
+  async create(userId: string, createRequestDto: CreateRequestDto) {
     const { items, viaticos, ...requestData } = createRequestDto;
 
     // Calculate total amount in backend as per requirement
@@ -31,6 +31,9 @@ export class RequestsService {
           code,
           totalAmount,
           requesterId: userId,
+          poaActivityId: createRequestDto.poaActivityId,
+          refById: createRequestDto.refById,
+          disbursementToId: createRequestDto.disbursementToId,
           status: RequestStatus.DRAFT,
           items: {
             create: items.map((item: CreateRequestItemDto) => ({

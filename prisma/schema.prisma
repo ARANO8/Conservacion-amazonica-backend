@@ -1,6 +1,3 @@
-// --------------------------------------------------------
-// CONFIGURACIÓN E INFRAESTRUCTURA
-// --------------------------------------------------------
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,279 +7,245 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// --------------------------------------------------------
-// ENUMS (Listas Desplegables del Sistema)
-// --------------------------------------------------------
-
-// Jerarquía del POA (Basado en FORM-4)
-enum ActivityType {
-  OG // Objetivo de Gestión (Nivel 1)
-  OE // Objetivo Específico (Nivel 2)
-  OP // Operación (Nivel 3)
-  AC // Actividad (Nivel 4 - Aquí está el dinero)
-}
-
-// Estado del Flujo de Solicitud (Workflow)
-enum RequestStatus {
-  DRAFT // Borrador
-  REVIEW_SUPERVISOR // En revisión por Jefe Inmediato
-  REVIEW_DIRECTOR // En revisión por Director de Área
-  REVIEW_FINANCE // En revisión por Contabilidad (Fondos)
-  APPROVED // Aprobado para Desembolso
-  REJECTED // Rechazado (Ver motivo)
-  DISBURSED // Dinero entregado (En ejecución)
-  COMPLETED // Rendición finalizada y cerrada
-}
-
-// Tipos de Gasto para Impuestos (Basado en REND. FONDOS BS)
-enum ExpenseType {
-  INVOICE // Con Factura (Sin retención)
-  RETENTION_GOODS // Bienes (IUE 5% + IT 3%)
-  RETENTION_SERVICES // Servicios (IUE 12.5% + IT 3%)
-  NO_DEDUCTIBLE // Gasto sin factura asumido por empleado
-}
-
-enum Currency {
-  BS
-  USD
-}
-
-// --------------------------------------------------------
-// MÓDULO 1: RECURSOS HUMANOS Y ACCESO (Source: REC HUM.xlsx)
-// --------------------------------------------------------
-
 model Role {
   id    Int    @id @default(autoincrement())
-  name  String @unique // Ej: "ADMIN", "SOLICITANTE", "APROBADOR_FINANCIERO"
+  name  String @unique
   users User[]
 }
 
 model User {
-  id       Int     @id @default(autoincrement())
-  email    String  @unique
-  password String // Hash
-  fullName String
-  position String? // Cargo (Ej: "ESPECIALISTA EN SIG")
-  area     String? // Componente (Ej: "CIENCIA Y TECNOLOGÍA")
-
-  isActive Boolean @default(true)
-
-  // Jerarquía de Aprobación (Self-Relation)
-  supervisorId Int?
-  supervisor   User?  @relation("Hierarchy", fields: [supervisorId], references: [id])
-  subordinates User[] @relation("Hierarchy")
-
-  roleId Int
-  role   Role @relation(fields: [roleId], references: [id])
-
-  // Relaciones con el sistema
-  requests         Request[]        @relation("Requester")
+  id               String           @id @default(uuid())
+  email            String           @unique
+  password         String
+  fullName         String
+  position         String?
+  area             String?
+  isActive         Boolean          @default(true)
+  supervisorId     String?
+  roleId           Int
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
   approvedRequests Request[]        @relation("Approver")
-  approvals        RequestHistory[] // Solicitudes que aprobé (Historical audit)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  requests         Request[]        @relation("Requester")
+  refRequests          Request[]        @relation("RefUser")
+  disbursementRequests Request[]        @relation("DisbursementUser")
+  approvals        RequestHistory[]
+  role             Role             @relation(fields: [roleId], references: [id])
+  supervisor       User?            @relation("Hierarchy", fields: [supervisorId], references: [id])
+  subordinates     User[]           @relation("Hierarchy")
 }
 
-// --------------------------------------------------------
-// MÓDULO 2: PLANIFICACIÓN (POA) (Source: FORM-4 & FORM-6)
-// --------------------------------------------------------
-
-// Fuente de Financiamiento (Ej: RAINFOREST, BID, SUECIA)
 model FinancingSource {
-  id   String @id @default(uuid())
-  code String @unique // Ej: "BID-PV"
-  name String // Ej: "Banco Interamericano de Desarrollo"
-
+  id           String        @id @default(uuid())
+  code         String        @unique
+  name         String
   budgets      Budget[]
   requestItems RequestItem[]
 }
 
-// Partida Presupuestaria (Ej: 39500 - ÚTILES DE ESCRITORIO)
 model BudgetLine {
-  id       String  @id @default(uuid())
-  code     String  @unique // Ej: "39500"
-  name     String
-  category String? // Ej: "MATERIALES Y SUMINISTROS"
-
+  id           String        @id @default(uuid())
+  code         String        @unique
+  name         String
+  category     String?
   budgets      Budget[]
   requestItems RequestItem[]
 }
 
-// La Estructura del Árbol (OG -> OE -> OP -> AC)
 model Activity {
-  id   String       @id @default(uuid())
-  code String // Ej: "1.1.1.1" o "1111"
-  name String       @db.Text // Descripción larga del Excel
-  type ActivityType
-
-  // Relación recursiva (Padre e Hijos)
-  parentId String?
-  parent   Activity?  @relation("ActivityHierarchy", fields: [parentId], references: [id])
-  children Activity[] @relation("ActivityHierarchy")
-
-  // Solo las actividades nivel AC tienen presupuesto
-  budgets Budget[]
-  // requests    Request[] // Removed direct relation for now as per new spec focusing on simple requests first
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id        String       @id @default(uuid())
+  code      String
+  name      String
+  type      ActivityType
+  parentId  String?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  parent    Activity?    @relation("ActivityHierarchy", fields: [parentId], references: [id])
+  children  Activity[]   @relation("ActivityHierarchy")
+  budgets   Budget[]
 }
 
-// La "Bolsa de Dinero" (Cruce: Actividad + Fuente + Partida)
-model Budget {
-  id String @id @default(uuid())
-
-  amountAssigned    Decimal @db.Decimal(15, 2) // Presupuesto Inicial (FORM-6)
-  amountExecuted    Decimal @default(0) @db.Decimal(15, 2) // Lo gastado real
-  amountCompromised Decimal @default(0) @db.Decimal(15, 2) // Lo solicitado pero no rendido
-
+model PoaActivity {
+  id            String   @id @default(uuid())
+  code          String   // El "Código Control"
+  
+  // Jerarquía Estratégica
+  og            String?
+  oe            String?
+  op            String?
+  ac            String?
+  
+  // Clasificación
+  project       String   // Nombre del Proyecto (ej: "RAINFOREST")
+  group         String?  // Grupo de Gasto
+  poaBudgetLine String?  // La Partida del POA
+  
+  // Detalle
+  activityCode  String?  // Código interno de sistema
+  description   String   @db.Text
+  
+  // Financiero
+  unitCost      Float?
+  totalCost     Float?
+  
   // Relaciones
-  activityId String
-  activity   Activity @relation(fields: [activityId], references: [id])
-
-  sourceId        String
-  financingSource FinancingSource @relation(fields: [sourceId], references: [id])
-
-  budgetLineId String
-  budgetLine   BudgetLine @relation(fields: [budgetLineId], references: [id])
-
-  @@unique([activityId, sourceId, budgetLineId]) // Evita duplicados
+  requests      Request[]
+  
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
-// --------------------------------------------------------
-// MÓDULO 3: EJECUCIÓN (Source: Solicitud de Fondos)
-// --------------------------------------------------------
+model Budget {
+  id                String          @id @default(uuid())
+  amountAssigned    Decimal         @db.Decimal(15, 2)
+  amountExecuted    Decimal         @default(0) @db.Decimal(15, 2)
+  amountCompromised Decimal         @default(0) @db.Decimal(15, 2)
+  activityId        String
+  sourceId          String
+  budgetLineId      String
+  activity          Activity        @relation(fields: [activityId], references: [id])
+  budgetLine        BudgetLine      @relation(fields: [budgetLineId], references: [id])
+  financingSource   FinancingSource @relation(fields: [sourceId], references: [id])
+
+  @@unique([activityId, sourceId, budgetLineId])
+}
 
 model Request {
-  id           String        @id @default(uuid())
-  code         String        @unique // Ej: "SOL-001"
-  poaCode      String? // Código Actividad POA
-  title        String
-  description  String        @db.Text
-  place        String? // Lugar del viaje
-  startDate    DateTime? // Inicio viaje
-  endDate      DateTime? // Fin viaje
-  receiverName String? // A (Destinatario)
-  totalAmount  Decimal       @db.Decimal(15, 2)
-  status       RequestStatus @default(DRAFT)
-
-  // Relaciones
-  requesterId Int
-  requester   User @relation("Requester", fields: [requesterId], references: [id])
-
-  approverId Int?
-  approver   User? @relation("Approver", fields: [approverId], references: [id])
-
+  id             String           @id @default(uuid())
+  code           String           @unique
+  status         RequestStatus    @default(DRAFT)
+  totalAmount    Decimal          @db.Decimal(15, 2)
+  requesterId    String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  approverId     String?
+  description    String
+  title          String
+  endDate        DateTime?
+  place          String?
+  poaCode        String?
+  receiverName   String?
+  startDate      DateTime?
+  poaActivityId  String?
+  refById        String?
+  disbursementToId String?
+  
+  poaActivity    PoaActivity?     @relation(fields: [poaActivityId], references: [id])
+  refBy          User?            @relation("RefUser", fields: [refById], references: [id])
+  disbursementTo User?            @relation("DisbursementUser", fields: [disbursementToId], references: [id])
+  
+  quotes         Quote[]
+  rendition      Rendition?
+  approver       User?            @relation("Approver", fields: [approverId], references: [id])
+  requester      User             @relation("Requester", fields: [requesterId], references: [id])
+  history        RequestHistory[]
   items          RequestItem[]
   travelExpenses TravelExpense[]
-
-  // Legacy/Optional for now
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Keeping these for history/audit but making them optional or implicit
-  history   RequestHistory[]
-  rendition Rendition?
-  quotes    Quote[]
 }
 
-// Detalle de la Solicitud (Filas del formulario)
 model RequestItem {
-  id             String  @id @default(uuid())
-  description    String
-  quantity       Int     @default(1)
-  unitCost       Decimal @default(0) @db.Decimal(15, 2)
-  totalAmount    Decimal @default(0) @db.Decimal(15, 2)
-  detail         String? // Glosa/Detalle
-  documentNumber String? // Nro Doc
-
-  requestId String
-  request   Request @relation(fields: [requestId], references: [id])
-
-  budgetLineId String
-  budgetLine   BudgetLine @relation(fields: [budgetLineId], references: [id])
-
+  id                String          @id @default(uuid())
+  description       String
+  requestId         String
+  budgetLineId      String
   financingSourceId String
+  detail            String?
+  documentNumber    String?
+  quantity          Int             @default(1)
+  totalAmount       Decimal         @default(0) @db.Decimal(15, 2)
+  unitCost          Decimal         @default(0) @db.Decimal(15, 2)
+  budgetLine        BudgetLine      @relation(fields: [budgetLineId], references: [id])
   financingSource   FinancingSource @relation(fields: [financingSourceId], references: [id])
+  request           Request         @relation(fields: [requestId], references: [id])
 }
 
 model TravelExpense {
   id            String  @id @default(uuid())
-  concept       String // Concepto Viático
-  city          String? // Ciudad
-  destination   String? // Destino
-  transportType String? // Tipo (Aéreo/Terrestre)
-  days          Int? // Días
-  peopleCount   Int? // Cantidad Personas
-
-  requestId String
-  request   Request @relation(fields: [requestId], references: [id])
+  concept       String
+  city          String?
+  destination   String?
+  transportType String?
+  days          Int?
+  peopleCount   Int?
+  requestId     String
+  request       Request @relation(fields: [requestId], references: [id])
 }
 
-// Cotizaciones (Regla de las 3 cotizaciones)
 model Quote {
   id           String  @id @default(uuid())
   supplierName String
   amount       Decimal @db.Decimal(15, 2)
   isSelected   Boolean @default(false)
-  fileUrl      String? // PDF de la cotización
-
-  requestId String
-  request   Request @relation(fields: [requestId], references: [id])
+  fileUrl      String?
+  requestId    String
+  request      Request @relation(fields: [requestId], references: [id])
 }
 
-// Historial de Aprobaciones (Auditoría)
 model RequestHistory {
   id          String        @id @default(uuid())
-  status      RequestStatus // El estado al que cambió
-  observation String?       @db.Text
+  status      RequestStatus
+  observation String?
   date        DateTime      @default(now())
-
-  requestId String
-  request   Request @relation(fields: [requestId], references: [id])
-
-  actorId Int
-  actor   User @relation(fields: [actorId], references: [id])
+  requestId   String
+  actorId     String
+  actor       User          @relation(fields: [actorId], references: [id])
+  request     Request       @relation(fields: [requestId], references: [id])
 }
 
-// --------------------------------------------------------
-// MÓDULO 4: RENDICIÓN E IMPUESTOS (Source: REND. FONDOS BS)
-// --------------------------------------------------------
-
 model Rendition {
-  id            String   @id @default(uuid())
-  code          String   @unique // Código interno de rendición
-  renditionDate DateTime @default(now())
-
-  totalExpenses Decimal @db.Decimal(15, 2)
-  balance       Decimal @db.Decimal(15, 2) // Saldo (A favor o en contra)
-
-  requestId String  @unique
-  request   Request @relation(fields: [requestId], references: [id])
-
-  expenses Expense[]
+  id            String    @id @default(uuid())
+  code          String    @unique
+  renditionDate DateTime  @default(now())
+  totalExpenses Decimal   @db.Decimal(15, 2)
+  balance       Decimal   @db.Decimal(15, 2)
+  requestId     String    @unique
+  expenses      Expense[]
+  request       Request   @relation(fields: [requestId], references: [id])
 }
 
 model Expense {
-  id            String   @id @default(uuid())
+  id            String      @id @default(uuid())
   date          DateTime
-  invoiceNumber String? // Nro Factura
+  invoiceNumber String?
   description   String
-  amount        Decimal  @db.Decimal(15, 2)
+  amount        Decimal     @db.Decimal(15, 2)
+  type          ExpenseType @default(INVOICE)
+  taxRcIva      Decimal     @default(0) @db.Decimal(10, 2)
+  taxIue        Decimal     @default(0) @db.Decimal(10, 2)
+  taxIt         Decimal     @default(0) @db.Decimal(10, 2)
+  totalDeclared Decimal     @db.Decimal(15, 2)
+  renditionId   String
+  receiptUrl    String?
+  rendition     Rendition   @relation(fields: [renditionId], references: [id])
+}
 
-  type ExpenseType @default(INVOICE)
+enum ActivityType {
+  OG
+  OE
+  OP
+  AC
+}
 
-  // Campos calculados automáticamente (Del Excel RENDICIÓN)
-  taxRcIva Decimal @default(0) @db.Decimal(10, 2)
-  taxIue   Decimal @default(0) @db.Decimal(10, 2)
-  taxIt    Decimal @default(0) @db.Decimal(10, 2)
+enum RequestStatus {
+  DRAFT
+  REVIEW_SUPERVISOR
+  REVIEW_DIRECTOR
+  REVIEW_FINANCE
+  APPROVED
+  REJECTED
+  DISBURSED
+  COMPLETED
+}
 
-  totalDeclared Decimal @db.Decimal(15, 2) // Monto total con impuestos
+enum ExpenseType {
+  INVOICE
+  RETENTION_GOODS
+  RETENTION_SERVICES
+  NO_DEDUCTIBLE
+}
 
-  renditionId String
-  rendition   Rendition @relation(fields: [renditionId], references: [id])
-
-  // Archivo de respaldo (Foto factura)
-  receiptUrl String?
+enum Currency {
+  BS
+  USD
 }

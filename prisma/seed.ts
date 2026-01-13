@@ -35,6 +35,30 @@ interface EmployeeRow {
   COMPONENTE: string;
 }
 
+interface PoaActivityRow {
+  code: string;
+  project: string;
+  og?: string | null;
+  oe?: string | null;
+  op?: string | null;
+  ac?: string | null;
+  group?: string | null;
+  poaBudgetLine?: string | null;
+  activityCode?: string | null;
+  description: string;
+  unitCost?: number | null;
+  totalCost?: number | null;
+}
+
+// Helper to parse numbers like "50.000,00" or "52.403,71"
+function parseSpanishNumber(val: string): number | null {
+  if (!val || val.trim() === '') return null;
+  // Remove thousand separator (.) and replace decimal separator (,) with (.)
+  const cleaned = val.replace(/\./g, '').replace(',', '.').trim();
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+}
+
 // --- Ayudantes (Helpers) ---
 function loadCsv<T>(fileName: string): T[] {
   const filePath = path.join(DATA_PATH, fileName);
@@ -49,6 +73,36 @@ function loadCsv<T>(fileName: string): T[] {
     trim: true,
     bom: true, // Importante para manejar caracteres raros al inicio
   });
+}
+
+function loadPoaCsv(fileName: string): PoaActivityRow[] {
+  const filePath = path.join(DATA_PATH, fileName);
+  if (!fs.existsSync(filePath)) {
+    console.warn(`⚠️ Archivo no encontrado: ${filePath}`);
+    return [];
+  }
+  const fileContent = fs.readFileSync(filePath, 'utf-8');
+  // Formulario 6 skip headers until line 10, data starts at line 11
+  const records = parse(fileContent, {
+    from_line: 11,
+    skip_empty_lines: true,
+    trim: true,
+  });
+
+  return records.map((record: string[]) => ({
+    og: record[0]?.trim() || null,
+    oe: record[1]?.trim() || null,
+    op: record[2]?.trim() || null,
+    ac: record[3]?.trim() || null,
+    code: record[4]?.trim(),
+    project: record[5]?.trim(),
+    group: record[6]?.trim() || null,
+    poaBudgetLine: record[7]?.trim() || null,
+    activityCode: record[8]?.trim() || null,
+    description: record[9]?.trim(),
+    unitCost: parseSpanishNumber(record[11]),
+    totalCost: parseSpanishNumber(record[12]),
+  }));
 }
 
 function generateEmail(fullName: string): string {
@@ -133,8 +187,39 @@ async function main() {
     });
   }
 
+  // Cargando Estructura POA (Tabla Maestra)
+  console.log('🌳 Cargando Estructura POA...');
+  const poaRecords = loadPoaCsv('Formulario 6.csv');
+
+  // Limpiamos la tabla maestra para evitar duplicados en re-seed ya que no hay clave única natural
+  await prisma.poaActivity.deleteMany();
+
+  // Insertamos todos los registros como espejo del CSV
+  const poaData = poaRecords
+    .filter((row) => row.code && row.project) // Robustness filter
+    .map((row) => ({
+      og: row.og,
+      oe: row.oe,
+      op: row.op,
+      ac: row.ac,
+      code: row.code,
+      project: row.project,
+      group: row.group,
+      poaBudgetLine: row.poaBudgetLine,
+      activityCode: row.activityCode,
+      description: row.description,
+      unitCost: row.unitCost,
+      totalCost: row.totalCost,
+    }));
+
+  await prisma.poaActivity.createMany({
+    data: poaData,
+  });
+
+  console.log(`✅ ${poaData.length} registros POA procesados.`);
+
   // =================================================================
-  // 3. ROLES (Aseguramos que existan)
+  // 4. ROLES (Aseguramos que existan)
   // =================================================================
   console.log('🛡️  Verificando Roles...');
 

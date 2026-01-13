@@ -20,7 +20,7 @@ import { Request as ExpressRequest } from 'express';
 
 interface RequestWithUser extends ExpressRequest {
   user: {
-    userId: number;
+    userId: string;
     email: string;
     role: string;
   };
