@@ -72,8 +72,6 @@ export class RequestsService {
   async findAll(user: RequestUser) {
     const { role, userId } = user;
 
-    // Check if user is Admin or Approver
-    // Adjust role names based on your Role seed/enum
     const isAdminOrApprover = [
       'ADMIN',
       'APROBADOR',
@@ -82,7 +80,7 @@ export class RequestsService {
 
     const whereClause = isAdminOrApprover ? {} : { requesterId: userId };
 
-    return this.prisma.request.findMany({
+    const requests = await this.prisma.request.findMany({
       where: whereClause,
       include: {
         requester: {
@@ -93,16 +91,18 @@ export class RequestsService {
             position: true,
           },
         },
-        items: {
-          include: {
-            budgetLine: true,
-            financingSource: true,
-          },
-        },
+        items: true,
         travelExpenses: true,
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return requests.map((req) => ({
+      ...req,
+      user: {
+        name: req.requester.fullName,
+      },
+    }));
   }
 
   async findOne(id: string) {
