@@ -7,245 +7,278 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Role {
-  id    Int    @id @default(autoincrement())
-  name  String @unique
-  users User[]
+// --- ENUMS ---
+
+enum Rol {
+  ADMIN
+  TESORERO
+  USUARIO
 }
+
+enum EstadoSolicitud {
+  EN_SOLICITUD
+  DESEMBOLSADO
+  EJECUTADO
+  RECHAZADO
+}
+
+enum EstadoPoa {
+  ACTIVO
+  BLOQUEADO
+}
+
+enum AccionHistorial {
+  APROBADO
+  RECHAZADO
+  DERIVADO
+}
+
+enum TipoDestino {
+  INSTITUCIONAL
+  TERCEROS
+}
+
+enum TipoDocumento {
+  FACTURA
+  RECIBO
+}
+
+// --- MODELOS ---
 
 model User {
-  id               String           @id @default(uuid())
-  email            String           @unique
-  password         String
-  fullName         String
-  position         String?
-  area             String?
-  isActive         Boolean          @default(true)
-  supervisorId     String?
-  roleId           Int
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  approvedRequests Request[]        @relation("Approver")
-  requests         Request[]        @relation("Requester")
-  refRequests          Request[]        @relation("RefUser")
-  disbursementRequests Request[]        @relation("DisbursementUser")
-  approvals        RequestHistory[]
-  role             Role             @relation(fields: [roleId], references: [id])
-  supervisor       User?            @relation("Hierarchy", fields: [supervisorId], references: [id])
-  subordinates     User[]           @relation("Hierarchy")
+  id             Int      @id @default(autoincrement())
+  email          String   @unique
+  password       String
+  nombreCompleto String
+  rol            Rol      @default(USUARIO)
+  cargo          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  solicitudesEmitidas     Solicitud[]           @relation("Emisor")
+  solicitudesAprobadas    Solicitud[]           @relation("Aprobador")
+  solicitudesBeneficiadas Solicitud[]           @relation("Beneficiario")
+  historialAprobaciones   HistorialAprobacion[]
+  notificaciones          Notificacion[]
 }
 
-model FinancingSource {
-  id           String        @id @default(uuid())
-  code         String        @unique
-  name         String
-  budgets      Budget[]
-  requestItems RequestItem[]
+model Proyecto {
+  id     Int    @id @default(autoincrement())
+  nombre String
+
+  estructuras EstructuraProgramatica[]
 }
 
-model BudgetLine {
-  id           String        @id @default(uuid())
-  code         String        @unique
-  name         String
-  category     String?
-  budgets      Budget[]
-  requestItems RequestItem[]
+model Grupo {
+  id     Int    @id @default(autoincrement())
+  nombre String
+
+  estructuras EstructuraProgramatica[]
+  gastos      Gasto[]
 }
 
-model Activity {
-  id        String       @id @default(uuid())
-  code      String
-  name      String
-  type      ActivityType
-  parentId  String?
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  parent    Activity?    @relation("ActivityHierarchy", fields: [parentId], references: [id])
-  children  Activity[]   @relation("ActivityHierarchy")
-  budgets   Budget[]
+model Partida {
+  id     Int    @id @default(autoincrement())
+  nombre String
+
+  estructuras EstructuraProgramatica[]
+  gastos      Gasto[]
 }
 
-model PoaActivity {
-  id            String   @id @default(uuid())
-  code          String   // El "Código Control"
-  
-  // Jerarquía Estratégica
-  og            String?
-  oe            String?
-  op            String?
-  ac            String?
-  
-  // Clasificación
-  project       String   // Nombre del Proyecto (ej: "RAINFOREST")
-  group         String?  // Grupo de Gasto
-  poaBudgetLine String?  // La Partida del POA
-  
-  // Detalle
-  activityCode  String?  // Código interno de sistema
-  description   String   @db.Text
-  
-  // Financiero
-  unitCost      Float?
-  totalCost     Float?
-  
-  // Relaciones
-  requests      Request[]
-  
-  // Timestamps
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+model CodigoPresupuestario {
+  id             Int    @id @default(autoincrement())
+  codigoCompleto String
+
+  poas Poa[]
 }
 
-model Budget {
-  id                String          @id @default(uuid())
-  amountAssigned    Decimal         @db.Decimal(15, 2)
-  amountExecuted    Decimal         @default(0) @db.Decimal(15, 2)
-  amountCompromised Decimal         @default(0) @db.Decimal(15, 2)
-  activityId        String
-  sourceId          String
-  budgetLineId      String
-  activity          Activity        @relation(fields: [activityId], references: [id])
-  budgetLine        BudgetLine      @relation(fields: [budgetLineId], references: [id])
-  financingSource   FinancingSource @relation(fields: [sourceId], references: [id])
+model Actividad {
+  id                 Int    @id @default(autoincrement())
+  detalleDescripcion String
 
-  @@unique([activityId, sourceId, budgetLineId])
+  poas Poa[]
 }
 
-model Request {
-  id             String           @id @default(uuid())
-  code           String           @unique
-  status         RequestStatus    @default(DRAFT)
-  totalAmount    Decimal          @db.Decimal(15, 2)
-  requesterId    String
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  approverId     String?
-  description    String
-  title          String
-  endDate        DateTime?
-  place          String?
-  poaCode        String?
-  receiverName   String?
-  startDate      DateTime?
-  poaActivityId  String?
-  refById        String?
-  disbursementToId String?
-  
-  poaActivity    PoaActivity?     @relation(fields: [poaActivityId], references: [id])
-  refBy          User?            @relation("RefUser", fields: [refById], references: [id])
-  disbursementTo User?            @relation("DisbursementUser", fields: [disbursementToId], references: [id])
-  
-  quotes         Quote[]
-  rendition      Rendition?
-  approver       User?            @relation("Approver", fields: [approverId], references: [id])
-  requester      User             @relation("Requester", fields: [requesterId], references: [id])
-  history        RequestHistory[]
-  items          RequestItem[]
-  travelExpenses TravelExpense[]
+model EstructuraProgramatica {
+  id         Int      @id @default(autoincrement())
+  proyectoId Int
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id])
+  grupoId    Int
+  grupo      Grupo    @relation(fields: [grupoId], references: [id])
+  partidaId  Int
+  partida    Partida  @relation(fields: [partidaId], references: [id])
+
+  poas Poa[]
+
+  @@unique([proyectoId, grupoId, partidaId])
 }
 
-model RequestItem {
-  id                String          @id @default(uuid())
-  description       String
-  requestId         String
-  budgetLineId      String
-  financingSourceId String
-  detail            String?
-  documentNumber    String?
-  quantity          Int             @default(1)
-  totalAmount       Decimal         @default(0) @db.Decimal(15, 2)
-  unitCost          Decimal         @default(0) @db.Decimal(15, 2)
-  budgetLine        BudgetLine      @relation(fields: [budgetLineId], references: [id])
-  financingSource   FinancingSource @relation(fields: [financingSourceId], references: [id])
-  request           Request         @relation(fields: [requestId], references: [id])
+model Poa {
+  id                   Int       @id @default(autoincrement())
+  codigoPoaConcatenado String
+  montoInicial         Decimal   @db.Decimal(10, 2)
+  montoActual          Decimal   @db.Decimal(10, 2)
+  estado               EstadoPoa @default(ACTIVO)
+
+  estructuraId Int
+  estructura   EstructuraProgramatica @relation(fields: [estructuraId], references: [id])
+
+  codigoPresupuestarioId Int
+  codigoPresupuestario   CodigoPresupuestario @relation(fields: [codigoPresupuestarioId], references: [id])
+
+  actividadId Int
+  actividad   Actividad @relation(fields: [actividadId], references: [id])
+
+  solicitudes Solicitud[]
 }
 
-model TravelExpense {
-  id            String  @id @default(uuid())
-  concept       String
-  city          String?
-  destination   String?
-  transportType String?
-  days          Int?
-  peopleCount   Int?
-  requestId     String
-  request       Request @relation(fields: [requestId], references: [id])
+model Solicitud {
+  id                Int             @id @default(autoincrement())
+  descripcion       String?
+  fechaSolicitud    DateTime        @default(now())
+  motivoViaje       String?
+  lugarViaje        String?
+  fechaInicioEvento DateTime?
+  fechaFinEvento    DateTime?
+  codigoDesembolso  String?
+  montoTotal        Decimal         @db.Decimal(10, 2)
+  liquidoPagable    Decimal         @db.Decimal(10, 2)
+  estado            EstadoSolicitud @default(EN_SOLICITUD)
+
+  usuarioEmisorId Int
+  usuarioEmisor   User @relation("Emisor", fields: [usuarioEmisorId], references: [id])
+
+  usuarioAprobadorId Int?
+  usuarioAprobador   User? @relation("Aprobador", fields: [usuarioAprobadorId], references: [id])
+
+  usuarioBeneficiadoId Int?
+  usuarioBeneficiado   User? @relation("Beneficiario", fields: [usuarioBeneficiadoId], references: [id])
+
+  poaId Int?
+  poa   Poa? @relation(fields: [poaId], references: [id])
+
+  planificacionId Int?
+  planificacion   Planificacion? @relation(fields: [planificacionId], references: [id])
+
+  historialAprobaciones HistorialAprobacion[]
+  notificaciones        Notificacion[]
+  rendicion             Rendicion?
+  viaticos              Viatico[]
+  gastos                Gasto[]
+  personasExternas      PersonaExterna[]
 }
 
-model Quote {
-  id           String  @id @default(uuid())
-  supplierName String
-  amount       Decimal @db.Decimal(15, 2)
-  isSelected   Boolean @default(false)
-  fileUrl      String?
-  requestId    String
-  request      Request @relation(fields: [requestId], references: [id])
+model HistorialAprobacion {
+  id          Int             @id @default(autoincrement())
+  accion      AccionHistorial
+  comentario  String?
+  fechaAccion DateTime        @default(now())
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  usuarioActorId Int
+  usuarioActor   User @relation(fields: [usuarioActorId], references: [id])
 }
 
-model RequestHistory {
-  id          String        @id @default(uuid())
-  status      RequestStatus
-  observation String?
-  date        DateTime      @default(now())
-  requestId   String
-  actorId     String
-  actor       User          @relation(fields: [actorId], references: [id])
-  request     Request       @relation(fields: [requestId], references: [id])
+model Notificacion {
+  id            Int      @id @default(autoincrement())
+  mensaje       String
+  leido         Boolean  @default(false)
+  fechaCreacion DateTime @default(now())
+
+  usuarioId Int
+  usuario   User @relation(fields: [usuarioId], references: [id])
+
+  solicitudId Int?
+  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
 }
 
-model Rendition {
-  id            String    @id @default(uuid())
-  code          String    @unique
-  renditionDate DateTime  @default(now())
-  totalExpenses Decimal   @db.Decimal(15, 2)
-  balance       Decimal   @db.Decimal(15, 2)
-  requestId     String    @unique
-  expenses      Expense[]
-  request       Request   @relation(fields: [requestId], references: [id])
+model Rendicion {
+  id              Int      @id @default(autoincrement())
+  fechaRendicion  DateTime @default(now())
+  montoRespaldado Decimal  @db.Decimal(10, 2)
+  saldoADevolver  Decimal  @db.Decimal(10, 2)
+  observaciones   String?
+
+  solicitudId Int       @unique
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
 }
 
-model Expense {
-  id            String      @id @default(uuid())
-  date          DateTime
-  invoiceNumber String?
-  description   String
-  amount        Decimal     @db.Decimal(15, 2)
-  type          ExpenseType @default(INVOICE)
-  taxRcIva      Decimal     @default(0) @db.Decimal(10, 2)
-  taxIue        Decimal     @default(0) @db.Decimal(10, 2)
-  taxIt         Decimal     @default(0) @db.Decimal(10, 2)
-  totalDeclared Decimal     @db.Decimal(15, 2)
-  renditionId   String
-  receiptUrl    String?
-  rendition     Rendition   @relation(fields: [renditionId], references: [id])
+model Planificacion {
+  id                            Int      @id @default(autoincrement())
+  actividadProgramada           String
+  cantidadPersonasInstitucional Int      @default(0)
+  cantidadPersonasTerceros      Int      @default(0)
+  fechaInicio                   DateTime
+  fechaFin                      DateTime
+  diasCalculados                Int
+
+  solicitudes Solicitud[]
 }
 
-enum ActivityType {
-  OG
-  OE
-  OP
-  AC
+model Concepto {
+  id                  Int       @id @default(autoincrement())
+  nombre              String
+  precioInstitucional Decimal   @db.Decimal(10, 2)
+  precioTerceros      Decimal   @db.Decimal(10, 2)
+  viaticos            Viatico[]
 }
 
-enum RequestStatus {
-  DRAFT
-  REVIEW_SUPERVISOR
-  REVIEW_DIRECTOR
-  REVIEW_FINANCE
-  APPROVED
-  REJECTED
-  DISBURSED
-  COMPLETED
+model Viatico {
+  id             Int         @id @default(autoincrement())
+  tipoDestino    TipoDestino
+  dias           Int
+  costoUnitario  Decimal     @db.Decimal(10, 2)
+  totalBs        Decimal     @db.Decimal(10, 2)
+  iva13          Decimal     @db.Decimal(10, 2)
+  it3            Decimal     @db.Decimal(10, 2)
+  liquidoPagable Decimal     @db.Decimal(10, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  planificacionId Int
+  planificacion   Planificacion @relation(fields: [planificacionId], references: [id])
+
+  conceptoId Int
+  concepto   Concepto @relation(fields: [conceptoId], references: [id])
 }
 
-enum ExpenseType {
-  INVOICE
-  RETENTION_GOODS
-  RETENTION_SERVICES
-  NO_DEDUCTIBLE
+model TipoGasto {
+  id     Int     @id @default(autoincrement())
+  nombre String
+  gastos Gasto[]
 }
 
-enum Currency {
-  BS
-  USD
+model Gasto {
+  id             Int           @id @default(autoincrement())
+  tipoDocumento  TipoDocumento
+  cantidad       Int
+  costoUnitario  Decimal       @db.Decimal(10, 2)
+  totalBs        Decimal       @db.Decimal(10, 2)
+  iva13          Decimal       @db.Decimal(10, 2)
+  it3            Decimal       @db.Decimal(10, 2)
+  iue5           Decimal       @db.Decimal(10, 2)
+  liquidoPagable Decimal       @db.Decimal(10, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  grupoId Int
+  grupo   Grupo @relation(fields: [grupoId], references: [id])
+
+  partidaId Int
+  partida   Partida @relation(fields: [partidaId], references: [id])
+
+  tipoGastoId Int
+  tipoGasto   TipoGasto @relation(fields: [tipoGastoId], references: [id])
+}
+
+model PersonaExterna {
+  id                     Int       @id @default(autoincrement())
+  nombreCompleto         String
+  procedenciaInstitucion String
+  solicitudId            Int
+  solicitud              Solicitud @relation(fields: [solicitudId], references: [id])
 }
