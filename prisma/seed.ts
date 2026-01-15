@@ -35,6 +35,30 @@ interface EmployeeRow {
   COMPONENTE: string;
 }
 
+interface PoaActivityRow {
+  code: string;
+  project: string;
+  og?: string | null;
+  oe?: string | null;
+  op?: string | null;
+  ac?: string | null;
+  group?: string | null;
+  poaBudgetLine?: string | null;
+  activityCode?: string | null;
+  description: string;
+  unitCost?: number | null;
+  totalCost?: number | null;
+}
+
+// Helper to parse numbers like "50.000,00" or "52.403,71"
+function parseSpanishNumber(val: string): number | null {
+  if (!val || val.trim() === '') return null;
+  // Remove thousand separator (.) and replace decimal separator (,) with (.)
+  const cleaned = val.replace(/\./g, '').replace(',', '.').trim();
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? null : num;
+}
+
 // --- Ayudantes (Helpers) ---
 function loadCsv<T>(fileName: string): T[] {
   const filePath = path.join(DATA_PATH, fileName);
@@ -51,21 +75,79 @@ function loadCsv<T>(fileName: string): T[] {
   });
 }
 
-function generateEmail(fullName: string): string {
-  const cleanName = fullName
+function loadPoaCsv(fileName: string): PoaActivityRow[] {
+  const filePath = path.join(DATA_PATH, fileName);
+  if (!fs.existsSync(filePath)) {
+    console.warn(`⚠️ Archivo no encontrado: ${filePath}`);
+    return [];
+  }
+  const fileContent = fs.readFileSync(filePath, 'utf-8');
+  // Formulario 6 skip headers until line 10, data starts at line 11
+  const records = parse(fileContent, {
+    from_line: 11,
+    skip_empty_lines: true,
+    trim: true,
+  });
+
+  return records.map((record: string[]) => ({
+    og: record[0]?.trim() || null,
+    oe: record[1]?.trim() || null,
+    op: record[2]?.trim() || null,
+    ac: record[3]?.trim() || null,
+    code: record[4]?.trim(),
+    project: record[5]?.trim(),
+    group: record[6]?.trim() || null,
+    poaBudgetLine: record[7]?.trim() || null,
+    activityCode: record[8]?.trim() || null,
+    description: record[9]?.trim(),
+    unitCost: parseSpanishNumber(record[11]),
+    totalCost: parseSpanishNumber(record[12]),
+  }));
+}
+
+function generateEmail(fullName: string, usedEmails: Set<string>): string {
+  const normalized = fullName
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/ñ/g, 'n')
+    .replace(/ü/g, 'u')
     .trim();
 
-  const parts = cleanName.split(/\s+/);
-  if (parts.length < 2)
-    return `${cleanName.replace(/\s/g, '.')}@conservacion.org`;
+  const parts = normalized.split(/\s+/);
+  if (parts.length < 1) return 'info@conservacion.gob.bo';
 
   const firstName = parts[0];
-  const lastName = parts[1]; // Primer apellido
-  return `${firstName}.${lastName}@conservacion.org`;
+  let firstSurname = '';
+
+  // Lógica: 2 palabras -> última, 3 o 4 palabras -> penúltima
+  if (parts.length === 2) {
+    firstSurname = parts[1];
+  } else if (parts.length >= 3) {
+    firstSurname = parts[parts.length - 2];
+  } else {
+    firstSurname = parts[0];
+  }
+
+  const baseInitials = firstName[0];
+  let email = `${baseInitials}${firstSurname}@conservacion.gob.bo`;
+
+  // Control de unicidad (si el correo ya existe, intentamos con la segunda letra o un contador)
+  if (usedEmails.has(email)) {
+    if (firstName.length > 1) {
+      email = `${firstName[0]}${firstName[1]}${firstSurname}@conservacion.gob.bo`;
+    }
+
+    let counter = 2;
+    const baseWithTwoLetters = email.split('@')[0];
+    while (usedEmails.has(email)) {
+      email = `${baseWithTwoLetters}${counter}@conservacion.gob.bo`;
+      counter++;
+    }
+  }
+
+  usedEmails.add(email);
+  return email;
 }
 
 async function main() {
@@ -133,8 +215,39 @@ async function main() {
     });
   }
 
+  // Cargando Estructura POA (Tabla Maestra)
+  console.log('🌳 Cargando Estructura POA...');
+  const poaRecords = loadPoaCsv('Formulario 6.csv');
+
+  // Limpiamos la tabla maestra para evitar duplicados en re-seed ya que no hay clave única natural
+  await prisma.poaActivity.deleteMany();
+
+  // Insertamos todos los registros como espejo del CSV
+  const poaData = poaRecords
+    .filter((row) => row.code && row.project) // Robustness filter
+    .map((row) => ({
+      og: row.og,
+      oe: row.oe,
+      op: row.op,
+      ac: row.ac,
+      code: row.code,
+      project: row.project,
+      group: row.group,
+      poaBudgetLine: row.poaBudgetLine,
+      activityCode: row.activityCode,
+      description: row.description,
+      unitCost: row.unitCost,
+      totalCost: row.totalCost,
+    }));
+
+  await prisma.poaActivity.createMany({
+    data: poaData,
+  });
+
+  console.log(`✅ ${poaData.length} registros POA procesados.`);
+
   // =================================================================
-  // 3. ROLES (Aseguramos que existan)
+  // 4. ROLES (Aseguramos que existan)
   // =================================================================
   console.log('🛡️  Verificando Roles...');
 
@@ -175,6 +288,7 @@ async function main() {
   // 4.2 Empleados desde CSV
   // Nota: Usamos 'employees2.csv' porque ese fue el que subiste con datos completos
   const employeeRecords = loadCsv<EmployeeRow>('employees.csv');
+  const usedEmails = new Set<string>(['admin@admin.com']);
 
   for (const row of employeeRecords) {
     const fullName = row.NOMBRE?.trim();
@@ -183,7 +297,7 @@ async function main() {
 
     if (!fullName) continue;
 
-    const email = generateEmail(fullName);
+    const email = generateEmail(fullName, usedEmails);
 
     // Lógica simple de roles basada en el cargo
     const isDirector = position?.toUpperCase().includes('DIRECTOR');

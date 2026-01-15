@@ -147,6 +147,24 @@ export class CreateRequestDto {
   @IsOptional()
   receiverName?: string;
 
+  @ApiProperty({ description: 'ID de Actividad POA', required: false })
+  @IsUUID()
+  @IsString()
+  @IsOptional()
+  poaActivityId?: string;
+
+  @ApiProperty({ description: 'Referencia de (User ID)', required: false })
+  @IsUUID()
+  @IsString()
+  @IsOptional()
+  refById?: string;
+
+  @ApiProperty({ description: 'Desembolsar a (User ID)', required: false })
+  @IsUUID()
+  @IsString()
+  @IsOptional()
+  disbursementToId?: string;
+
   @ApiProperty({ type: [CreateRequestItemDto] })
   @IsArray()
   @ValidateNested({ each: true })

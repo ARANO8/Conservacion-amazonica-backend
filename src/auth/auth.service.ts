@@ -8,7 +8,7 @@ import { User, Role } from '@prisma/client';
 
 // Interfaz para el usuario validado (sin password)
 interface ValidatedUser {
-  id: number;
+  id: string;
   email: string;
   fullName: string;
   role: Role;

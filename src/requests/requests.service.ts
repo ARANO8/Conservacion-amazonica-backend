@@ -11,7 +11,7 @@ import { RequestUser } from './interfaces/request-user.interface';
 export class RequestsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: number, createRequestDto: CreateRequestDto) {
+  async create(userId: string, createRequestDto: CreateRequestDto) {
     const { items, viaticos, ...requestData } = createRequestDto;
 
     // Calculate total amount in backend as per requirement
@@ -31,6 +31,9 @@ export class RequestsService {
           code,
           totalAmount,
           requesterId: userId,
+          poaActivityId: createRequestDto.poaActivityId,
+          refById: createRequestDto.refById,
+          disbursementToId: createRequestDto.disbursementToId,
           status: RequestStatus.DRAFT,
           items: {
             create: items.map((item: CreateRequestItemDto) => ({
@@ -69,8 +72,6 @@ export class RequestsService {
   async findAll(user: RequestUser) {
     const { role, userId } = user;
 
-    // Check if user is Admin or Approver
-    // Adjust role names based on your Role seed/enum
     const isAdminOrApprover = [
       'ADMIN',
       'APROBADOR',
@@ -79,7 +80,7 @@ export class RequestsService {
 
     const whereClause = isAdminOrApprover ? {} : { requesterId: userId };
 
-    return this.prisma.request.findMany({
+    const requests = await this.prisma.request.findMany({
       where: whereClause,
       include: {
         requester: {
@@ -90,16 +91,18 @@ export class RequestsService {
             position: true,
           },
         },
-        items: {
-          include: {
-            budgetLine: true,
-            financingSource: true,
-          },
-        },
+        items: true,
         travelExpenses: true,
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    return requests.map((req) => ({
+      ...req,
+      user: {
+        name: req.requester.fullName,
+      },
+    }));
   }
 
   async findOne(id: string) {

@@ -3,7 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 
 interface JwtPayload {
-  sub: number;
+  sub: string;
   email: string;
   roleName: string;
 }
