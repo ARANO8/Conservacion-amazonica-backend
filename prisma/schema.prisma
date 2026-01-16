@@ -54,6 +54,7 @@ model Usuario {
   cargo          String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
 
   solicitudesEmitidas     Solicitud[] @relation("Emisor")
   solicitudesAprobadas    Solicitud[] @relation("Aprobador")
@@ -65,6 +66,7 @@ model Usuario {
 model Proyecto {
   id     Int    @id @default(autoincrement())
   nombre String
+  deletedAt DateTime?
 
   estructuras EstructuraProgramatica[]
 }
@@ -72,6 +74,7 @@ model Proyecto {
 model Grupo {
   id     Int    @id @default(autoincrement())
   nombre String
+  deletedAt DateTime?
 
   estructuras EstructuraProgramatica[]
   gastos      Gasto[]
@@ -80,6 +83,7 @@ model Grupo {
 model Partida {
   id     Int    @id @default(autoincrement())
   nombre String
+  deletedAt DateTime?
 
   estructuras EstructuraProgramatica[]
   gastos      Gasto[]
@@ -120,6 +124,7 @@ model Poa {
   costoUnitario        Decimal   @db.Decimal(10, 2)
   costoTotal           Decimal   @db.Decimal(10, 2)
   estado               EstadoPoa @default(ACTIVO)
+  deletedAt            DateTime?
 
   estructuraId Int
   estructura   EstructuraProgramatica @relation(fields: [estructuraId], references: [id])
@@ -145,6 +150,7 @@ model Solicitud {
   montoTotal        Decimal         @db.Decimal(10, 2)
   liquidoPagable    Decimal         @db.Decimal(10, 2)
   estado            EstadoSolicitud @default(EN_SOLICITUD)
+  deletedAt         DateTime?
 
   usuarioEmisorId Int
   usuarioEmisor   Usuario @relation("Emisor", fields: [usuarioEmisorId], references: [id])
