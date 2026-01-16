@@ -1,28 +1,35 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { UsuariosService } from '../usuarios/usuarios.service';
 
 interface JwtPayload {
-  sub: string;
+  sub: number;
   email: string;
-  roleName: string;
+  rol: string;
 }
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor() {
+  constructor(private usuariosService: UsuariosService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'secretKey', // TODO: Move to env
+      secretOrKey: process.env.JWT_SECRET || 'secretKey',
     });
   }
 
-  validate(payload: JwtPayload) {
+  async validate(payload: JwtPayload) {
+    const usuario = await this.usuariosService.findOne(payload.sub);
+
+    if (!usuario || usuario.deletedAt) {
+      throw new UnauthorizedException('Usuario no válido o eliminado');
+    }
+
     return {
-      userId: payload.sub,
-      email: payload.email,
-      role: payload.roleName,
+      userId: usuario.id,
+      email: usuario.email,
+      rol: usuario.rol,
     };
   }
 }

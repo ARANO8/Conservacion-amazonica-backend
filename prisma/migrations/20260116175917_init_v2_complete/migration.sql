@@ -26,6 +26,7 @@ CREATE TABLE "Usuario" (
     "cargo" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Usuario_pkey" PRIMARY KEY ("id")
 );
@@ -34,6 +35,7 @@ CREATE TABLE "Usuario" (
 CREATE TABLE "Proyecto" (
     "id" SERIAL NOT NULL,
     "nombre" TEXT NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Proyecto_pkey" PRIMARY KEY ("id")
 );
@@ -42,6 +44,7 @@ CREATE TABLE "Proyecto" (
 CREATE TABLE "Grupo" (
     "id" SERIAL NOT NULL,
     "nombre" TEXT NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Grupo_pkey" PRIMARY KEY ("id")
 );
@@ -50,6 +53,7 @@ CREATE TABLE "Grupo" (
 CREATE TABLE "Partida" (
     "id" SERIAL NOT NULL,
     "nombre" TEXT NOT NULL,
+    "deletedAt" TIMESTAMP(3),
 
     CONSTRAINT "Partida_pkey" PRIMARY KEY ("id")
 );
@@ -88,6 +92,7 @@ CREATE TABLE "Poa" (
     "costoUnitario" DECIMAL(10,2) NOT NULL,
     "costoTotal" DECIMAL(10,2) NOT NULL,
     "estado" "EstadoPoa" NOT NULL DEFAULT 'ACTIVO',
+    "deletedAt" TIMESTAMP(3),
     "estructuraId" INTEGER NOT NULL,
     "codigoPresupuestarioId" INTEGER NOT NULL,
     "actividadId" INTEGER NOT NULL,
@@ -108,6 +113,7 @@ CREATE TABLE "Solicitud" (
     "montoTotal" DECIMAL(10,2) NOT NULL,
     "liquidoPagable" DECIMAL(10,2) NOT NULL,
     "estado" "EstadoSolicitud" NOT NULL DEFAULT 'EN_SOLICITUD',
+    "deletedAt" TIMESTAMP(3),
     "usuarioEmisorId" INTEGER NOT NULL,
     "usuarioAprobadorId" INTEGER,
     "usuarioBeneficiadoId" INTEGER,
