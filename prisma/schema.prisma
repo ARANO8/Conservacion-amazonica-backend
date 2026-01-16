@@ -45,7 +45,7 @@ enum TipoDocumento {
 
 // --- MODELOS ---
 
-model User {
+model Usuario { 
   id             Int      @id @default(autoincrement())
   email          String   @unique
   password       String
@@ -55,9 +55,9 @@ model User {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  solicitudesEmitidas     Solicitud[]           @relation("Emisor")
-  solicitudesAprobadas    Solicitud[]           @relation("Aprobador")
-  solicitudesBeneficiadas Solicitud[]           @relation("Beneficiario")
+  solicitudesEmitidas     Solicitud[] @relation("Emisor")
+  solicitudesAprobadas    Solicitud[] @relation("Aprobador")
+  solicitudesBeneficiadas Solicitud[] @relation("Beneficiario")
   historialAprobaciones   HistorialAprobacion[]
   notificaciones          Notificacion[]
 }
@@ -115,9 +115,10 @@ model EstructuraProgramatica {
 
 model Poa {
   id                   Int       @id @default(autoincrement())
-  codigoPoaConcatenado String
-  montoInicial         Decimal   @db.Decimal(10, 2)
-  montoActual          Decimal   @db.Decimal(10, 2)
+  codigoPoa            String
+  cantidad             Int
+  costoUnitario        Decimal   @db.Decimal(10, 2)
+  costoTotal           Decimal   @db.Decimal(10, 2)
   estado               EstadoPoa @default(ACTIVO)
 
   estructuraId Int
@@ -129,7 +130,7 @@ model Poa {
   actividadId Int
   actividad   Actividad @relation(fields: [actividadId], references: [id])
 
-  solicitudes Solicitud[]
+  solicitud Solicitud?
 }
 
 model Solicitud {
@@ -138,23 +139,23 @@ model Solicitud {
   fechaSolicitud    DateTime        @default(now())
   motivoViaje       String?
   lugarViaje        String?
-  fechaInicioEvento DateTime?
-  fechaFinEvento    DateTime?
+  fechaInicio       DateTime?
+  fechaFin          DateTime?
   codigoDesembolso  String?
   montoTotal        Decimal         @db.Decimal(10, 2)
   liquidoPagable    Decimal         @db.Decimal(10, 2)
   estado            EstadoSolicitud @default(EN_SOLICITUD)
 
   usuarioEmisorId Int
-  usuarioEmisor   User @relation("Emisor", fields: [usuarioEmisorId], references: [id])
+  usuarioEmisor   Usuario @relation("Emisor", fields: [usuarioEmisorId], references: [id])
 
   usuarioAprobadorId Int?
-  usuarioAprobador   User? @relation("Aprobador", fields: [usuarioAprobadorId], references: [id])
+  usuarioAprobador   Usuario? @relation("Aprobador", fields: [usuarioAprobadorId], references: [id])
 
   usuarioBeneficiadoId Int?
-  usuarioBeneficiado   User? @relation("Beneficiario", fields: [usuarioBeneficiadoId], references: [id])
+  usuarioBeneficiado   Usuario? @relation("Beneficiario", fields: [usuarioBeneficiadoId], references: [id])
 
-  poaId Int?
+  poaId Int? @unique
   poa   Poa? @relation(fields: [poaId], references: [id])
 
   planificacionId Int?
@@ -178,7 +179,7 @@ model HistorialAprobacion {
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
 
   usuarioActorId Int
-  usuarioActor   User @relation(fields: [usuarioActorId], references: [id])
+  usuarioActor   Usuario @relation(fields: [usuarioActorId], references: [id])
 }
 
 model Notificacion {
@@ -188,7 +189,7 @@ model Notificacion {
   fechaCreacion DateTime @default(now())
 
   usuarioId Int
-  usuario   User @relation(fields: [usuarioId], references: [id])
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
 
   solicitudId Int?
   solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
@@ -215,6 +216,7 @@ model Planificacion {
   diasCalculados                Int
 
   solicitudes Solicitud[]
+  viaticos    Viatico[]
 }
 
 model Concepto {

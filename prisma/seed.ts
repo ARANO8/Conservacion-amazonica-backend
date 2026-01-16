@@ -1,341 +1,340 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Rol, EstadoPoa } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as bcrypt from 'bcrypt';
-import { parse } from 'csv-parse/sync';
+import * as readline from 'readline';
 
 const prisma = new PrismaClient();
 
-// --- Configuración ---
-const PASSWORD_DEFAULT = '123456';
-// Ajusta esta ruta si tus CSVs están en otro lado (ej: 'prisma/seeds')
-const DATA_PATH = path.join(__dirname, 'seeds');
-
-// --- UUIDs CRÍTICOS PARA EL FRONTEND ---
-// Estos IDs deben ser estáticos para que los Mocks del Frontend coincidan
-const FIXED_UUIDS = {
-  budgetLinePasajes: '550e8400-e29b-41d4-a716-446655440000', // Partida 30000
-  financingSourceRP: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', // Fuente RP
-};
-
-// --- Interfaces de Datos ---
-interface SourceRow {
-  CODIGO: string; // ej: "RP", "BID-PV"
-  NOMBRE?: string; // A veces el CSV no trae nombre, usaremos el código
-}
-
-interface BudgetLineRow {
-  CODIGO: string; // ej: "30000"
-  DETALLE: string; // ej: "Pasajes y Viáticos"
-}
-
-interface EmployeeRow {
-  NOMBRE: string;
-  CARGO: string;
-  COMPONENTE: string;
-}
-
-interface PoaActivityRow {
-  code: string;
-  project: string;
-  og?: string | null;
-  oe?: string | null;
-  op?: string | null;
-  ac?: string | null;
-  group?: string | null;
-  poaBudgetLine?: string | null;
-  activityCode?: string | null;
-  description: string;
-  unitCost?: number | null;
-  totalCost?: number | null;
-}
-
-// Helper to parse numbers like "50.000,00" or "52.403,71"
-function parseSpanishNumber(val: string): number | null {
-  if (!val || val.trim() === '') return null;
-  // Remove thousand separator (.) and replace decimal separator (,) with (.)
-  const cleaned = val.replace(/\./g, '').replace(',', '.').trim();
+/**
+ * Normaliza montos en formato europeo (50.000,00) a decimal estándar (50000.00)
+ */
+function cleanAmount(val: string): number {
+  if (!val) return 0;
+  // Eliminar puntos de miles y cambiar coma decimal por punto
+  const cleaned = val.replace(/\./g, '').replace(',', '.');
   const num = parseFloat(cleaned);
-  return isNaN(num) ? null : num;
+  return isNaN(num) ? 0 : num;
 }
 
-// --- Ayudantes (Helpers) ---
-function loadCsv<T>(fileName: string): T[] {
-  const filePath = path.join(DATA_PATH, fileName);
-  if (!fs.existsSync(filePath)) {
-    console.warn(`⚠️ Archivo no encontrado: ${filePath}`);
-    return [];
-  }
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
-  return parse(fileContent, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true,
-    bom: true, // Importante para manejar caracteres raros al inicio
-  });
-}
-
-function loadPoaCsv(fileName: string): PoaActivityRow[] {
-  const filePath = path.join(DATA_PATH, fileName);
-  if (!fs.existsSync(filePath)) {
-    console.warn(`⚠️ Archivo no encontrado: ${filePath}`);
-    return [];
-  }
-  const fileContent = fs.readFileSync(filePath, 'utf-8');
-  // Formulario 6 skip headers until line 10, data starts at line 11
-  const records = parse(fileContent, {
-    from_line: 11,
-    skip_empty_lines: true,
-    trim: true,
-  });
-
-  return records.map((record: string[]) => ({
-    og: record[0]?.trim() || null,
-    oe: record[1]?.trim() || null,
-    op: record[2]?.trim() || null,
-    ac: record[3]?.trim() || null,
-    code: record[4]?.trim(),
-    project: record[5]?.trim(),
-    group: record[6]?.trim() || null,
-    poaBudgetLine: record[7]?.trim() || null,
-    activityCode: record[8]?.trim() || null,
-    description: record[9]?.trim(),
-    unitCost: parseSpanishNumber(record[11]),
-    totalCost: parseSpanishNumber(record[12]),
-  }));
-}
-
-function generateEmail(fullName: string, usedEmails: Set<string>): string {
-  const normalized = fullName
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/ñ/g, 'n')
-    .replace(/ü/g, 'u')
-    .trim();
-
-  const parts = normalized.split(/\s+/);
-  if (parts.length < 1) return 'info@conservacion.gob.bo';
+/**
+ * Genera el correo corporativo: [PrimeraLetraNombre][PrimerApellido]@conservacion.gob.bo
+ */
+function generateEmail(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2)
+    return `${fullName.toLowerCase().replace(/\s+/g, '')}@conservacion.gob.bo`;
 
   const firstName = parts[0];
-  let firstSurname = '';
-
-  // Lógica: 2 palabras -> última, 3 o 4 palabras -> penúltima
-  if (parts.length === 2) {
-    firstSurname = parts[1];
-  } else if (parts.length >= 3) {
-    firstSurname = parts[parts.length - 2];
-  } else {
-    firstSurname = parts[0];
+  // En Bolivia/Latam: [Nombre1] [Nombre2] [Apellido Paterno] [Apellido Materno]
+  // MARCOS FERNANDO TERÁN VALENZUELA (4 parts) -> TERÁN is parts[2]
+  // MARCOS TERÁN VALENZUELA (3 parts) -> TERÁN is parts[1]
+  // MARCOS TERÁN (2 parts) -> TERÁN is parts[1]
+  let firstSurname = parts[1]; // Default para 2 y 3 partes
+  if (parts.length >= 4) {
+    firstSurname = parts[2]; // Para 4 o más partes, asumimos 2 nombres
   }
 
-  const baseInitials = firstName[0];
-  let email = `${baseInitials}${firstSurname}@conservacion.gob.bo`;
+  const normalize = (str: string) =>
+    str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Quitar tildes
+      .replace(/ñ/g, 'n')
+      .replace(/Ñ/g, 'N')
+      .toLowerCase();
 
-  // Control de unicidad (si el correo ya existe, intentamos con la segunda letra o un contador)
-  if (usedEmails.has(email)) {
-    if (firstName.length > 1) {
-      email = `${firstName[0]}${firstName[1]}${firstSurname}@conservacion.gob.bo`;
-    }
-
-    let counter = 2;
-    const baseWithTwoLetters = email.split('@')[0];
-    while (usedEmails.has(email)) {
-      email = `${baseWithTwoLetters}${counter}@conservacion.gob.bo`;
-      counter++;
-    }
-  }
-
-  usedEmails.add(email);
+  const email = `${normalize(firstName[0])}${normalize(firstSurname)}@conservacion.gob.bo`;
   return email;
 }
 
-async function main() {
-  console.log('🚀 Iniciando sembrado de base de datos (Master Seed)...');
+/**
+ * Parser de CSV robusto para manejar comas dentro de comillas
+ */
+function parseCSVLine(line: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuotes = false;
 
-  // Encriptar password una sola vez
-  const hashedPassword = await bcrypt.hash(PASSWORD_DEFAULT, 10);
-
-  // =================================================================
-  // 1. FUENTES DE FINANCIAMIENTO (Sources)
-  // =================================================================
-  console.log('💰 Cargando Fuentes de Financiamiento...');
-  const sourceRecords = loadCsv<SourceRow>('sources.csv'); // Asegúrate que el archivo se llame así
-
-  for (const row of sourceRecords) {
-    const code = row.CODIGO?.trim();
-    if (!code) continue;
-
-    // Si es "RP", forzamos el UUID mágico
-    const isFixed = code === 'RP' || code === 'RECURSOS PROPIOS';
-    const id = isFixed ? FIXED_UUIDS.financingSourceRP : undefined;
-
-    // Usamos el código o el nombre si existe (algunos CSV solo tienen codigo)
-    const name = row.NOMBRE || code;
-
-    await prisma.financingSource.upsert({
-      where: { code },
-      update: {
-        // No actualizamos ID para evitar choques P2002
-      },
-      create: {
-        id: id,
-        code,
-        name,
-      },
-    });
-  }
-
-  // =================================================================
-  // 2. PARTIDAS PRESUPUESTARIAS (Budget Lines)
-  // =================================================================
-  console.log('📊 Cargando Partidas Presupuestarias...');
-  const budgetRecords = loadCsv<BudgetLineRow>('budget_lines.csv');
-
-  for (const row of budgetRecords) {
-    const code = row.CODIGO?.trim();
-    const name = row.DETALLE?.trim();
-    if (!code || !name) continue;
-
-    // Si es la partida 30000, forzamos el UUID mágico
-    const isFixed = code === '30000';
-    const id = isFixed ? FIXED_UUIDS.budgetLinePasajes : undefined;
-
-    await prisma.budgetLine.upsert({
-      where: { code },
-      update: {
-        // No actualizamos ID para evitar choques P2002
-      },
-      create: {
-        id: id,
-        code,
-        name,
-        category: 'GASTO CORRIENTE', // Valor por defecto útil
-      },
-    });
-  }
-
-  // Cargando Estructura POA (Tabla Maestra)
-  console.log('🌳 Cargando Estructura POA...');
-  const poaRecords = loadPoaCsv('Formulario 6.csv');
-
-  // Limpiamos la tabla maestra para evitar duplicados en re-seed ya que no hay clave única natural
-  await prisma.poaActivity.deleteMany();
-
-  // Insertamos todos los registros como espejo del CSV
-  const poaData = poaRecords
-    .filter((row) => row.code && row.project) // Robustness filter
-    .map((row) => ({
-      og: row.og,
-      oe: row.oe,
-      op: row.op,
-      ac: row.ac,
-      code: row.code,
-      project: row.project,
-      group: row.group,
-      poaBudgetLine: row.poaBudgetLine,
-      activityCode: row.activityCode,
-      description: row.description,
-      unitCost: row.unitCost,
-      totalCost: row.totalCost,
-    }));
-
-  await prisma.poaActivity.createMany({
-    data: poaData,
-  });
-
-  console.log(`✅ ${poaData.length} registros POA procesados.`);
-
-  // =================================================================
-  // 4. ROLES (Aseguramos que existan)
-  // =================================================================
-  console.log('🛡️  Verificando Roles...');
-
-  const adminRole = await prisma.role.upsert({
-    where: { name: 'ADMIN' },
-    update: {},
-    create: { name: 'ADMIN' },
-  });
-
-  const userRole = await prisma.role.upsert({
-    where: { name: 'USER' },
-    update: {},
-    create: { name: 'USER' },
-  });
-
-  // =================================================================
-  // 4. USUARIOS (Admin + Empleados)
-  // =================================================================
-  console.log('👤 Cargando Usuarios...');
-
-  // 4.1 Usuario Super Admin (Para que entres YA)
-  await prisma.user.upsert({
-    where: { email: 'admin@admin.com' },
-    update: {
-      password: hashedPassword,
-      role: { connect: { id: adminRole.id } },
-    },
-    create: {
-      email: 'admin@admin.com',
-      fullName: 'Super Admin',
-      password: hashedPassword,
-      role: { connect: { id: adminRole.id } },
-      position: 'SISTEMAS',
-      area: 'DIRECCION',
-    },
-  });
-
-  // 4.2 Empleados desde CSV
-  // Nota: Usamos 'employees2.csv' porque ese fue el que subiste con datos completos
-  const employeeRecords = loadCsv<EmployeeRow>('employees.csv');
-  const usedEmails = new Set<string>(['admin@admin.com']);
-
-  for (const row of employeeRecords) {
-    const fullName = row.NOMBRE?.trim();
-    const position = row.CARGO?.trim();
-    const area = row.COMPONENTE?.trim();
-
-    if (!fullName) continue;
-
-    const email = generateEmail(fullName, usedEmails);
-
-    // Lógica simple de roles basada en el cargo
-    const isDirector = position?.toUpperCase().includes('DIRECTOR');
-    const roleToConnect = isDirector
-      ? { id: adminRole.id }
-      : { id: userRole.id };
-
-    try {
-      await prisma.user.upsert({
-        where: { email },
-        update: {
-          fullName: fullName,
-          position,
-          area,
-          role: { connect: roleToConnect },
-          password: hashedPassword, // Actualizamos pass por si acaso
-        },
-        create: {
-          email,
-          password: hashedPassword,
-          fullName: fullName,
-          position,
-          area,
-          role: { connect: roleToConnect },
-        },
-      });
-    } catch (error) {
-      console.error(`❌ Error importando ${fullName}:`, error);
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      result.push(current.trim());
+      current = '';
+    } else {
+      current += char;
     }
   }
+  result.push(current.trim());
+  return result.map((v) => v.replace(/^"|"$/g, '')); // Quitar comillas exteriores
+}
 
-  console.log('✅ Seed completado exitosamente.');
+async function processCSV(
+  filename: string,
+  callback: (row: string[]) => Promise<void>,
+) {
+  const filePath = path.join(__dirname, 'seeds', filename);
+  if (!fs.existsSync(filePath)) {
+    console.error(`❌ Archivo no encontrado: ${filename}`);
+    return;
+  }
+
+  const fileStream = fs.createReadStream(filePath, { encoding: 'latin1' }); // Latin1 suele ser mejor para estos CSVs con eñes
+  const rl = readline.createInterface({
+    input: fileStream,
+    crlfDelay: Infinity,
+  });
+
+  for await (const line of rl) {
+    if (line.trim()) {
+      const row = parseCSVLine(line);
+      await callback(row);
+    }
+  }
+}
+
+async function main() {
+  const STICKY_PLACEHOLDER = 'SIN_CLASIFICAR_REQUIERE_REVISION';
+  const passwordHash = '$2b$10$EpRnTzVlqHNP0zQx.ZuxBOs65.k.x.h.x';
+
+  // Mapas para caché en memoria
+  const proyectoMap = new Map<string, number>();
+  const grupoMap = new Map<string, number>();
+  const partidaMap = new Map<string, number>();
+  const actividadMap = new Map<string, number>();
+  const codigoPresupMap = new Map<string, number>();
+  const estructuraMap = new Map<string, number>();
+
+  console.log('🚀 Iniciando Seeding...');
+
+  // 1. Usuarios
+  let userCount = 0;
+  await processCSV('Usuario.csv', async (row) => {
+    const [nombre, cargo, rolStr] = row;
+    const email = generateEmail(nombre);
+    const rol = (Rol[rolStr as keyof typeof Rol] || Rol.USUARIO) as Rol;
+
+    await prisma.usuario.upsert({
+      where: { email },
+      update: { nombreCompleto: nombre, cargo, rol },
+      create: {
+        email,
+        nombreCompleto: nombre,
+        cargo,
+        rol,
+        password: passwordHash,
+      },
+    });
+    userCount++;
+  });
+
+  // 2. Catálogos Maestros (Precarga)
+  await processCSV('Proyecto.csv', async (row) => {
+    const nombre = row[0];
+    const p = await prisma.proyecto.create({ data: { nombre } });
+    proyectoMap.set(nombre, p.id);
+  });
+
+  await processCSV('Grupo.csv', async (row) => {
+    const nombre = row[0];
+    const g = await prisma.grupo.create({ data: { nombre } });
+    grupoMap.set(nombre, g.id);
+  });
+
+  await processCSV('Partida.csv', async (row) => {
+    const nombre = row[0];
+    const p = await prisma.partida.create({ data: { nombre } });
+    partidaMap.set(nombre, p.id);
+  });
+
+  await processCSV('Actividad.csv', async (row) => {
+    const detalle = row[0];
+    const a = await prisma.actividad.create({
+      data: { detalleDescripcion: detalle },
+    });
+    actividadMap.set(detalle, a.id);
+  });
+
+  await processCSV('Codigo_Presupuestario.csv', async (row) => {
+    const codigo = row[0];
+    const c = await prisma.codigoPresupuestario.create({
+      data: { codigoCompleto: codigo },
+    });
+    codigoPresupMap.set(codigo, c.id);
+  });
+
+  await processCSV('Concepto.csv', async (row) => {
+    const [nombre, pInst, pTerc] = row;
+    await prisma.concepto.create({
+      data: {
+        nombre,
+        precioInstitucional: cleanAmount(pInst),
+        precioTerceros: cleanAmount(pTerc),
+      },
+    });
+  });
+
+  // 3. Estructura Programática (Relaciones Ternarias Maestras)
+  await processCSV('ProyectoGrupoPartida.csv', async (row) => {
+    const [proy, grup, part] = row;
+
+    // Auto-Healing para catálogos faltantes en el maestro de relaciones
+    if (!proyectoMap.has(proy)) {
+      const p = await prisma.proyecto.create({ data: { nombre: proy } });
+      proyectoMap.set(proy, p.id);
+    }
+    if (!grupoMap.has(grup)) {
+      const g = await prisma.grupo.create({ data: { nombre: grup } });
+      grupoMap.set(grup, g.id);
+    }
+    if (!partidaMap.has(part)) {
+      const p = await prisma.partida.create({ data: { nombre: part } });
+      partidaMap.set(part, p.id);
+    }
+
+    const pId = proyectoMap.get(proy)!;
+    const gId = grupoMap.get(grup)!;
+    const prId = partidaMap.get(part)!;
+
+    const key = `${proy}|${grup}|${part}`;
+
+    const est = await prisma.estructuraProgramatica.upsert({
+      where: {
+        proyectoId_grupoId_partidaId: {
+          proyectoId: pId,
+          grupoId: gId,
+          partidaId: prId,
+        },
+      },
+      update: {},
+      create: {
+        proyectoId: pId,
+        grupoId: gId,
+        partidaId: prId,
+      },
+    });
+    estructuraMap.set(key, est.id);
+  });
+
+  /**
+   * Asegurar que un registro de catálogo exista (Auto-Healing).
+   */
+  async function ensureCatalog(
+    map: Map<string, number>,
+    name: string | undefined,
+    model: { create: (args: { data: any }) => Promise<{ id: number }> },
+    field: string,
+  ): Promise<number> {
+    const val = name || STICKY_PLACEHOLDER;
+    const cachedId = map.get(val);
+    if (cachedId !== undefined) return cachedId;
+
+    const record = await model.create({
+      data: { [field]: val },
+    });
+
+    map.set(val, record.id);
+    return record.id;
+  }
+
+  // 4. Inserción del POA
+  let poaCount = 0;
+  await processCSV('POA.csv', async (row) => {
+    const [
+      codPoa,
+      proy,
+      grup,
+      part,
+      codPresup,
+      actividadDetalle,
+      cant,
+      costoUnit,
+      costoTotal,
+    ] = row;
+
+    // Asegurar elementos de la estructura
+    const pId = await ensureCatalog(
+      proyectoMap,
+      proy,
+      prisma.proyecto,
+      'nombre',
+    );
+    const gId = await ensureCatalog(grupoMap, grup, prisma.grupo, 'nombre');
+    const prId = await ensureCatalog(
+      partidaMap,
+      part,
+      prisma.partida,
+      'nombre',
+    );
+
+    // Asegurar estructura
+    const key = `${proy || STICKY_PLACEHOLDER}|${grup || STICKY_PLACEHOLDER}|${part || STICKY_PLACEHOLDER}`;
+    let estId: number;
+    if (estructuraMap.has(key)) {
+      estId = estructuraMap.get(key)!;
+    } else {
+      const est = await prisma.estructuraProgramatica.upsert({
+        where: {
+          proyectoId_grupoId_partidaId: {
+            proyectoId: pId,
+            grupoId: gId,
+            partidaId: prId,
+          },
+        },
+        update: {},
+        create: {
+          proyectoId: pId,
+          grupoId: gId,
+          partidaId: prId,
+        },
+      });
+      estId = est.id;
+      estructuraMap.set(key, estId);
+      console.log(
+        `⚠️ Nueva estructura creada dinámicamente: [${proy || '?'}]-[${grup || '?'}]-[${part || '?'}]`,
+      );
+    }
+
+    // Asegurar Actividad y Código Presupuestario
+    const actId = await ensureCatalog(
+      actividadMap,
+      actividadDetalle,
+      prisma.actividad,
+      'detalleDescripcion',
+    );
+    const cpId = await ensureCatalog(
+      codigoPresupMap,
+      codPresup,
+      prisma.codigoPresupuestario,
+      'codigoCompleto',
+    );
+
+    // Crear POA
+    await prisma.poa.create({
+      data: {
+        codigoPoa: codPoa || STICKY_PLACEHOLDER,
+        cantidad: parseInt(cant) || 0,
+        costoUnitario: cleanAmount(costoUnit),
+        costoTotal: cleanAmount(costoTotal),
+        estado: EstadoPoa.ACTIVO,
+        estructuraId: estId,
+        actividadId: actId,
+        codigoPresupuestarioId: cpId,
+      },
+    });
+    poaCount++;
+  });
+
+  console.log(`✅ Seeding completado.`);
+  console.log(`--- Resumen ---`);
+  console.log(`Usuarios: ${userCount}`);
+  console.log(`Estructuras: ${estructuraMap.size}`);
+  console.log(`Filas POA: ${poaCount}`);
 }
 
 main()
   .catch((e) => {
-    console.error('🔴 Error crítico en el seed:');
-    console.error(e);
+    console.error('❌ Error en seeding:', e);
     process.exit(1);
   })
   .finally(async () => {
