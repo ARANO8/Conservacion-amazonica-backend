@@ -290,3 +290,7 @@ model PersonaExterna {
   solicitudId            Int
   solicitud              Solicitud @relation(fields: [solicitudId], references: [id])
 }
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "../ERD.md"
+}

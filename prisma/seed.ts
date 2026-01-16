@@ -95,7 +95,8 @@ async function processCSV(
 
 async function main() {
   const STICKY_PLACEHOLDER = 'SIN_CLASIFICAR_REQUIERE_REVISION';
-  const passwordHash = '$2b$10$EpRnTzVlqHNP0zQx.ZuxBOs65.k.x.h.x';
+  const passwordHash =
+    '$2a$12$wbhVNc2q5wLlKnryn3F8SOjhR2YYregnGlRB.R2VmhNNhnrhMpYBe';
 
   // Mapas para caché en memoria
   const proyectoMap = new Map<string, number>();
