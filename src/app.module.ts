@@ -5,6 +5,12 @@ import { PrismaModule } from './prisma/prisma.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { PoaModule } from './poa/poa.module';
 import { SolicitudesModule } from './solicitudes/solicitudes.module';
+import { ConceptosModule } from './catalogos/conceptos/conceptos.module';
+import { TipoGastosModule } from './catalogos/tipo-gastos/tipo-gastos.module';
+import { GruposModule } from './catalogos/grupos/grupos.module';
+import { PartidasModule } from './catalogos/partidas/partidas.module';
+import { ProyectosModule } from './catalogos/proyectos/proyectos.module';
+import { CodigosPresupuestariosModule } from './catalogos/codigos-presupuestarios/codigos-presupuestarios.module';
 
 @Module({
   imports: [
@@ -14,6 +20,12 @@ import { SolicitudesModule } from './solicitudes/solicitudes.module';
     UsuariosModule,
     PoaModule,
     SolicitudesModule,
+    ConceptosModule,
+    TipoGastosModule,
+    GruposModule,
+    PartidasModule,
+    ProyectosModule,
+    CodigosPresupuestariosModule,
   ],
 })
 export class AppModule {}
