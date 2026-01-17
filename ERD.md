@@ -184,6 +184,7 @@ RECIBO RECIBO
   "TipoGasto" {
     Int id "🗝️"
     String nombre 
+    String codigo 
     }
   
 
@@ -206,6 +207,13 @@ RECIBO RECIBO
     String procedenciaInstitucion 
     }
   
+
+  "NominaTerceros" {
+    Int id "🗝️"
+    String nombreCompleto 
+    String ci 
+    }
+  
     "Usuario" |o--|| "Rol" : "enum:rol"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
     "EstructuraProgramatica" }o--|| "Grupo" : "grupo"
@@ -219,13 +227,13 @@ RECIBO RECIBO
     "Solicitud" }o--|o "Usuario" : "aprobador"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
     "Solicitud" |o--|o "Poa" : "poa"
-    "Solicitud" }o--|o "Planificacion" : "planificacion"
     "HistorialAprobacion" |o--|| "AccionHistorial" : "enum:accion"
     "HistorialAprobacion" }o--|| "Solicitud" : "solicitud"
     "HistorialAprobacion" }o--|| "Usuario" : "usuarioActor"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
+    "Planificacion" }o--|| "Solicitud" : "solicitud"
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"
     "Viatico" }o--|| "Solicitud" : "solicitud"
     "Viatico" }o--|| "Planificacion" : "planificacion"
@@ -236,4 +244,5 @@ RECIBO RECIBO
     "Gasto" }o--|| "Partida" : "partida"
     "Gasto" }o--|| "TipoGasto" : "tipoGasto"
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
+    "NominaTerceros" }o--|| "Solicitud" : "solicitud"
 ```

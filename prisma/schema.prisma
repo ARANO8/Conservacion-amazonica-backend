@@ -166,8 +166,8 @@ model Solicitud {
   poaId Int? @unique
   poa   Poa? @relation(fields: [poaId], references: [id])
 
-  planificacionId Int?
-  planificacion   Planificacion? @relation(fields: [planificacionId], references: [id])
+  planificaciones     Planificacion[]
+  nominasTerceros     NominaTerceros[]
 
   historialAprobaciones HistorialAprobacion[]
   notificaciones        Notificacion[]
@@ -223,13 +223,14 @@ model Planificacion {
   fechaFin                      DateTime
   diasCalculados                Int
 
-  solicitudes Solicitud[]
+  solicitudId                   Int
+  solicitud                     Solicitud @relation(fields: [solicitudId], references: [id])
   viaticos    Viatico[]
 }
 
 model Concepto {
   id                  Int       @id @default(autoincrement())
-  nombre              String
+  nombre              String    @unique
   precioInstitucional Decimal   @db.Decimal(10, 2)
   precioTerceros      Decimal   @db.Decimal(10, 2)
   viaticos            Viatico[]
@@ -258,6 +259,7 @@ model Viatico {
 model TipoGasto {
   id     Int     @id @default(autoincrement())
   nombre String
+  codigo String  @unique
   gastos Gasto[]
 }
 
@@ -291,6 +293,14 @@ model PersonaExterna {
   procedenciaInstitucion String
   solicitudId            Int
   solicitud              Solicitud @relation(fields: [solicitudId], references: [id])
+}
+
+model NominaTerceros {
+  id             Int       @id @default(autoincrement())
+  nombreCompleto String
+  ci             String
+  solicitudId    Int
+  solicitud      Solicitud @relation(fields: [solicitudId], references: [id])
 }
 generator erd {
   provider = "prisma-erd-generator"

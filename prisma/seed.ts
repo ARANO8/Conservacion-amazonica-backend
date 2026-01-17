@@ -164,16 +164,46 @@ async function main() {
     codigoPresupMap.set(codigo, c.id);
   });
 
-  await processCSV('Concepto.csv', async (row) => {
-    const [nombre, pInst, pTerc] = row;
+  // 2.5 Conceptos (REAL PRODUCTION DATA)
+  console.log('💰 Seeding Conceptos (Limpieza y Carga Real)...');
+  await prisma.concepto.deleteMany(); // Limpieza previa
+
+  const conceptosProduccion = [
+    { nombre: 'CIUDADES_PRINCIPALES', institucional: 229.89, terceros: 119.05 },
+    { nombre: 'CIUDADES_INTERMEDIAS', institucional: 155.17, terceros: 83.33 },
+    { nombre: 'PUEBLOS', institucional: 137.93, terceros: 137.93 },
+    { nombre: 'COMUNIDADES', institucional: 103.45, terceros: 59.52 },
+    { nombre: 'EXTERIOR', institucional: 600.0, terceros: 600.0 },
+  ];
+
+  for (const c of conceptosProduccion) {
     await prisma.concepto.create({
       data: {
-        nombre,
-        precioInstitucional: cleanAmount(pInst),
-        precioTerceros: cleanAmount(pTerc),
+        nombre: c.nombre,
+        precioInstitucional: c.institucional,
+        precioTerceros: c.terceros,
       },
     });
-  });
+  }
+
+  // 2.6 Tipos de Gasto (REAL PRODUCTION DATA)
+  console.log('📦 Seeding Tipos de Gasto (Limpieza y Carga Real)...');
+  await prisma.tipoGasto.deleteMany(); // Limpieza previa
+
+  const tiposGastoProduccion = [
+    { nombre: 'Compra', codigo: 'COMPRA' },
+    { nombre: 'Alquiler', codigo: 'ALQUILER' },
+    { nombre: 'Servicio', codigo: 'SERVICIO' },
+    { nombre: 'Recibo CPS', codigo: 'RECIBO_CPS' },
+    { nombre: 'Peaje', codigo: 'PEAJE' },
+    { nombre: 'AutoCompra', codigo: 'AUTO_COMPRA' },
+  ];
+
+  for (const tg of tiposGastoProduccion) {
+    await prisma.tipoGasto.create({
+      data: tg,
+    });
+  }
 
   // 3. Estructura Programática (Relaciones Ternarias Maestras)
   await processCSV('ProyectoGrupoPartida.csv', async (row) => {
