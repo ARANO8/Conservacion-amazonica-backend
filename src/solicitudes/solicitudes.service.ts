@@ -358,7 +358,13 @@ export class SolicitudesService {
       include: {
         usuarioEmisor: true,
         aprobador: true,
-        poa: { include: { actividad: true } },
+        poa: {
+          include: {
+            actividad: true,
+            estructura: { include: { proyecto: true } },
+            codigoPresupuestario: true,
+          },
+        },
         planificaciones: true,
         viaticos: { include: { concepto: true } },
         gastos: { include: { tipoGasto: true } },

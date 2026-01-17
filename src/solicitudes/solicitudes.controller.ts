@@ -9,8 +9,16 @@ import {
   UseGuards,
   Req,
   ParseIntPipe,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiProduces,
+  ApiOkResponse,
+} from '@nestjs/swagger';
 import { SolicitudesService } from './solicitudes.service';
 import { CreateSolicitudDto } from './dto/create-solicitud.dto';
 import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
@@ -20,7 +28,8 @@ import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { Request } from 'express';
+import type { Request, Response } from 'express';
+import { ReportsService } from '../reports/reports.service';
 import { Rol } from '@prisma/client';
 
 interface RequestWithUser extends Request {
@@ -36,7 +45,10 @@ interface RequestWithUser extends Request {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('solicitudes')
 export class SolicitudesController {
-  constructor(private readonly solicitudesService: SolicitudesService) {}
+  constructor(
+    private readonly solicitudesService: SolicitudesService,
+    private readonly reportsService: ReportsService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear una nueva solicitud en estado PENDIENTE' })
@@ -130,5 +142,38 @@ export class SolicitudesController {
       { id: req.user.userId, rol: req.user.rol },
       desembolsarDto,
     );
+  }
+
+  @Get(':id/pdf')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Generar y descargar reporte PDF de la solicitud' })
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({
+    description: 'Archivo PDF generado exitosamente.',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async generatePdf(
+    @Param('id', ParseIntPipe) id: number,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    const solicitud = await this.solicitudesService.findOne(id);
+    const buffer = await this.reportsService.generateSolicitudPdf(
+      solicitud as unknown as import('../reports/reports.service').SolicitudReportData,
+    );
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="Solicitud-${solicitud.codigoSolicitud}.pdf"`,
+      'Content-Length': buffer.length.toString(),
+    });
+
+    return new StreamableFile(buffer);
   }
 }
