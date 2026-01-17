@@ -11,6 +11,7 @@ import { GruposModule } from './catalogos/grupos/grupos.module';
 import { PartidasModule } from './catalogos/partidas/partidas.module';
 import { ProyectosModule } from './catalogos/proyectos/proyectos.module';
 import { CodigosPresupuestariosModule } from './catalogos/codigos-presupuestarios/codigos-presupuestarios.module';
+import { ReportsModule } from './reports/reports.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { CodigosPresupuestariosModule } from './catalogos/codigos-presupuestario
     PartidasModule,
     ProyectosModule,
     CodigosPresupuestariosModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

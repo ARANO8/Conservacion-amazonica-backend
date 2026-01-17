@@ -35,7 +35,10 @@
     "csv-parse": "^6.1.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "pdfkit": "^0.17.2",
+    "pdfmake": "^0.3.2",
     "reflect-metadata": "^0.2.2",
+    "roboto-font": "^0.1.0",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1"
   },
@@ -54,6 +57,7 @@
     "@types/node": "^22.10.7",
     "@types/passport": "^1.0.17",
     "@types/passport-jwt": "^4.0.1",
+    "@types/pdfmake": "^0.2.12",
     "@types/supertest": "^6.0.2",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",
