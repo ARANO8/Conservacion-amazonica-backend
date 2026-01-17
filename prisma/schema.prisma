@@ -16,10 +16,10 @@ enum Rol {
 }
 
 enum EstadoSolicitud {
-  EN_SOLICITUD
+  PENDIENTE
+  OBSERVADO
   DESEMBOLSADO
   EJECUTADO
-  RECHAZADO
 }
 
 enum EstadoPoa {
@@ -57,7 +57,7 @@ model Usuario {
   deletedAt      DateTime?
 
   solicitudesEmitidas     Solicitud[] @relation("Emisor")
-  solicitudesAprobadas    Solicitud[] @relation("Aprobador")
+  solicitudesPorAprobar   Solicitud[] @relation("AprobadorSolicitud")
   solicitudesBeneficiadas Solicitud[] @relation("Beneficiario")
   historialAprobaciones   HistorialAprobacion[]
   notificaciones          Notificacion[]
@@ -140,6 +140,7 @@ model Poa {
 
 model Solicitud {
   id                Int             @id @default(autoincrement())
+  codigoSolicitud   String          @unique
   descripcion       String?
   fechaSolicitud    DateTime        @default(now())
   motivoViaje       String?
@@ -149,14 +150,15 @@ model Solicitud {
   codigoDesembolso  String?
   montoTotal        Decimal         @db.Decimal(10, 2)
   liquidoPagable    Decimal         @db.Decimal(10, 2)
-  estado            EstadoSolicitud @default(EN_SOLICITUD)
+  estado            EstadoSolicitud @default(PENDIENTE)
+  observacion       String?
   deletedAt         DateTime?
 
   usuarioEmisorId Int
   usuarioEmisor   Usuario @relation("Emisor", fields: [usuarioEmisorId], references: [id])
 
-  usuarioAprobadorId Int?
-  usuarioAprobador   Usuario? @relation("Aprobador", fields: [usuarioAprobadorId], references: [id])
+  aprobadorId Int?
+  aprobador   Usuario? @relation("AprobadorSolicitud", fields: [aprobadorId], references: [id])
 
   usuarioBeneficiadoId Int?
   usuarioBeneficiado   Usuario? @relation("Beneficiario", fields: [usuarioBeneficiadoId], references: [id])

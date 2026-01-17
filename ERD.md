@@ -10,10 +10,10 @@ USUARIO USUARIO
 
 
         EstadoSolicitud {
-            EN_SOLICITUD EN_SOLICITUD
+            PENDIENTE PENDIENTE
+OBSERVADO OBSERVADO
 DESEMBOLSADO DESEMBOLSADO
 EJECUTADO EJECUTADO
-RECHAZADO RECHAZADO
         }
     
 
@@ -109,6 +109,7 @@ RECIBO RECIBO
 
   "Solicitud" {
     Int id "🗝️"
+    String codigoSolicitud 
     String descripcion "❓"
     DateTime fechaSolicitud 
     String motivoViaje "❓"
@@ -119,6 +120,7 @@ RECIBO RECIBO
     Decimal montoTotal 
     Decimal liquidoPagable 
     EstadoSolicitud estado 
+    String observacion "❓"
     DateTime deletedAt "❓"
     }
   
@@ -214,7 +216,7 @@ RECIBO RECIBO
     "Poa" }o--|| "Actividad" : "actividad"
     "Solicitud" |o--|| "EstadoSolicitud" : "enum:estado"
     "Solicitud" }o--|| "Usuario" : "usuarioEmisor"
-    "Solicitud" }o--|o "Usuario" : "usuarioAprobador"
+    "Solicitud" }o--|o "Usuario" : "aprobador"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
     "Solicitud" |o--|o "Poa" : "poa"
     "Solicitud" }o--|o "Planificacion" : "planificacion"

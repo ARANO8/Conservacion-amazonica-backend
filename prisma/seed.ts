@@ -17,12 +17,12 @@ function cleanAmount(val: string): number {
 }
 
 /**
- * Genera el correo corporativo: [PrimeraLetraNombre][PrimerApellido]@conservacion.gob.bo
+ * Genera el correo corporativo: [PrimeraLetraNombre][PrimerApellido]@conservacion.org.bo
  */
 function generateEmail(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
   if (parts.length < 2)
-    return `${fullName.toLowerCase().replace(/\s+/g, '')}@conservacion.gob.bo`;
+    return `${fullName.toLowerCase().replace(/\s+/g, '')}@conservacion.org.bo`;
 
   const firstName = parts[0];
   // En Bolivia/Latam: [Nombre1] [Nombre2] [Apellido Paterno] [Apellido Materno]
@@ -42,7 +42,7 @@ function generateEmail(fullName: string): string {
       .replace(/Ñ/g, 'N')
       .toLowerCase();
 
-  const email = `${normalize(firstName[0])}${normalize(firstSurname)}@conservacion.gob.bo`;
+  const email = `${normalize(firstName[0])}${normalize(firstSurname)}@conservacion.org.bo`;
   return email;
 }
 
