@@ -210,8 +210,8 @@ RECIBO RECIBO
 
   "NominaTerceros" {
     Int id "🗝️"
-    String nombreCompleto 
-    String ci 
+    String nombre 
+    String procedencia 
     }
   
     "Usuario" |o--|| "Rol" : "enum:rol"

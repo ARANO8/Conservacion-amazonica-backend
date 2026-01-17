@@ -297,8 +297,8 @@ model PersonaExterna {
 
 model NominaTerceros {
   id             Int       @id @default(autoincrement())
-  nombreCompleto String
-  ci             String
+  nombre      String
+  procedencia String
   solicitudId    Int
   solicitud      Solicitud @relation(fields: [solicitudId], references: [id])
 }
