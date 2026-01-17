@@ -101,11 +101,11 @@ export class CreateGastoDto {
 export class CreateNominaDto {
   @ApiProperty({ example: 'Juan Pérez' })
   @IsString()
-  nombre: string;
+  nombreCompleto: string;
 
-  @ApiProperty({ example: 'Comunidad A' })
+  @ApiProperty({ example: '1234567 LP' })
   @IsString()
-  procedencia: string;
+  ci: string;
 }
 
 export class CreateSolicitudDto {

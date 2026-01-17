@@ -173,6 +173,7 @@ RECIBO RECIBO
     Int id "🗝️"
     TipoDestino tipoDestino 
     Int dias 
+    Int cantidadPersonas 
     Decimal costoUnitario 
     Decimal totalBs 
     Decimal iva13 
@@ -198,6 +199,7 @@ RECIBO RECIBO
     Decimal it3 
     Decimal iue5 
     Decimal liquidoPagable 
+    String detalle "❓"
     }
   
 
@@ -210,8 +212,8 @@ RECIBO RECIBO
 
   "NominaTerceros" {
     Int id "🗝️"
-    String nombre 
-    String procedencia 
+    String nombreCompleto 
+    String ci 
     }
   
     "Usuario" |o--|| "Rol" : "enum:rol"

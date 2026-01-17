@@ -237,14 +237,15 @@ model Concepto {
 }
 
 model Viatico {
-  id             Int         @id @default(autoincrement())
-  tipoDestino    TipoDestino
-  dias           Int
-  costoUnitario  Decimal     @db.Decimal(10, 2)
-  totalBs        Decimal     @db.Decimal(10, 2)
-  iva13          Decimal     @db.Decimal(10, 2)
-  it3            Decimal     @db.Decimal(10, 2)
-  liquidoPagable Decimal     @db.Decimal(10, 2)
+  id               Int         @id @default(autoincrement())
+  tipoDestino      TipoDestino
+  dias             Int
+  cantidadPersonas Int         @default(1)
+  costoUnitario    Decimal     @db.Decimal(10, 2)
+  totalBs          Decimal     @db.Decimal(10, 2)
+  iva13            Decimal     @db.Decimal(10, 2)
+  it3              Decimal     @db.Decimal(10, 2)
+  liquidoPagable   Decimal     @db.Decimal(10, 2)
 
   solicitudId Int
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
@@ -273,6 +274,7 @@ model Gasto {
   it3            Decimal       @db.Decimal(10, 2)
   iue5           Decimal       @db.Decimal(10, 2)
   liquidoPagable Decimal       @db.Decimal(10, 2)
+  detalle        String?
 
   solicitudId Int
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
@@ -297,8 +299,8 @@ model PersonaExterna {
 
 model NominaTerceros {
   id             Int       @id @default(autoincrement())
-  nombre      String
-  procedencia String
+  nombreCompleto String
+  ci             String
   solicitudId    Int
   solicitud      Solicitud @relation(fields: [solicitudId], references: [id])
 }
