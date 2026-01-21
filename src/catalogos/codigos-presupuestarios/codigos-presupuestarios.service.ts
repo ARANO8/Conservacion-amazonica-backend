@@ -14,4 +14,32 @@ export class CodigosPresupuestariosService {
       orderBy: { codigoCompleto: 'asc' },
     });
   }
+
+  filterByStructure(
+    codigoPoa: string,
+    proyectoId: number,
+    grupoId: number,
+    partidaId: number,
+  ) {
+    return this.prisma.codigoPresupuestario.findMany({
+      where: {
+        poas: {
+          some: {
+            deletedAt: null,
+            codigoPoa,
+            estructura: {
+              proyectoId,
+              grupoId,
+              partidaId,
+            },
+          },
+        },
+      },
+      distinct: ['id'],
+      select: {
+        id: true,
+        codigoCompleto: true,
+      },
+    });
+  }
 }

@@ -15,4 +15,28 @@ export class ProyectosService {
       orderBy: { nombre: 'asc' },
     });
   }
+
+  findByPoaCode(codigo: string) {
+    return this.prisma.proyecto.findMany({
+      where: {
+        deletedAt: null,
+        estructuras: {
+          some: {
+            poas: {
+              some: {
+                codigoPoa: codigo,
+                deletedAt: null,
+              },
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        nombre: true,
+      },
+      distinct: ['id'],
+      orderBy: { nombre: 'asc' },
+    });
+  }
 }

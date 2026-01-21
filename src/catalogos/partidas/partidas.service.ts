@@ -11,6 +11,24 @@ export class PartidasService {
         id: true,
         nombre: true,
       },
+    });
+  }
+
+  findByGrupoId(grupoId: number) {
+    return this.prisma.partida.findMany({
+      where: {
+        deletedAt: null,
+        estructuras: {
+          some: {
+            grupoId,
+          },
+        },
+      },
+      distinct: ['id'],
+      select: {
+        id: true,
+        nombre: true,
+      },
       orderBy: { nombre: 'asc' },
     });
   }
