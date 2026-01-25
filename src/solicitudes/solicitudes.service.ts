@@ -114,17 +114,15 @@ export class SolicitudesService {
 
       if (vDto.dias > diffDays) {
         throw new BadRequestException(
-          `Los días del viático (${vDto.dias}) no pueden superar los días de la planificación (${diffDays})`,
+          'Los días de viático exceden la duración de la actividad planificada',
         );
       }
 
-      const limitPersonas =
-        vDto.tipoDestino === 'INSTITUCIONAL'
-          ? planif.cantInstitucional
-          : planif.cantTerceros;
-      if (vDto.cantidadPersonas > limitPersonas) {
+      const totalCapacidadPlanificada =
+        planif.cantInstitucional + planif.cantTerceros;
+      if (vDto.cantidadPersonas > totalCapacidadPlanificada) {
         throw new BadRequestException(
-          `La cantidad de personas del viático (${vDto.cantidadPersonas}) excede el límite de la planificación (${limitPersonas}) para el tipo ${vDto.tipoDestino}`,
+          'La cantidad de personas excede lo planificado',
         );
       }
 
