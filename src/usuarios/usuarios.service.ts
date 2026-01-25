@@ -8,6 +8,17 @@ import * as bcrypt from 'bcrypt';
 export class UsuariosService {
   constructor(private prisma: PrismaService) {}
 
+  private readonly userSelect = {
+    id: true,
+    nombreCompleto: true,
+    email: true,
+    rol: true,
+    cargo: true,
+    createdAt: true,
+    updatedAt: true,
+    deletedAt: true,
+  };
+
   async create(createUsuarioDto: CreateUsuarioDto) {
     const hashedPassword = await bcrypt.hash(createUsuarioDto.password, 10);
 
@@ -16,18 +27,21 @@ export class UsuariosService {
         ...createUsuarioDto,
         password: hashedPassword,
       },
+      select: this.userSelect,
     });
   }
 
   async findAll() {
     return this.prisma.usuario.findMany({
       where: { deletedAt: null },
+      select: this.userSelect,
     });
   }
 
   async findOne(id: number) {
     const usuario = await this.prisma.usuario.findFirst({
       where: { id, deletedAt: null },
+      select: this.userSelect,
     });
 
     if (!usuario) {
@@ -54,6 +68,7 @@ export class UsuariosService {
     return this.prisma.usuario.update({
       where: { id },
       data,
+      select: this.userSelect,
     });
   }
 
@@ -63,6 +78,7 @@ export class UsuariosService {
     return this.prisma.usuario.update({
       where: { id },
       data: { deletedAt: new Date() },
+      select: this.userSelect,
     });
   }
 }

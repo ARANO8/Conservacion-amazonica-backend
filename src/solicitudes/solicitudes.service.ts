@@ -28,6 +28,14 @@ export class SolicitudesService {
     private presupuestoService: SolicitudPresupuestoService,
   ) {}
 
+  private readonly userSelect = {
+    id: true,
+    nombreCompleto: true,
+    email: true,
+    cargo: true,
+    rol: true,
+  };
+
   private async generarCodigo(): Promise<string> {
     const anioActual = new Date().getFullYear();
     const count = await this.prisma.solicitud.count({
@@ -344,8 +352,8 @@ export class SolicitudesService {
           viaticos: true,
           gastos: true,
           nominasTerceros: true,
-          usuarioEmisor: true,
-          aprobador: true,
+          usuarioEmisor: { select: this.userSelect },
+          aprobador: { select: this.userSelect },
           presupuestos: {
             include: {
               poa: { include: { actividad: true } },
@@ -372,8 +380,8 @@ export class SolicitudesService {
     return this.prisma.solicitud.findMany({
       where,
       include: {
-        usuarioEmisor: true,
-        aprobador: true,
+        usuarioEmisor: { select: this.userSelect },
+        aprobador: { select: this.userSelect },
         presupuestos: {
           include: {
             poa: {
@@ -394,8 +402,8 @@ export class SolicitudesService {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
       include: {
-        usuarioEmisor: true,
-        aprobador: true,
+        usuarioEmisor: { select: this.userSelect },
+        aprobador: { select: this.userSelect },
         presupuestos: {
           include: {
             poa: {
@@ -552,8 +560,8 @@ export class SolicitudesService {
           aprobador: { connect: { id: aprobadorId } },
         },
         include: {
-          usuarioEmisor: true,
-          aprobador: true,
+          usuarioEmisor: { select: this.userSelect },
+          aprobador: { select: this.userSelect },
           presupuestos: {
             include: {
               poa: { include: { actividad: true } },
@@ -633,6 +641,10 @@ export class SolicitudesService {
     return this.prisma.solicitud.update({
       where: { id },
       data: { aprobadorId: nuevoAprobadorId },
+      include: {
+        usuarioEmisor: { select: this.userSelect },
+        aprobador: { select: this.userSelect },
+      },
     });
   }
 
@@ -662,6 +674,10 @@ export class SolicitudesService {
         observacion: observarDto.observacion,
         aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
       },
+      include: {
+        usuarioEmisor: { select: this.userSelect },
+        aprobador: { select: this.userSelect },
+      },
     });
   }
 
@@ -690,6 +706,10 @@ export class SolicitudesService {
         estado: EstadoSolicitud.DESEMBOLSADO,
         codigoDesembolso: desembolsarDto.codigoDesembolso,
         aprobadorId: null, // Finalizado
+      },
+      include: {
+        usuarioEmisor: { select: this.userSelect },
+        aprobador: { select: this.userSelect },
       },
     });
   }
