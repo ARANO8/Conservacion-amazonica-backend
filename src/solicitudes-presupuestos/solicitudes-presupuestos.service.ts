@@ -74,10 +74,30 @@ export class SolicitudPresupuestoService {
     });
   }
 
-  async confirmarReservas(solicitudId: number, presupuestosIds: number[]) {
+  async confirmarReservas(
+    solicitudId: number,
+    presupuestosIds: number[],
+    usuarioId: number,
+  ) {
+    // Validamos primero que todas las reservas pertenezcan al usuario
+    const count = await this.prisma.solicitudPresupuesto.count({
+      where: {
+        id: { in: presupuestosIds },
+        usuarioId,
+        estado: EstadoReserva.RESERVADO,
+      },
+    });
+
+    if (count !== presupuestosIds.length) {
+      throw new ConflictException(
+        'Algunas de las reservas seleccionadas no son válidas o no pertenecen al usuario',
+      );
+    }
+
     return this.prisma.solicitudPresupuesto.updateMany({
       where: {
         id: { in: presupuestosIds },
+        usuarioId,
       },
       data: {
         estado: EstadoReserva.CONFIRMADO,

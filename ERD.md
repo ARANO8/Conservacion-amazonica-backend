@@ -191,10 +191,10 @@ CONFIRMADO CONFIRMADO
     Int dias 
     Int cantidadPersonas 
     Decimal costoUnitario 
-    Decimal totalBs 
+    Decimal montoPresupuestado 
     Decimal iva13 
     Decimal it3 
-    Decimal liquidoPagable 
+    Decimal montoNeto 
     }
   
 
@@ -210,11 +210,11 @@ CONFIRMADO CONFIRMADO
     TipoDocumento tipoDocumento 
     Int cantidad 
     Decimal costoUnitario 
-    Decimal totalBs 
+    Decimal montoPresupuestado 
     Decimal iva13 
     Decimal it3 
     Decimal iue5 
-    Decimal liquidoPagable 
+    Decimal montoNeto 
     String detalle "❓"
     }
   

@@ -266,11 +266,11 @@ model Viatico {
   tipoDestino      TipoDestino
   dias             Int
   cantidadPersonas Int         @default(1)
-  costoUnitario    Decimal     @db.Decimal(10, 2)
-  totalBs          Decimal     @db.Decimal(10, 2)
-  iva13            Decimal     @db.Decimal(10, 2)
-  it3              Decimal     @db.Decimal(10, 2)
-  liquidoPagable   Decimal     @db.Decimal(10, 2)
+  costoUnitario      Decimal     @db.Decimal(10, 2)
+  montoPresupuestado Decimal     @db.Decimal(10, 2)
+  iva13              Decimal     @db.Decimal(10, 2)
+  it3                Decimal     @db.Decimal(10, 2)
+  montoNeto          Decimal     @db.Decimal(10, 2)
 
   solicitudId Int
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
@@ -296,12 +296,12 @@ model Gasto {
   id             Int           @id @default(autoincrement())
   tipoDocumento  TipoDocumento
   cantidad       Int
-  costoUnitario  Decimal       @db.Decimal(10, 2)
-  totalBs        Decimal       @db.Decimal(10, 2)
-  iva13          Decimal       @db.Decimal(10, 2)
-  it3            Decimal       @db.Decimal(10, 2)
-  iue5           Decimal       @db.Decimal(10, 2)
-  liquidoPagable Decimal       @db.Decimal(10, 2)
+  costoUnitario      Decimal       @db.Decimal(10, 2)
+  montoPresupuestado Decimal       @db.Decimal(10, 2)
+  iva13              Decimal       @db.Decimal(10, 2)
+  it3                Decimal       @db.Decimal(10, 2)
+  iue5               Decimal       @db.Decimal(10, 2)
+  montoNeto          Decimal       @db.Decimal(10, 2)
   detalle        String?
 
   solicitudId Int
