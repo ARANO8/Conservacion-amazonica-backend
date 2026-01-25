@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TDocumentDefinitions, CustomTableLayout } from 'pdfmake/interfaces';
+import { formatDate, formatCurrency } from '../shared/utils/formatters.util';
 
 // Definición de interfaces para tipado estricto y satisfacer ESLint
 export interface SolicitudReportData {
@@ -79,26 +80,6 @@ export class ReportsService {
 
     // 3. Instanciación
     const printer = new PdfPrinter(fonts);
-
-    const formatDate = (date: Date | string | null | undefined) => {
-      if (!date) return 'N/A';
-      const d = new Date(date);
-      return d.toLocaleDateString('es-BO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-    };
-
-    const formatCurrency = (
-      amount: number | string | { toString(): string } | null | undefined,
-    ) => {
-      const val = parseFloat(amount?.toString() || '0');
-      return `Bs ${val.toLocaleString('es-BO', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`;
-    };
 
     const docDefinition: TDocumentDefinitions = {
       content: [

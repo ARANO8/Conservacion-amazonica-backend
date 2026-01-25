@@ -19,6 +19,12 @@ import {
 } from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
+import {
+  calcularMontosGastos,
+  calcularMontosViaticos,
+  validarLimitesViatico,
+} from './solicitudes.helper';
+import { SOLICITUD_INCLUDE } from './solicitudes.constants';
 
 @Injectable()
 export class SolicitudesService {
@@ -27,14 +33,6 @@ export class SolicitudesService {
     @Inject(forwardRef(() => SolicitudPresupuestoService))
     private presupuestoService: SolicitudPresupuestoService,
   ) {}
-
-  private readonly userSelect = {
-    id: true,
-    nombreCompleto: true,
-    email: true,
-    cargo: true,
-    rol: true,
-  };
 
   private async generarCodigo(): Promise<string> {
     const anioActual = new Date().getFullYear();
@@ -114,25 +112,7 @@ export class SolicitudesService {
         );
       }
 
-      const dInicio = new Date(planif.fechaInicio);
-      const dFin = new Date(planif.fechaFin);
-      const diffDays = Math.ceil(
-        (dFin.getTime() - dInicio.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      if (vDto.dias > diffDays) {
-        throw new BadRequestException(
-          'Los días de viático exceden la duración de la actividad planificada',
-        );
-      }
-
-      const totalCapacidadPlanificada =
-        planif.cantInstitucional + planif.cantTerceros;
-      if (vDto.cantidadPersonas > totalCapacidadPlanificada) {
-        throw new BadRequestException(
-          'La cantidad de personas excede lo planificado',
-        );
-      }
+      validarLimitesViatico(vDto, planif);
 
       const precioCatalogo =
         vDto.tipoDestino === 'INSTITUCIONAL'
@@ -143,13 +123,12 @@ export class SolicitudesService {
         ? new Prisma.Decimal(vDto.montoNeto)
         : precioCatalogo;
 
-      const subtotalNeto = montoNetoUnitario
-        .mul(vDto.dias)
-        .mul(vDto.cantidadPersonas);
-
-      const iva = subtotalNeto.mul(0.13);
-      const it = subtotalNeto.mul(0.03);
-      const montoPresupuestado = subtotalNeto.add(iva).add(it);
+      const { subtotalNeto, iva, it, montoPresupuestado } =
+        calcularMontosViaticos(
+          montoNetoUnitario,
+          vDto.dias,
+          vDto.cantidadPersonas,
+        );
 
       montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
       montoTotalNeto = montoTotalNeto.add(subtotalNeto);
@@ -180,25 +159,13 @@ export class SolicitudesService {
         );
       }
 
-      const subtotalNeto = new Prisma.Decimal(gDto.montoNeto).mul(
-        gDto.cantidad,
-      );
-      let iva = new Prisma.Decimal(0);
-      let it = new Prisma.Decimal(0);
-      let iue = new Prisma.Decimal(0);
-
-      if (gDto.tipoDocumento === 'RECIBO') {
-        const codigo = tipoGasto.codigo;
-        if (codigo === 'COMPRA') {
-          iue = subtotalNeto.mul(0.05);
-          it = subtotalNeto.mul(0.03);
-        } else if (codigo === 'ALQUILER' || codigo === 'SERVICIO') {
-          iva = subtotalNeto.mul(0.13);
-          it = subtotalNeto.mul(0.03);
-        }
-      }
-
-      const montoPresupuestado = subtotalNeto.add(iva).add(it).add(iue);
+      const { subtotalNeto, iva, it, iue, montoPresupuestado } =
+        calcularMontosGastos(
+          new Prisma.Decimal(gDto.montoNeto),
+          gDto.cantidad,
+          gDto.tipoDocumento,
+          tipoGasto.codigo,
+        );
 
       montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
       montoTotalNeto = montoTotalNeto.add(subtotalNeto);
@@ -347,19 +314,7 @@ export class SolicitudesService {
 
       return tx.solicitud.findUnique({
         where: { id: solicitud.id },
-        include: {
-          planificaciones: true,
-          viaticos: true,
-          gastos: true,
-          nominasTerceros: true,
-          usuarioEmisor: { select: this.userSelect },
-          aprobador: { select: this.userSelect },
-          presupuestos: {
-            include: {
-              poa: { include: { actividad: true } },
-            },
-          },
-        },
+        include: SOLICITUD_INCLUDE,
       });
     });
 
@@ -379,19 +334,7 @@ export class SolicitudesService {
 
     return this.prisma.solicitud.findMany({
       where,
-      include: {
-        usuarioEmisor: { select: this.userSelect },
-        aprobador: { select: this.userSelect },
-        presupuestos: {
-          include: {
-            poa: {
-              include: {
-                actividad: true,
-              },
-            },
-          },
-        },
-      },
+      include: SOLICITUD_INCLUDE,
       orderBy: {
         fechaSolicitud: 'desc',
       },
@@ -401,25 +344,7 @@ export class SolicitudesService {
   async findOne(id: number): Promise<Solicitud> {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
-      include: {
-        usuarioEmisor: { select: this.userSelect },
-        aprobador: { select: this.userSelect },
-        presupuestos: {
-          include: {
-            poa: {
-              include: {
-                actividad: true,
-                estructura: { include: { proyecto: true } },
-                codigoPresupuestario: true,
-              },
-            },
-          },
-        },
-        planificaciones: true,
-        viaticos: { include: { concepto: true } },
-        gastos: { include: { tipoGasto: true } },
-        nominasTerceros: true,
-      },
+      include: SOLICITUD_INCLUDE,
     });
 
     if (!solicitud) {
@@ -559,19 +484,7 @@ export class SolicitudesService {
           observacion: null,
           aprobador: { connect: { id: aprobadorId } },
         },
-        include: {
-          usuarioEmisor: { select: this.userSelect },
-          aprobador: { select: this.userSelect },
-          presupuestos: {
-            include: {
-              poa: { include: { actividad: true } },
-            },
-          },
-          planificaciones: true,
-          viaticos: { include: { concepto: true } },
-          gastos: { include: { tipoGasto: true } },
-          nominasTerceros: true,
-        },
+        include: SOLICITUD_INCLUDE,
       });
     });
   }
@@ -641,10 +554,7 @@ export class SolicitudesService {
     return this.prisma.solicitud.update({
       where: { id },
       data: { aprobadorId: nuevoAprobadorId },
-      include: {
-        usuarioEmisor: { select: this.userSelect },
-        aprobador: { select: this.userSelect },
-      },
+      include: SOLICITUD_INCLUDE,
     });
   }
 
@@ -674,10 +584,7 @@ export class SolicitudesService {
         observacion: observarDto.observacion,
         aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
       },
-      include: {
-        usuarioEmisor: { select: this.userSelect },
-        aprobador: { select: this.userSelect },
-      },
+      include: SOLICITUD_INCLUDE,
     });
   }
 
@@ -707,10 +614,7 @@ export class SolicitudesService {
         codigoDesembolso: desembolsarDto.codigoDesembolso,
         aprobadorId: null, // Finalizado
       },
-      include: {
-        usuarioEmisor: { select: this.userSelect },
-        aprobador: { select: this.userSelect },
-      },
+      include: SOLICITUD_INCLUDE,
     });
   }
 }
