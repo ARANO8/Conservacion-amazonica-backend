@@ -63,16 +63,28 @@ export class CreateViaticoDto {
   @IsInt()
   @Min(1)
   cantidadPersonas: number;
+
+  @ApiProperty({
+    example: 200,
+    description: 'Monto neto a recibir (Opcional, sobreescribe catálogo)',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  montoNeto?: number;
+
+  @ApiProperty({ example: 1, description: 'ID de la reserva de presupuesto' })
+  @IsInt()
+  @Min(1)
+  solicitudPresupuestoId: number;
 }
 
 export class CreateGastoDto {
-  @ApiProperty({ example: 1 })
+  @ApiProperty({ example: 1, description: 'ID de la reserva de presupuesto' })
   @IsInt()
-  grupoId: number;
-
-  @ApiProperty({ example: 1 })
-  @IsInt()
-  partidaId: number;
+  @Min(1)
+  solicitudPresupuestoId: number;
 
   @ApiProperty({ example: 1 })
   @IsInt()
@@ -87,10 +99,14 @@ export class CreateGastoDto {
   @Min(1)
   cantidad: number;
 
-  @ApiProperty({ example: 50.5, minimum: 0 })
+  @ApiProperty({
+    example: 50.5,
+    minimum: 0,
+    description: 'Monto neto unitario a recibir',
+  })
   @IsNumber()
   @Min(0)
-  costoUnitario: number;
+  montoNeto: number;
 
   @ApiProperty({ example: 'Compra de herramientas', required: false })
   @IsOptional()
@@ -109,9 +125,14 @@ export class CreateNominaDto {
 }
 
 export class CreateSolicitudDto {
-  @ApiProperty({ example: 1, description: 'ID del registro POA vinculado' })
-  @IsInt()
-  poaId: number;
+  @ApiProperty({
+    example: [1, 2],
+    description:
+      'IDs de los registros de reserva de presupuesto (SolicitudPresupuesto)',
+  })
+  @IsArray()
+  @IsInt({ each: true })
+  presupuestosIds: number[];
 
   @ApiProperty({ example: 2, description: 'ID del usuario aprobador' })
   @IsInt()

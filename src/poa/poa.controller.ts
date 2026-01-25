@@ -20,6 +20,7 @@ import { PoaService } from './poa.service';
 import { CreatePoaDto } from './dto/create-poa.dto';
 import { UpdatePoaDto } from './dto/update-poa.dto';
 import { PoaPaginationDto } from './dto/poa-pagination.dto';
+import { PoaLookupDto } from './dto/poa-lookup.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -36,6 +37,48 @@ export class PoaController {
   @ApiOperation({ summary: 'Obtener lista de POA con paginación y búsqueda' })
   findAll(@Query() paginationDto: PoaPaginationDto) {
     return this.poaService.findAll(paginationDto);
+  }
+
+  @Get('lookup')
+  @ApiOperation({ summary: 'Listar códigos POA para selectores' })
+  @ApiResponse({
+    status: 200,
+    description: 'Lista de códigos POA',
+    type: [PoaLookupDto],
+  })
+  getLookup() {
+    return this.poaService.getLookup();
+  }
+
+  @Get('detail')
+  @ApiOperation({ summary: 'Obtener detalle financiero de un POA específico' })
+  @ApiResponse({
+    status: 200,
+    description: 'Detalle financiero del POA',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'number' },
+        costoTotal: { type: 'number' },
+        descripcion: { type: 'string' },
+      },
+    },
+  })
+  getDetail(
+    @Query('codigoPoa') codigoPoa: string,
+    @Query('proyectoId', ParseIntPipe) proyectoId: number,
+    @Query('grupoId', ParseIntPipe) grupoId: number,
+    @Query('partidaId', ParseIntPipe) partidaId: number,
+    @Query('codigoPresupuestarioId', ParseIntPipe)
+    codigoPresupuestarioId: number,
+  ) {
+    return this.poaService.findDetailByStructure(
+      codigoPoa,
+      proyectoId,
+      grupoId,
+      partidaId,
+      codigoPresupuestarioId,
+    );
   }
 
   @Post()

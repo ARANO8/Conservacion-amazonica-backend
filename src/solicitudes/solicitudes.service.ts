@@ -10,11 +10,29 @@ import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
 import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
-import { Rol, EstadoSolicitud, Solicitud, Prisma } from '@prisma/client';
+import {
+  Rol,
+  EstadoSolicitud,
+  Solicitud,
+  Prisma,
+  EstadoReserva,
+} from '@prisma/client';
+import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
+import { Inject, forwardRef } from '@nestjs/common';
+import {
+  calcularMontosGastos,
+  calcularMontosViaticos,
+  validarLimitesViatico,
+} from './solicitudes.helper';
+import { SOLICITUD_INCLUDE } from './solicitudes.constants';
 
 @Injectable()
 export class SolicitudesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => SolicitudPresupuestoService))
+    private presupuestoService: SolicitudPresupuestoService,
+  ) {}
 
   private async generarCodigo(): Promise<string> {
     const anioActual = new Date().getFullYear();
@@ -34,8 +52,8 @@ export class SolicitudesService {
   private async prepararInsertAnidado(
     dto: CreateSolicitudDto | UpdateSolicitudDto,
   ): Promise<{
-    montoTotal: Prisma.Decimal;
-    liquidoPagable: Prisma.Decimal;
+    montoTotalPresupuestado: Prisma.Decimal;
+    montoTotalNeto: Prisma.Decimal;
     viaticosData: {
       data: Omit<
         Prisma.ViaticoUncheckedCreateInput,
@@ -64,8 +82,8 @@ export class SolicitudesService {
     const tiposGastoMap = new Map(tiposGastoRaw.map((tg) => [tg.id, tg]));
 
     // 2. CÁLCULOS PREVIOS Y VALIDACIONES
-    let montoTotal = new Prisma.Decimal(0);
-    let liquidoPagable = new Prisma.Decimal(0);
+    let montoTotalPresupuestado = new Prisma.Decimal(0);
+    let montoTotalNeto = new Prisma.Decimal(0);
 
     const viaticosData: {
       data: Omit<
@@ -94,39 +112,26 @@ export class SolicitudesService {
         );
       }
 
-      const dInicio = new Date(planif.fechaInicio);
-      const dFin = new Date(planif.fechaFin);
-      const diffDays = Math.ceil(
-        (dFin.getTime() - dInicio.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      validarLimitesViatico(vDto, planif);
 
-      if (vDto.dias > diffDays) {
-        throw new BadRequestException(
-          `Los días del viático (${vDto.dias}) no pueden superar los días de la planificación (${diffDays})`,
-        );
-      }
-
-      const limitPersonas =
-        vDto.tipoDestino === 'INSTITUCIONAL'
-          ? planif.cantInstitucional
-          : planif.cantTerceros;
-      if (vDto.cantidadPersonas > limitPersonas) {
-        throw new BadRequestException(
-          `La cantidad de personas del viático (${vDto.cantidadPersonas}) excede el límite de la planificación (${limitPersonas}) para el tipo ${vDto.tipoDestino}`,
-        );
-      }
-
-      const precio =
+      const precioCatalogo =
         vDto.tipoDestino === 'INSTITUCIONAL'
           ? concepto.precioInstitucional
           : concepto.precioTerceros;
-      const subtotal = precio.mul(vDto.dias).mul(vDto.cantidadPersonas);
-      const iva = subtotal.mul(0.13);
-      const it = subtotal.mul(0.03);
-      const liquido = subtotal.sub(iva).sub(it);
 
-      montoTotal = montoTotal.add(subtotal);
-      liquidoPagable = liquidoPagable.add(liquido);
+      const montoNetoUnitario = vDto.montoNeto
+        ? new Prisma.Decimal(vDto.montoNeto)
+        : precioCatalogo;
+
+      const { subtotalNeto, iva, it, montoPresupuestado } =
+        calcularMontosViaticos(
+          montoNetoUnitario,
+          vDto.dias,
+          vDto.cantidadPersonas,
+        );
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
+      montoTotalNeto = montoTotalNeto.add(subtotalNeto);
 
       viaticosData.push({
         planificacionIndex: vDto.planificacionIndex,
@@ -135,11 +140,12 @@ export class SolicitudesService {
           tipoDestino: vDto.tipoDestino,
           dias: vDto.dias,
           cantidadPersonas: vDto.cantidadPersonas,
-          costoUnitario: precio,
-          totalBs: subtotal,
+          costoUnitario: montoNetoUnitario,
+          montoPresupuestado: montoPresupuestado,
           iva13: iva,
           it3: it,
-          liquidoPagable: liquido,
+          montoNeto: subtotalNeto,
+          solicitudPresupuestoId: vDto.solicitudPresupuestoId,
         },
       });
     }
@@ -153,48 +159,35 @@ export class SolicitudesService {
         );
       }
 
-      const subtotal = new Prisma.Decimal(gDto.costoUnitario).mul(
-        gDto.cantidad,
-      );
-      let iva = new Prisma.Decimal(0);
-      let it = new Prisma.Decimal(0);
-      let iue = new Prisma.Decimal(0);
+      const { subtotalNeto, iva, it, iue, montoPresupuestado } =
+        calcularMontosGastos(
+          new Prisma.Decimal(gDto.montoNeto),
+          gDto.cantidad,
+          gDto.tipoDocumento,
+          tipoGasto.codigo,
+        );
 
-      if (gDto.tipoDocumento === 'RECIBO') {
-        const codigo = tipoGasto.codigo;
-        if (codigo === 'COMPRA') {
-          iue = subtotal.mul(0.05);
-          it = subtotal.mul(0.03);
-        } else if (codigo === 'ALQUILER' || codigo === 'SERVICIO') {
-          iva = subtotal.mul(0.13);
-          it = subtotal.mul(0.03);
-        }
-      }
-
-      const liquido = subtotal.sub(iva).sub(it).sub(iue);
-
-      montoTotal = montoTotal.add(subtotal);
-      liquidoPagable = liquidoPagable.add(liquido);
+      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
+      montoTotalNeto = montoTotalNeto.add(subtotalNeto);
 
       gastosData.push({
-        grupoId: gDto.grupoId,
-        partidaId: gDto.partidaId,
+        solicitudPresupuestoId: gDto.solicitudPresupuestoId,
         tipoGastoId: gDto.tipoGastoId,
         tipoDocumento: gDto.tipoDocumento,
         cantidad: gDto.cantidad,
-        costoUnitario: new Prisma.Decimal(gDto.costoUnitario),
-        totalBs: subtotal,
+        costoUnitario: new Prisma.Decimal(gDto.montoNeto),
+        montoPresupuestado: montoPresupuestado,
         iva13: iva,
         it3: it,
         iue5: iue,
-        liquidoPagable: liquido,
+        montoNeto: subtotalNeto,
         detalle: gDto.detalle,
       });
     }
 
     return {
-      montoTotal,
-      liquidoPagable,
+      montoTotalPresupuestado,
+      montoTotalNeto,
       viaticosData,
       gastosData,
       planificaciones,
@@ -206,8 +199,13 @@ export class SolicitudesService {
     createSolicitudDto: CreateSolicitudDto,
     usuarioId: number,
   ): Promise<Solicitud> {
-    const { poaId, descripcion, aprobadorId, lugarViaje, motivoViaje } =
-      createSolicitudDto;
+    const {
+      presupuestosIds,
+      descripcion,
+      aprobadorId,
+      lugarViaje,
+      motivoViaje,
+    } = createSolicitudDto;
 
     // VALIDACIÓN: Evitar Auto-Aprobación
     if (aprobadorId === usuarioId) {
@@ -219,15 +217,9 @@ export class SolicitudesService {
     const detalles = await this.prepararInsertAnidado(createSolicitudDto);
 
     // 3. TRANSACCIÓN PRISMA
-    const poa = await this.prisma.poa.findUnique({ where: { id: poaId } });
-    if (!poa) throw new NotFoundException(`POA ${poaId} no encontrado`);
-
-    const poaOcupado = await this.prisma.solicitud.findFirst({
-      where: { poaId, deletedAt: null },
-    });
-    if (poaOcupado) {
+    if (!presupuestosIds || presupuestosIds.length === 0) {
       throw new BadRequestException(
-        'El ítem del POA ya está asociado a otra solicitud activa',
+        'Debes seleccionar al menos un presupuesto reservado',
       );
     }
 
@@ -239,19 +231,32 @@ export class SolicitudesService {
         data: {
           codigoSolicitud,
           descripcion,
-          montoTotal: detalles.montoTotal,
-          liquidoPagable: detalles.liquidoPagable,
+          montoTotalPresupuestado: detalles.montoTotalPresupuestado,
+          montoTotalNeto: detalles.montoTotalNeto,
           lugarViaje,
           motivoViaje,
           estado: EstadoSolicitud.PENDIENTE,
           usuarioEmisor: { connect: { id: usuarioId } },
           aprobador: { connect: { id: aprobadorId } },
           usuarioBeneficiado: { connect: { id: usuarioId } },
-          poa: { connect: { id: poaId } },
         },
       });
 
-      // B. Crear Planificaciones y mapear IDs
+      // B. Confirmar Reservas (Dentro de la misma transacción para evitar P2003)
+      await tx.solicitudPresupuesto.updateMany({
+        where: {
+          id: { in: presupuestosIds },
+          usuarioId,
+          estado: EstadoReserva.RESERVADO,
+        },
+        data: {
+          estado: EstadoReserva.CONFIRMADO,
+          expiresAt: null,
+          solicitudId: solicitud.id,
+        },
+      });
+
+      // C. Crear Planificaciones y mapear IDs
       const createdPlanificaciones: { id: number }[] = [];
       for (const p of detalles.planificaciones) {
         const d1 = new Date(p.fechaInicio);
@@ -274,7 +279,7 @@ export class SolicitudesService {
         createdPlanificaciones.push({ id: cp.id });
       }
 
-      // C. Crear Viáticos
+      // D. Crear Viáticos
       for (const vItem of detalles.viaticosData) {
         await tx.viatico.create({
           data: {
@@ -286,7 +291,7 @@ export class SolicitudesService {
         });
       }
 
-      // D. Crear Gastos
+      // E. Crear Gastos
       for (const gRecord of detalles.gastosData) {
         await tx.gasto.create({
           data: {
@@ -296,7 +301,7 @@ export class SolicitudesService {
         });
       }
 
-      // E. Crear Nómina
+      // F. Crear Nómina
       for (const n of detalles.nominasTerceros) {
         await tx.nominaTerceros.create({
           data: {
@@ -309,15 +314,7 @@ export class SolicitudesService {
 
       return tx.solicitud.findUnique({
         where: { id: solicitud.id },
-        include: {
-          planificaciones: true,
-          viaticos: true,
-          gastos: true,
-          nominasTerceros: true,
-          usuarioEmisor: true,
-          aprobador: true,
-          poa: { include: { actividad: true } },
-        },
+        include: SOLICITUD_INCLUDE,
       });
     });
 
@@ -337,15 +334,7 @@ export class SolicitudesService {
 
     return this.prisma.solicitud.findMany({
       where,
-      include: {
-        usuarioEmisor: true,
-        aprobador: true,
-        poa: {
-          include: {
-            actividad: true,
-          },
-        },
-      },
+      include: SOLICITUD_INCLUDE,
       orderBy: {
         fechaSolicitud: 'desc',
       },
@@ -355,21 +344,7 @@ export class SolicitudesService {
   async findOne(id: number): Promise<Solicitud> {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
-      include: {
-        usuarioEmisor: true,
-        aprobador: true,
-        poa: {
-          include: {
-            actividad: true,
-            estructura: { include: { proyecto: true } },
-            codigoPresupuestario: true,
-          },
-        },
-        planificaciones: true,
-        viaticos: { include: { concepto: true } },
-        gastos: { include: { tipoGasto: true } },
-        nominasTerceros: true,
-      },
+      include: SOLICITUD_INCLUDE,
     });
 
     if (!solicitud) {
@@ -402,7 +377,6 @@ export class SolicitudesService {
 
     const {
       aprobadorId,
-      poaId,
       lugarViaje,
       motivoViaje,
       descripcion,
@@ -426,23 +400,6 @@ export class SolicitudesService {
       );
     }
 
-    // VALIDACIÓN 3: POA Uniqueness Check (Excluyendo actual)
-    if (poaId !== undefined && poaId !== solicitud.poaId) {
-      const poaOcupado = await this.prisma.solicitud.findFirst({
-        where: {
-          poaId,
-          id: { not: id },
-          deletedAt: null,
-        },
-      });
-
-      if (poaOcupado) {
-        throw new BadRequestException(
-          'El ítem del POA seleccionado ya está asociado a otra solicitud activa',
-        );
-      }
-    }
-
     // [SAFETY CHECK] Conditional Nuke: Solo reemplazamos si se envían planes/viaticos/gastos/nominas
     const itemsActualizados =
       (planificaciones && planificaciones.length > 0) ||
@@ -451,8 +408,8 @@ export class SolicitudesService {
       (nominasTerceros && nominasTerceros.length > 0);
 
     return this.prisma.$transaction(async (tx) => {
-      let finalMontoTotal = solicitud.montoTotal;
-      let finalLiquidoPagable = solicitud.liquidoPagable;
+      let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
+      let finalMontoTotalNeto = solicitud.montoTotalNeto;
 
       if (itemsActualizados) {
         // A. Limpiar existentes
@@ -463,8 +420,8 @@ export class SolicitudesService {
 
         // B. Recalcular y re-insertar
         const detalles = await this.prepararInsertAnidado(updateSolicitudDto);
-        finalMontoTotal = detalles.montoTotal;
-        finalLiquidoPagable = detalles.liquidoPagable;
+        finalMontoTotalPresupuestado = detalles.montoTotalPresupuestado;
+        finalMontoTotalNeto = detalles.montoTotalNeto;
 
         // C. Re-inserción masiva (exactamente igual que el create)
         const createdPlanif: { id: number }[] = [];
@@ -521,22 +478,13 @@ export class SolicitudesService {
           lugarViaje,
           motivoViaje,
           descripcion,
-          montoTotal: finalMontoTotal,
-          liquidoPagable: finalLiquidoPagable,
+          montoTotalPresupuestado: finalMontoTotalPresupuestado,
+          montoTotalNeto: finalMontoTotalNeto,
           estado: EstadoSolicitud.PENDIENTE,
           observacion: null,
           aprobador: { connect: { id: aprobadorId } },
-          ...(poaId !== undefined ? { poa: { connect: { id: poaId } } } : {}),
         },
-        include: {
-          usuarioEmisor: true,
-          aprobador: true,
-          poa: { include: { actividad: true } },
-          planificaciones: true,
-          viaticos: { include: { concepto: true } },
-          gastos: { include: { tipoGasto: true } },
-          nominasTerceros: true,
-        },
+        include: SOLICITUD_INCLUDE,
       });
     });
   }
@@ -606,6 +554,7 @@ export class SolicitudesService {
     return this.prisma.solicitud.update({
       where: { id },
       data: { aprobadorId: nuevoAprobadorId },
+      include: SOLICITUD_INCLUDE,
     });
   }
 
@@ -635,6 +584,7 @@ export class SolicitudesService {
         observacion: observarDto.observacion,
         aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
       },
+      include: SOLICITUD_INCLUDE,
     });
   }
 
@@ -664,6 +614,7 @@ export class SolicitudesService {
         codigoDesembolso: desembolsarDto.codigoDesembolso,
         aprobadorId: null, // Finalizado
       },
+      include: SOLICITUD_INCLUDE,
     });
   }
 }

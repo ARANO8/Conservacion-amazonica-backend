@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { TDocumentDefinitions, CustomTableLayout } from 'pdfmake/interfaces';
+import { formatDate, formatCurrency } from '../shared/utils/formatters.util';
 
 // Definición de interfaces para tipado estricto y satisfacer ESLint
 export interface SolicitudReportData {
@@ -8,8 +9,8 @@ export interface SolicitudReportData {
   motivoViaje?: string | null;
   fechaInicio?: Date | string | null;
   fechaFin?: Date | string | null;
-  montoTotal: number | string | { toString(): string };
-  liquidoPagable: number | string | { toString(): string };
+  montoTotalPresupuestado: number | string | { toString(): string };
+  montoTotalNeto: number | string | { toString(): string };
   usuarioEmisor?: {
     nombreCompleto?: string | null;
   } | null;
@@ -38,7 +39,8 @@ export interface SolicitudReportData {
     dias: number;
     cantidadPersonas: number;
     costoUnitario: number | string | { toString(): string };
-    totalBs: number | string | { toString(): string };
+    montoPresupuestado: number | string | { toString(): string };
+    montoNeto: number | string | { toString(): string };
     concepto?: {
       nombre?: string | null;
     } | null;
@@ -48,7 +50,8 @@ export interface SolicitudReportData {
     tipoDocumento: string;
     cantidad: number;
     costoUnitario: number | string | { toString(): string };
-    totalBs: number | string | { toString(): string };
+    montoPresupuestado: number | string | { toString(): string };
+    montoNeto: number | string | { toString(): string };
     tipoGasto?: {
       nombre?: string | null;
     } | null;
@@ -77,26 +80,6 @@ export class ReportsService {
 
     // 3. Instanciación
     const printer = new PdfPrinter(fonts);
-
-    const formatDate = (date: Date | string | null | undefined) => {
-      if (!date) return 'N/A';
-      const d = new Date(date);
-      return d.toLocaleDateString('es-BO', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      });
-    };
-
-    const formatCurrency = (
-      amount: number | string | { toString(): string } | null | undefined,
-    ) => {
-      const val = parseFloat(amount?.toString() || '0');
-      return `Bs ${val.toLocaleString('es-BO', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })}`;
-    };
 
     const docDefinition: TDocumentDefinitions = {
       content: [
@@ -204,7 +187,10 @@ export class ReportsService {
                 v.tipoDestino,
                 `${v.dias} días x ${v.cantidadPersonas} pers`,
                 formatCurrency(v.costoUnitario),
-                { text: formatCurrency(v.totalBs), alignment: 'right' },
+                {
+                  text: formatCurrency(v.montoPresupuestado),
+                  alignment: 'right',
+                },
               ]),
               // Gastos
               ...(solicitud.gastos || []).map((g) => [
@@ -212,7 +198,10 @@ export class ReportsService {
                 g.detalle || g.tipoDocumento,
                 g.cantidad,
                 formatCurrency(g.costoUnitario),
-                { text: formatCurrency(g.totalBs), alignment: 'right' },
+                {
+                  text: formatCurrency(g.montoPresupuestado),
+                  alignment: 'right',
+                },
               ]),
               // Totales
               [
@@ -226,14 +215,14 @@ export class ReportsService {
                 {},
                 {},
                 {
-                  text: formatCurrency(solicitud.montoTotal),
+                  text: formatCurrency(solicitud.montoTotalPresupuestado),
                   bold: true,
                   alignment: 'right',
                 },
               ],
               [
                 {
-                  text: 'LÍQUIDO PAGABLE',
+                  text: 'MONTO NETO',
                   colSpan: 4,
                   bold: true,
                   alignment: 'right',
@@ -242,7 +231,7 @@ export class ReportsService {
                 {},
                 {},
                 {
-                  text: formatCurrency(solicitud.liquidoPagable),
+                  text: formatCurrency(solicitud.montoTotalNeto),
                   bold: true,
                   alignment: 'right',
                   color: 'darkblue',

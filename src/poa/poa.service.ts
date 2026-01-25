@@ -4,6 +4,7 @@ import { EstadoPoa, Prisma } from '@prisma/client';
 import { CreatePoaDto } from './dto/create-poa.dto';
 import { UpdatePoaDto } from './dto/update-poa.dto';
 import { PoaPaginationDto } from './dto/poa-pagination.dto';
+import { PoaLookupDto } from './dto/poa-lookup.dto';
 
 @Injectable()
 export class PoaService {
@@ -272,5 +273,57 @@ export class PoaService {
         codigoPresupuestario: true,
       },
     });
+  }
+
+  async getLookup(): Promise<PoaLookupDto[]> {
+    const poas = await this.prisma.poa.findMany({
+      where: { deletedAt: null },
+      distinct: ['codigoPoa'],
+      select: {
+        codigoPoa: true,
+      },
+      orderBy: { codigoPoa: 'asc' },
+    });
+
+    return poas.map((poa) => ({
+      codigo: poa.codigoPoa,
+    }));
+  }
+
+  async findDetailByStructure(
+    codigoPoa: string,
+    proyectoId: number,
+    grupoId: number,
+    partidaId: number,
+    codigoPresupuestarioId: number,
+  ) {
+    const poa = await this.prisma.poa.findFirst({
+      where: {
+        codigoPresupuestarioId,
+        deletedAt: null,
+        estructura: {
+          proyectoId,
+          grupoId,
+          partidaId,
+        },
+      },
+      select: {
+        id: true,
+        costoTotal: true,
+        actividad: {
+          select: {
+            detalleDescripcion: true,
+          },
+        },
+      },
+    });
+
+    if (!poa) return null;
+
+    return {
+      id: poa.id,
+      costoTotal: poa.costoTotal,
+      descripcion: poa.actividad.detalleDescripcion,
+    };
   }
 }

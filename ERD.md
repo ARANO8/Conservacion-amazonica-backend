@@ -45,6 +45,13 @@ TERCEROS TERCEROS
 RECIBO RECIBO
         }
     
+
+
+        EstadoReserva {
+            RESERVADO RESERVADO
+CONFIRMADO CONFIRMADO
+        }
+    
   "Usuario" {
     Int id "🗝️"
     String email 
@@ -117,8 +124,8 @@ RECIBO RECIBO
     DateTime fechaInicio "❓"
     DateTime fechaFin "❓"
     String codigoDesembolso "❓"
-    Decimal montoTotal 
-    Decimal liquidoPagable 
+    Decimal montoTotalNeto 
+    Decimal montoTotalPresupuestado 
     EstadoSolicitud estado 
     String observacion "❓"
     DateTime deletedAt "❓"
@@ -150,6 +157,15 @@ RECIBO RECIBO
     }
   
 
+  "SolicitudPresupuesto" {
+    Int id "🗝️"
+    EstadoReserva estado 
+    DateTime expiresAt "❓"
+    Decimal subtotalNeto 
+    Decimal subtotalPresupuestado 
+    }
+  
+
   "Planificacion" {
     Int id "🗝️"
     String actividadProgramada 
@@ -175,10 +191,10 @@ RECIBO RECIBO
     Int dias 
     Int cantidadPersonas 
     Decimal costoUnitario 
-    Decimal totalBs 
+    Decimal montoPresupuestado 
     Decimal iva13 
     Decimal it3 
-    Decimal liquidoPagable 
+    Decimal montoNeto 
     }
   
 
@@ -194,11 +210,11 @@ RECIBO RECIBO
     TipoDocumento tipoDocumento 
     Int cantidad 
     Decimal costoUnitario 
-    Decimal totalBs 
+    Decimal montoPresupuestado 
     Decimal iva13 
     Decimal it3 
     Decimal iue5 
-    Decimal liquidoPagable 
+    Decimal montoNeto 
     String detalle "❓"
     }
   
@@ -228,22 +244,25 @@ RECIBO RECIBO
     "Solicitud" }o--|| "Usuario" : "usuarioEmisor"
     "Solicitud" }o--|o "Usuario" : "aprobador"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
-    "Solicitud" |o--|o "Poa" : "poa"
     "HistorialAprobacion" |o--|| "AccionHistorial" : "enum:accion"
     "HistorialAprobacion" }o--|| "Solicitud" : "solicitud"
     "HistorialAprobacion" }o--|| "Usuario" : "usuarioActor"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
+    "SolicitudPresupuesto" |o--|| "EstadoReserva" : "enum:estado"
+    "SolicitudPresupuesto" }o--|o "Solicitud" : "solicitud"
+    "SolicitudPresupuesto" }o--|o "Usuario" : "usuario"
+    "SolicitudPresupuesto" }o--|| "Poa" : "poa"
     "Planificacion" }o--|| "Solicitud" : "solicitud"
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"
     "Viatico" }o--|| "Solicitud" : "solicitud"
+    "Viatico" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
     "Viatico" }o--|| "Planificacion" : "planificacion"
     "Viatico" }o--|| "Concepto" : "concepto"
     "Gasto" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Gasto" }o--|| "Solicitud" : "solicitud"
-    "Gasto" }o--|| "Grupo" : "grupo"
-    "Gasto" }o--|| "Partida" : "partida"
+    "Gasto" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
     "Gasto" }o--|| "TipoGasto" : "tipoGasto"
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
     "NominaTerceros" }o--|| "Solicitud" : "solicitud"

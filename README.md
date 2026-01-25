@@ -2,97 +2,71 @@
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+# Conservación Amazónica - ACEAA Backend
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Sistema de gestión para la administración de solicitudes de fondos, presupuestos y procesos operativos de Conservación Amazónica.
 
-## Description
+##  Arquitectura de Datos
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+El sistema gestiona una relación compleja entre solicitudes y presupuestos basada en la disponibilidad del POA (Plan Operativo Anual).
 
-## Project setup
+- **Relación N:M**: Una **Solicitud** puede estar vinculada a múltiples **Presupuestos** a través de una tabla de unión.
+- **Ciclo de Reservas**:
+  - `RESERVADO`: El fondo está bloqueado temporalmente por un usuario.
+  - `CONFIRMADO`: La solicitud ha sido creada y los fondos están oficialmente comprometidos.
+- **Estructura Programática**: Integración multinivel de Proyecto -> Grupo -> Partida -> Actividad POA.
 
+##  Lógica Financiera (Gross-up Aditivo)
+
+El backend implementa una lógica de cálculo **Aditiva** para simplificar la entrada de datos del usuario:
+
+1. **Entrada**: El usuario ingresa el `montoNeto` (el monto líquido que se desea recibir o pagar).
+2. **Cálculo**: El sistema aplica las tasas impositivas configuradas (IVA, IT, IUE) sobre el neto.
+3. **Resultado**: Se obtiene el `montoPresupuestado`, que representa el costo total real para la institución.
+
+> [!NOTE]
+> Todos los cálculos financieros utilizan la librería `Decimal.js` (vía Prisma) para garantizar precisión decimal y evitar errores de coma flotante, con redondeo estricto a 2 decimales.
+
+##  Seguridad y Sanitización
+
+- **Protección de Datos**: Todas las respuestas de la API que involucran objetos de usuario están sanitizadas.
+- **Exclusión de Passwords**: Los hashes de contraseñas se eliminan explícitamente en la capa de servicio tanto en el módulo de `Usuarios` como en las relaciones de `Solicitudes` (Emisor, Aprobador).
+
+##  Validaciones de Negocio
+
+Se aplican reglas estrictas de integridad antes de persistir cualquier solicitud:
+- **Días de Viático**: La cantidad de días solicitados no puede exceder la duración de la actividad planificada.
+- **Capacidad de Personas**: El número de beneficiarios de viáticos debe ser menor o igual a la capacidad planificada (Institucional + Terceros).
+- **Flujo de Aprobación**: Validación de estados para permitir transiciones solo entre estados válidos (`PENDIENTE`, `OBSERVADO`, `DESEMBOLSADO`).
+
+## 🛠️ Setup Rápido
+
+### Requisitos
+- Node.js (v18+)
+- pnpm
+
+### Instalación
 ```bash
+# 1. Instalar dependencias
 $ pnpm install
+
+# 2. Configurar base de datos (copiar .env.example a .env)
+# 3. Correr migraciones de Prisma
+$ npx prisma migrate dev
+
+# 4. (Opcional) Cargar datos iniciales
+$ pnpm run seed
 ```
 
-## Compile and run the project
-
+### Ejecución
 ```bash
-# development
-$ pnpm run start
-
-# watch mode
+# Desarrollo
 $ pnpm run start:dev
 
-# production mode
+# Producción
+$ pnpm run build
 $ pnpm run start:prod
 ```
 
-## Run tests
-
-```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
-```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+## 📄 Licencia
+Este proyecto es propiedad privada de Conservación Amazónica - ACEAA.
