@@ -81,6 +81,14 @@ export class PoaController {
     );
   }
 
+  @Get('structure')
+  @ApiOperation({
+    summary: 'Obtener estructura completa de un POA filtrado por código',
+  })
+  getStructureFiltered(@Query('codigoPoa') codigoPoa: string) {
+    return this.poaService.getStructureByPoa(codigoPoa);
+  }
+
   @Post()
   @Roles(Rol.ADMIN)
   @ApiOperation({ summary: 'Crear una nueva fila de POA' })

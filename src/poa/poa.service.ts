@@ -326,4 +326,55 @@ export class PoaService {
       descripcion: poa.actividad.detalleDescripcion,
     };
   }
+
+  async getStructureByPoa(codigoPoa: string) {
+    return this.prisma.poa.findMany({
+      where: {
+        codigoPoa,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        codigoPoa: true,
+        cantidad: true,
+        costoUnitario: true,
+        costoTotal: true,
+        actividad: {
+          select: {
+            id: true,
+            detalleDescripcion: true,
+          },
+        },
+        codigoPresupuestario: {
+          select: {
+            id: true,
+            codigoCompleto: true,
+          },
+        },
+        estructura: {
+          select: {
+            proyecto: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
+            grupo: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
+            partida: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { id: 'asc' },
+    });
+  }
 }

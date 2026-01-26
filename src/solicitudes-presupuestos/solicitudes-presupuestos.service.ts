@@ -13,6 +13,22 @@ import { EstadoReserva } from '@prisma/client';
 export class SolicitudPresupuestoService {
   private readonly logger = new Logger(SolicitudPresupuestoService.name);
 
+  private readonly RESERVA_INCLUDE = {
+    poa: {
+      include: {
+        actividad: true,
+        codigoPresupuestario: true,
+        estructura: {
+          include: {
+            proyecto: true,
+            grupo: true,
+            partida: true,
+          },
+        },
+      },
+    },
+  };
+
   constructor(private prisma: PrismaService) {}
 
   async reservarFuente(dto: ReservarFuenteDto, usuarioId: number) {
@@ -57,12 +73,11 @@ export class SolicitudPresupuestoService {
             expiresAt: new Date(Date.now() + 30 * 60 * 1000),
             usuarioId,
           },
+          include: this.RESERVA_INCLUDE,
         });
       }
 
       // Caso C: No existe o los encontrados estaban expirados (reutilizamos lógica de creación)
-      // Nota: Si existía uno expirado, deleteMany lo limpiará el cron,
-      // pero para reservar ahora simplemente creamos uno nuevo.
       return tx.solicitudPresupuesto.create({
         data: {
           poaId,
@@ -70,6 +85,7 @@ export class SolicitudPresupuestoService {
           expiresAt: new Date(Date.now() + 30 * 60 * 1000),
           usuarioId,
         },
+        include: this.RESERVA_INCLUDE,
       });
     });
   }
@@ -146,20 +162,7 @@ export class SolicitudPresupuestoService {
         estado: EstadoReserva.RESERVADO,
         expiresAt: { gt: new Date() },
       },
-      include: {
-        poa: {
-          include: {
-            estructura: {
-              include: {
-                proyecto: true,
-                grupo: true,
-                partida: true,
-              },
-            },
-            actividad: true,
-          },
-        },
-      },
+      include: this.RESERVA_INCLUDE,
     });
   }
 }
