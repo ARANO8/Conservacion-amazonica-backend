@@ -1,14 +1,63 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { EstadoPoa, Prisma } from '@prisma/client';
+import { EstadoPoa, EstadoSolicitud, Prisma } from '@prisma/client';
 import { CreatePoaDto } from './dto/create-poa.dto';
 import { UpdatePoaDto } from './dto/update-poa.dto';
 import { PoaPaginationDto } from './dto/poa-pagination.dto';
 import { PoaLookupDto } from './dto/poa-lookup.dto';
 
+type PoaDetailed = Prisma.PoaGetPayload<{
+  include: {
+    estructura: {
+      include: {
+        proyecto: true;
+        grupo: true;
+        partida: true;
+      };
+    };
+    actividad: true;
+    codigoPresupuestario: true;
+  };
+}>;
+
+type PoaWithSaldo<T> = T & { saldoDisponible: number };
+
 @Injectable()
 export class PoaService {
   constructor(private prisma: PrismaService) {}
+
+  private async addSaldoDisponible<
+    T extends { id: number; costoTotal: Prisma.Decimal },
+  >(poa: T): Promise<PoaWithSaldo<T>> {
+    const comprometidoRaw = await this.prisma.solicitudPresupuesto.aggregate({
+      where: {
+        poaId: poa.id,
+        solicitud: {
+          deletedAt: null,
+          estado: {
+            in: [
+              EstadoSolicitud.PENDIENTE,
+              EstadoSolicitud.OBSERVADO,
+              EstadoSolicitud.DESEMBOLSADO,
+            ],
+          },
+        },
+      },
+      _sum: {
+        subtotalPresupuestado: true,
+      },
+    });
+
+    const montoComprometido =
+      comprometidoRaw._sum.subtotalPresupuestado || new Prisma.Decimal(0);
+
+    const saldoDisponible = poa.costoTotal.sub(montoComprometido).toNumber();
+
+    return {
+      ...poa,
+      saldoDisponible,
+    };
+  }
 
   async findAll(paginationDto: PoaPaginationDto) {
     const { page = 1, limit = 10, search } = paginationDto;
@@ -57,8 +106,12 @@ export class PoaService {
 
     const lastPage = Math.ceil(total / limit);
 
+    const enrichedData = await Promise.all(
+      data.map((poa) => this.addSaldoDisponible(poa)),
+    );
+
     return {
-      data,
+      data: enrichedData,
       meta: {
         total,
         page,
@@ -67,7 +120,7 @@ export class PoaService {
     };
   }
 
-  async findOne(id: number) {
+  async findOne(id: number): Promise<PoaWithSaldo<PoaDetailed>> {
     const poa = await this.prisma.poa.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -87,7 +140,7 @@ export class PoaService {
       throw new NotFoundException(`POA con ID ${id} no encontrado`);
     }
 
-    return poa;
+    return this.addSaldoDisponible(poa as PoaDetailed);
   }
 
   async create(createPoaDto: CreatePoaDto) {
@@ -239,18 +292,24 @@ export class PoaService {
       },
     });
 
-    return estructuras.map((e) => {
-      const saldoDisponible = e.poas.reduce(
-        (acc, poa) => acc + Number(poa.costoTotal),
-        0,
-      );
+    return Promise.all(
+      estructuras.map(async (e) => {
+        const poasEnriquecidos = await Promise.all(
+          e.poas.map((poa) => this.addSaldoDisponible(poa)),
+        );
 
-      return {
-        id: e.partida.id,
-        nombre: e.partida.nombre,
-        saldoDisponible,
-      };
-    });
+        const saldoTotalPartida = poasEnriquecidos.reduce(
+          (acc, poa) => acc + poa.saldoDisponible,
+          0,
+        );
+
+        return {
+          id: e.partida.id,
+          nombre: e.partida.nombre,
+          saldoDisponible: saldoTotalPartida,
+        };
+      }),
+    );
   }
 
   async getItemsPorPartida(
@@ -328,7 +387,7 @@ export class PoaService {
   }
 
   async getStructureByPoa(codigoPoa: string) {
-    return this.prisma.poa.findMany({
+    const poas = await this.prisma.poa.findMany({
       where: {
         codigoPoa,
         deletedAt: null,
@@ -376,5 +435,7 @@ export class PoaService {
       },
       orderBy: { id: 'asc' },
     });
+
+    return Promise.all(poas.map((poa) => this.addSaldoDisponible(poa)));
   }
 }
