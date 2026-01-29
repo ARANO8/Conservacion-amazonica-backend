@@ -11,16 +11,10 @@ import {
   IUE_COMPRA_RATE,
 } from '../common/constants/financial.constants';
 
-/**
- * Redondea un Decimal a 2 posiciones decimales.
- */
 function redondear(valor: Prisma.Decimal): Prisma.Decimal {
   return valor.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }
 
-/**
- * Valida que un viático esté dentro de los límites de su planificación.
- */
 export function validarLimitesViatico(
   vDto: CreateViaticoDto,
   planificacion: CreatePlanificacionDto,
@@ -28,14 +22,19 @@ export function validarLimitesViatico(
   const dInicio = new Date(planificacion.fechaInicio);
   const dFin = new Date(planificacion.fechaFin);
 
-  // Cálculo de días duración (IDEM a SolicitudesService)
-  const diffDays = Math.ceil(
-    (dFin.getTime() - dInicio.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  const oneDay = 1000 * 60 * 60 * 24;
+
+  const diffTime = dFin.getTime() - dInicio.getTime();
+
+  const diffDays = Math.floor(diffTime / oneDay) + 1;
 
   if (vDto.dias > diffDays) {
     throw new BadRequestException(
-      'Los días de viático exceden la duración de la actividad planificada',
+      'Los días de viático exceden la duración de la actividad planificada' +
+        'Estos son los dias de la planificacion: ' +
+        diffDays +
+        'Estos son los dias del viatico: ' +
+        vDto.dias,
     );
   }
 
@@ -49,10 +48,6 @@ export function validarLimitesViatico(
   }
 }
 
-/**
- * Calcula montos para viáticos basándose en lógica ADITIVA.
- * Retorna { subtotalNeto, iva, it, montoPresupuestado } redondeados.
- */
 export function calcularMontosViaticos(
   montoNetoUnitario: Prisma.Decimal,
   dias: number,
@@ -71,10 +66,6 @@ export function calcularMontosViaticos(
   };
 }
 
-/**
- * Calcula montos para gastos basándose en lógica ADITIVA y tipo de documento.
- * Retorna { subtotalNeto, iva, it, iue, montoPresupuestado } redondeados.
- */
 export function calcularMontosGastos(
   montoNetoUnitario: Prisma.Decimal,
   cantidad: number,

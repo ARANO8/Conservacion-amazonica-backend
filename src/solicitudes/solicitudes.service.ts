@@ -312,6 +312,9 @@ export class SolicitudesService {
         });
       }
 
+      // SYNC: Recalcular subtotales de los presupuestos involucrados
+      await this.presupuestoService.recalcularTotales(solicitud.id, tx);
+
       return tx.solicitud.findUnique({
         where: { id: solicitud.id },
         include: SOLICITUD_INCLUDE,
@@ -470,6 +473,9 @@ export class SolicitudesService {
           });
         }
       }
+
+      // SYNC: Recalcular subtotales de los presupuestos involucrados
+      await this.presupuestoService.recalcularTotales(id, tx);
 
       // D. Actualizar Cabecera
       return tx.solicitud.update({

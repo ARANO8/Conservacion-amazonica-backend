@@ -2,12 +2,14 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservarFuenteDto } from './dto/reservar-fuente.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { EstadoReserva } from '@prisma/client';
+import { EstadoReserva, Prisma } from '@prisma/client';
+import { PoaService } from '../poa/poa.service';
 
 @Injectable()
 export class SolicitudPresupuestoService {
@@ -29,7 +31,10 @@ export class SolicitudPresupuestoService {
     },
   };
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private poaService: PoaService,
+  ) {}
 
   async reservarFuente(dto: ReservarFuenteDto, usuarioId: number) {
     const { poaId } = dto;
@@ -50,12 +55,6 @@ export class SolicitudPresupuestoService {
       });
 
       if (existing) {
-        if (existing.estado === EstadoReserva.CONFIRMADO) {
-          throw new ConflictException(
-            'Esta partida ya está asignada a otra solicitud aprobada',
-          );
-        }
-
         if (
           existing.estado === EstadoReserva.RESERVADO &&
           existing.usuarioId !== usuarioId
@@ -75,6 +74,12 @@ export class SolicitudPresupuestoService {
           },
           include: this.RESERVA_INCLUDE,
         });
+      }
+
+      // MANDATORY: Calculate available balance before allowing reservation
+      const poa = await this.poaService.findOne(poaId);
+      if (poa.saldoDisponible <= 0) {
+        throw new BadRequestException('Partida Agotada');
       }
 
       // Caso C: No existe o los encontrados estaban expirados (reutilizamos lógica de creación)
@@ -153,6 +158,52 @@ export class SolicitudPresupuestoService {
       );
 
     return this.prisma.solicitudPresupuesto.delete({ where: { id } });
+  }
+
+  async recalcularTotales(solicitudId: number, tx?: Prisma.TransactionClient) {
+    const client = tx || this.prisma;
+
+    // 1. Buscamos todos los presupuestos asociados a esta solicitud
+    const presupuestos = await client.solicitudPresupuesto.findMany({
+      where: { solicitudId },
+      include: {
+        viaticos: true,
+        gastos: true,
+      },
+    });
+
+    for (const p of presupuestos) {
+      // 2. Sumamos viaticos
+      const sumViaticosPresupuestado = p.viaticos.reduce(
+        (acc, v) => acc.add(v.montoPresupuestado),
+        new Prisma.Decimal(0),
+      );
+      const sumViaticosNeto = p.viaticos.reduce(
+        (acc, v) => acc.add(v.montoNeto),
+        new Prisma.Decimal(0),
+      );
+
+      // 3. Sumamos gastos
+      const sumGastosPresupuestado = p.gastos.reduce(
+        (acc, g) => acc.add(g.montoPresupuestado),
+        new Prisma.Decimal(0),
+      );
+      const sumGastosNeto = p.gastos.reduce(
+        (acc, g) => acc.add(g.montoNeto),
+        new Prisma.Decimal(0),
+      );
+
+      // 4. Actualizamos el presupuesto
+      await client.solicitudPresupuesto.update({
+        where: { id: p.id },
+        data: {
+          subtotalPresupuestado: sumViaticosPresupuestado.add(
+            sumGastosPresupuestado,
+          ),
+          subtotalNeto: sumViaticosNeto.add(sumGastosNeto),
+        },
+      });
+    }
   }
 
   async findMyActive(usuarioId: number) {

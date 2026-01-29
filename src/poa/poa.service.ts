@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { EstadoPoa, EstadoSolicitud, Prisma } from '@prisma/client';
+import { EstadoPoa, Prisma } from '@prisma/client';
 import { CreatePoaDto } from './dto/create-poa.dto';
 import { UpdatePoaDto } from './dto/update-poa.dto';
 import { PoaPaginationDto } from './dto/poa-pagination.dto';
@@ -20,7 +20,11 @@ type PoaDetailed = Prisma.PoaGetPayload<{
   };
 }>;
 
-type PoaWithSaldo<T> = T & { saldoDisponible: number };
+type PoaWithSaldo<T> = T & {
+  saldoDisponible: number;
+  montoComprometido: number;
+  tieneCompromisos: boolean;
+};
 
 @Injectable()
 export class PoaService {
@@ -34,13 +38,6 @@ export class PoaService {
         poaId: poa.id,
         solicitud: {
           deletedAt: null,
-          estado: {
-            in: [
-              EstadoSolicitud.PENDIENTE,
-              EstadoSolicitud.OBSERVADO,
-              EstadoSolicitud.DESEMBOLSADO,
-            ],
-          },
         },
       },
       _sum: {
@@ -55,7 +52,9 @@ export class PoaService {
 
     return {
       ...poa,
+      montoComprometido: montoComprometido.toNumber(),
       saldoDisponible,
+      tieneCompromisos: montoComprometido.gt(0),
     };
   }
 
