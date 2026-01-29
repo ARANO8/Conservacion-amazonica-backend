@@ -216,17 +216,26 @@ export class SolicitudesService {
 
     const detalles = await this.prepararInsertAnidado(createSolicitudDto);
 
-    // --- CÁLCULO DE FECHAS (Sugerencia de Seguridad) ---
+    // --- CÁLCULO DE FECHAS (Strict Separation) ---
     let minDate: Date | null = null;
     let maxDate: Date | null = null;
 
     if (detalles.planificaciones && detalles.planificaciones.length > 0) {
-      const timestamps = detalles.planificaciones.flatMap((p) => [
-        new Date(p.fechaInicio).getTime(),
-        new Date(p.fechaFin).getTime(),
-      ]);
-      minDate = new Date(Math.min(...timestamps));
-      maxDate = new Date(Math.max(...timestamps));
+      minDate = detalles.planificaciones.reduce(
+        (min, p) => {
+          const current = new Date(p.fechaInicio);
+          return !min || current < min ? current : min;
+        },
+        null as Date | null,
+      );
+
+      maxDate = detalles.planificaciones.reduce(
+        (max, p) => {
+          const current = new Date(p.fechaFin);
+          return !max || current > max ? current : max;
+        },
+        null as Date | null,
+      );
     }
 
     // 3. TRANSACCIÓN PRISMA
@@ -320,8 +329,10 @@ export class SolicitudesService {
       for (const n of detalles.nominasTerceros) {
         await tx.personaExterna.create({
           data: {
-            nombreCompleto: n.nombreCompleto,
-            procedenciaInstitucion: n.procedenciaInstitucion,
+            nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
+            procedenciaInstitucion: n.procedenciaInstitucion
+              .trim()
+              .toUpperCase(),
             solicitudId: solicitud.id,
           },
         });
@@ -443,14 +454,23 @@ export class SolicitudesService {
         finalMontoTotalPresupuestado = detalles.montoTotalPresupuestado;
         finalMontoTotalNeto = detalles.montoTotalNeto;
 
-        // --- CÁLCULO DE FECHAS (Update) ---
+        // --- CÁLCULO DE FECHAS (Update - Strict Separation) ---
         if (detalles.planificaciones && detalles.planificaciones.length > 0) {
-          const timestamps = detalles.planificaciones.flatMap((p) => [
-            new Date(p.fechaInicio).getTime(),
-            new Date(p.fechaFin).getTime(),
-          ]);
-          finalFechaInicio = new Date(Math.min(...timestamps));
-          finalFechaFin = new Date(Math.max(...timestamps));
+          finalFechaInicio = detalles.planificaciones.reduce(
+            (min, p) => {
+              const current = new Date(p.fechaInicio);
+              return !min || current < min ? current : min;
+            },
+            null as Date | null,
+          );
+
+          finalFechaFin = detalles.planificaciones.reduce(
+            (max, p) => {
+              const current = new Date(p.fechaFin);
+              return !max || current > max ? current : max;
+            },
+            null as Date | null,
+          );
         } else {
           finalFechaInicio = null;
           finalFechaFin = null;
@@ -496,8 +516,10 @@ export class SolicitudesService {
         for (const n of detalles.nominasTerceros) {
           await tx.personaExterna.create({
             data: {
-              nombreCompleto: n.nombreCompleto,
-              procedenciaInstitucion: n.procedenciaInstitucion,
+              nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
+              procedenciaInstitucion: n.procedenciaInstitucion
+                .trim()
+                .toUpperCase(),
               solicitudId: id,
             },
           });
