@@ -123,15 +123,31 @@ export class SolicitudesService {
         ? new Prisma.Decimal(vDto.montoNeto)
         : precioCatalogo;
 
-      const { subtotalNeto, iva, it, montoPresupuestado } =
-        calcularMontosViaticos(
-          montoNetoUnitario,
-          vDto.dias,
-          vDto.cantidadPersonas,
-        );
+      const {
+        subtotalNeto,
+        iva,
+        it,
+        montoPresupuestado: calcMontoPresupuestado,
+      } = calcularMontosViaticos(
+        montoNetoUnitario,
+        vDto.dias,
+        vDto.cantidadPersonas,
+      );
 
-      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
-      montoTotalNeto = montoTotalNeto.add(subtotalNeto);
+      // Trust DTO if provided (assuming DTO sends the TOTAL for viáticos if it specifies it)
+      // Actually, looking at vDto.montoNeto, it says 'Monto neto a recibir'.
+      // If vDto.montoPresupuestado is present, we trust it as the TOTAL for that viatico entry.
+      const finalMontoNeto = vDto.montoNeto
+        ? new Prisma.Decimal(vDto.montoNeto)
+        : subtotalNeto;
+      const finalMontoPresupuestado = vDto.montoPresupuestado
+        ? new Prisma.Decimal(vDto.montoPresupuestado)
+        : calcMontoPresupuestado;
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(
+        finalMontoPresupuestado,
+      );
+      montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       viaticosData.push({
         planificacionIndex: vDto.planificacionIndex,
@@ -141,10 +157,10 @@ export class SolicitudesService {
           dias: vDto.dias,
           cantidadPersonas: vDto.cantidadPersonas,
           costoUnitario: montoNetoUnitario,
-          montoPresupuestado: montoPresupuestado,
+          montoPresupuestado: finalMontoPresupuestado,
           iva13: iva,
           it3: it,
-          montoNeto: subtotalNeto,
+          montoNeto: finalMontoNeto,
           solicitudPresupuestoId: vDto.solicitudPresupuestoId,
         },
       });
@@ -159,16 +175,32 @@ export class SolicitudesService {
         );
       }
 
-      const { subtotalNeto, iva, it, iue, montoPresupuestado } =
-        calcularMontosGastos(
-          new Prisma.Decimal(gDto.montoNeto),
-          gDto.cantidad,
-          gDto.tipoDocumento,
-          tipoGasto.codigo,
-        );
+      const {
+        subtotalNeto: calcSubtotalNeto,
+        iva,
+        it,
+        iue,
+        montoPresupuestado: calcMontoPresupuestado,
+      } = calcularMontosGastos(
+        new Prisma.Decimal(gDto.montoNeto),
+        gDto.cantidad,
+        gDto.tipoDocumento,
+        tipoGasto.codigo,
+      );
 
-      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
-      montoTotalNeto = montoTotalNeto.add(subtotalNeto);
+      // Trust DTO if provided. For Gastos, it's usually unitary as per DTO descriptions,
+      // but let's assume the user wants to pass the total or unitary as calculated by FE.
+      const finalMontoNeto = gDto.montoNeto
+        ? new Prisma.Decimal(gDto.montoNeto).mul(gDto.cantidad)
+        : calcSubtotalNeto;
+      const finalMontoPresupuestado = gDto.montoPresupuestado
+        ? new Prisma.Decimal(gDto.montoPresupuestado).mul(gDto.cantidad)
+        : calcMontoPresupuestado;
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(
+        finalMontoPresupuestado,
+      );
+      montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       gastosData.push({
         solicitudPresupuestoId: gDto.solicitudPresupuestoId,
@@ -176,11 +208,11 @@ export class SolicitudesService {
         tipoDocumento: gDto.tipoDocumento,
         cantidad: gDto.cantidad,
         costoUnitario: new Prisma.Decimal(gDto.montoNeto),
-        montoPresupuestado: montoPresupuestado,
+        montoPresupuestado: finalMontoPresupuestado,
         iva13: iva,
         it3: it,
         iue5: iue,
-        montoNeto: subtotalNeto,
+        montoNeto: finalMontoNeto,
         detalle: gDto.detalle,
       });
     }

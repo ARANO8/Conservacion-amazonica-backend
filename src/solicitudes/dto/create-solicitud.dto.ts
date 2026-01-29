@@ -75,6 +75,16 @@ export class CreateViaticoDto {
   @Min(0)
   montoNeto?: number;
 
+  @ApiProperty({
+    example: 232,
+    description: 'Monto presupuestado total (incl. impuestos)',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  montoPresupuestado?: number;
+
   @ApiProperty({ example: 1, description: 'ID de la reserva de presupuesto' })
   @IsInt()
   @Min(1)
@@ -108,6 +118,15 @@ export class CreateGastoDto {
   @IsNumber()
   @Min(0)
   montoNeto: number;
+
+  @ApiProperty({
+    example: 58.58,
+    minimum: 0,
+    description: 'Monto presupuestado unitario (incl. impuestos)',
+  })
+  @IsNumber()
+  @Min(0)
+  montoPresupuestado: number;
 
   @ApiProperty({ example: 'Compra de herramientas', required: false })
   @IsOptional()

@@ -44,6 +44,7 @@ export class SolicitudPresupuestoService {
       const existing = await tx.solicitudPresupuesto.findFirst({
         where: {
           poaId,
+          solicitudId: null, // CRITICAL: Only reuse if not yet linked to a solicitud
           OR: [
             { estado: EstadoReserva.CONFIRMADO },
             {
@@ -172,6 +173,9 @@ export class SolicitudPresupuestoService {
       },
     });
 
+    let totalSolicitudPresupuestado = new Prisma.Decimal(0);
+    let totalSolicitudNeto = new Prisma.Decimal(0);
+
     for (const p of presupuestos) {
       // 2. Sumamos viaticos
       const sumViaticosPresupuestado = p.viaticos.reduce(
@@ -193,17 +197,30 @@ export class SolicitudPresupuestoService {
         new Prisma.Decimal(0),
       );
 
+      const subtotalP = sumViaticosPresupuestado.add(sumGastosPresupuestado);
+      const subtotalN = sumViaticosNeto.add(sumGastosNeto);
+
       // 4. Actualizamos el presupuesto
       await client.solicitudPresupuesto.update({
         where: { id: p.id },
         data: {
-          subtotalPresupuestado: sumViaticosPresupuestado.add(
-            sumGastosPresupuestado,
-          ),
-          subtotalNeto: sumViaticosNeto.add(sumGastosNeto),
+          subtotalPresupuestado: subtotalP,
+          subtotalNeto: subtotalN,
         },
       });
+
+      totalSolicitudPresupuestado = totalSolicitudPresupuestado.add(subtotalP);
+      totalSolicitudNeto = totalSolicitudNeto.add(subtotalN);
     }
+
+    // 5. Sincronizar totales en la Solicitud
+    await client.solicitud.update({
+      where: { id: solicitudId },
+      data: {
+        montoTotalPresupuestado: totalSolicitudPresupuestado,
+        montoTotalNeto: totalSolicitudNeto,
+      },
+    });
   }
 
   async findMyActive(usuarioId: number) {
