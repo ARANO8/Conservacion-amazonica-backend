@@ -30,7 +30,7 @@ type PoaWithSaldo<T> = T & {
 export class PoaService {
   constructor(private prisma: PrismaService) {}
 
-  private async addSaldoDisponible<
+  async addSaldoDisponible<
     T extends { id: number; costoTotal: Prisma.Decimal },
   >(poa: T): Promise<PoaWithSaldo<T>> {
     const comprometidoRaw = await this.prisma.solicitudPresupuesto.aggregate({

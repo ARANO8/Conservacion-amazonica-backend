@@ -66,7 +66,7 @@ export class SolicitudPresupuestoService {
         }
 
         // Si es el mismo usuario, renovamos la reserva
-        return tx.solicitudPresupuesto.update({
+        const updated = await tx.solicitudPresupuesto.update({
           where: { id: existing.id },
           data: {
             estado: EstadoReserva.RESERVADO,
@@ -75,6 +75,13 @@ export class SolicitudPresupuestoService {
           },
           include: this.RESERVA_INCLUDE,
         });
+
+        if (updated.poa) {
+          updated.poa = (await this.poaService.addSaldoDisponible(
+            updated.poa,
+          )) as unknown as typeof updated.poa;
+        }
+        return updated;
       }
 
       // MANDATORY: Calculate available balance before allowing reservation
@@ -84,7 +91,7 @@ export class SolicitudPresupuestoService {
       }
 
       // Caso C: No existe o los encontrados estaban expirados (reutilizamos lógica de creación)
-      return tx.solicitudPresupuesto.create({
+      const newReserva = await tx.solicitudPresupuesto.create({
         data: {
           poaId,
           estado: EstadoReserva.RESERVADO,
@@ -93,6 +100,13 @@ export class SolicitudPresupuestoService {
         },
         include: this.RESERVA_INCLUDE,
       });
+
+      if (newReserva.poa) {
+        newReserva.poa = (await this.poaService.addSaldoDisponible(
+          newReserva.poa,
+        )) as unknown as typeof newReserva.poa;
+      }
+      return newReserva;
     });
   }
 
@@ -224,7 +238,7 @@ export class SolicitudPresupuestoService {
   }
 
   async findMyActive(usuarioId: number) {
-    return this.prisma.solicitudPresupuesto.findMany({
+    const data = await this.prisma.solicitudPresupuesto.findMany({
       where: {
         usuarioId,
         estado: EstadoReserva.RESERVADO,
@@ -232,5 +246,16 @@ export class SolicitudPresupuestoService {
       },
       include: this.RESERVA_INCLUDE,
     });
+
+    return Promise.all(
+      data.map(async (item) => {
+        if (item.poa) {
+          item.poa = (await this.poaService.addSaldoDisponible(
+            item.poa,
+          )) as unknown as typeof item.poa;
+        }
+        return item;
+      }),
+    );
   }
 }
