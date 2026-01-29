@@ -54,9 +54,17 @@ export function calcularMontosViaticos(
   personas: number,
 ) {
   const subtotalNeto = redondear(montoNetoUnitario.mul(dias).mul(personas));
-  const iva = redondear(subtotalNeto.mul(IVA_RATE));
-  const it = redondear(subtotalNeto.mul(IT_RATE));
-  const montoPresupuestado = redondear(subtotalNeto.add(iva).add(it));
+
+  // Grossing Up: montoTotal = montoNeto / 0.87 (Tasa Efectiva RC-IVA 13%)
+  const montoPresupuestado = redondear(subtotalNeto.div(0.87));
+
+  // El impuesto (IVA/Retención) es la diferencia
+  const totalImpuestos = redondear(montoPresupuestado.sub(subtotalNeto));
+
+  // Mantenemos iva e it para compatibilidad con la DB, asignando el total a iva (RC-IVA)
+  // y dejando it en 0, o distribuyendo si fuera necesario. El usuario pide RC-IVA 13%.
+  const iva = totalImpuestos;
+  const it = new Prisma.Decimal(0);
 
   return {
     subtotalNeto,
