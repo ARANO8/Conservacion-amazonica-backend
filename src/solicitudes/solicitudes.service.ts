@@ -216,6 +216,19 @@ export class SolicitudesService {
 
     const detalles = await this.prepararInsertAnidado(createSolicitudDto);
 
+    // --- CÁLCULO DE FECHAS (Sugerencia de Seguridad) ---
+    let minDate: Date | null = null;
+    let maxDate: Date | null = null;
+
+    if (detalles.planificaciones && detalles.planificaciones.length > 0) {
+      const timestamps = detalles.planificaciones.flatMap((p) => [
+        new Date(p.fechaInicio).getTime(),
+        new Date(p.fechaFin).getTime(),
+      ]);
+      minDate = new Date(Math.min(...timestamps));
+      maxDate = new Date(Math.max(...timestamps));
+    }
+
     // 3. TRANSACCIÓN PRISMA
     if (!presupuestosIds || presupuestosIds.length === 0) {
       throw new BadRequestException(
@@ -235,6 +248,8 @@ export class SolicitudesService {
           montoTotalNeto: detalles.montoTotalNeto,
           lugarViaje,
           motivoViaje,
+          fechaInicio: minDate,
+          fechaFin: maxDate,
           estado: EstadoSolicitud.PENDIENTE,
           usuarioEmisor: { connect: { id: usuarioId } },
           aprobador: { connect: { id: aprobadorId } },
@@ -301,12 +316,12 @@ export class SolicitudesService {
         });
       }
 
-      // F. Crear Nómina
+      // F. Crear PersonaExterna (Viene de nominasTerceros)
       for (const n of detalles.nominasTerceros) {
-        await tx.nominaTerceros.create({
+        await tx.personaExterna.create({
           data: {
             nombreCompleto: n.nombreCompleto,
-            ci: n.ci,
+            procedenciaInstitucion: n.procedenciaInstitucion,
             solicitudId: solicitud.id,
           },
         });
@@ -413,18 +428,33 @@ export class SolicitudesService {
     return this.prisma.$transaction(async (tx) => {
       let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
       let finalMontoTotalNeto = solicitud.montoTotalNeto;
+      let finalFechaInicio: Date | null = solicitud.fechaInicio;
+      let finalFechaFin: Date | null = solicitud.fechaFin;
 
       if (itemsActualizados) {
         // A. Limpiar existentes
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
-        await tx.nominaTerceros.deleteMany({ where: { solicitudId: id } });
+        await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
 
         // B. Recalcular y re-insertar
         const detalles = await this.prepararInsertAnidado(updateSolicitudDto);
         finalMontoTotalPresupuestado = detalles.montoTotalPresupuestado;
         finalMontoTotalNeto = detalles.montoTotalNeto;
+
+        // --- CÁLCULO DE FECHAS (Update) ---
+        if (detalles.planificaciones && detalles.planificaciones.length > 0) {
+          const timestamps = detalles.planificaciones.flatMap((p) => [
+            new Date(p.fechaInicio).getTime(),
+            new Date(p.fechaFin).getTime(),
+          ]);
+          finalFechaInicio = new Date(Math.min(...timestamps));
+          finalFechaFin = new Date(Math.max(...timestamps));
+        } else {
+          finalFechaInicio = null;
+          finalFechaFin = null;
+        }
 
         // C. Re-inserción masiva (exactamente igual que el create)
         const createdPlanif: { id: number }[] = [];
@@ -464,10 +494,10 @@ export class SolicitudesService {
         }
 
         for (const n of detalles.nominasTerceros) {
-          await tx.nominaTerceros.create({
+          await tx.personaExterna.create({
             data: {
               nombreCompleto: n.nombreCompleto,
-              ci: n.ci,
+              procedenciaInstitucion: n.procedenciaInstitucion,
               solicitudId: id,
             },
           });
@@ -486,6 +516,8 @@ export class SolicitudesService {
           descripcion,
           montoTotalPresupuestado: finalMontoTotalPresupuestado,
           montoTotalNeto: finalMontoTotalNeto,
+          fechaInicio: finalFechaInicio,
+          fechaFin: finalFechaFin,
           estado: EstadoSolicitud.PENDIENTE,
           observacion: null,
           aprobador: { connect: { id: aprobadorId } },

@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsArray,
   ValidateNested,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoDestino, TipoDocumento } from '@prisma/client';
@@ -117,11 +118,13 @@ export class CreateGastoDto {
 export class CreateNominaDto {
   @ApiProperty({ example: 'Juan Pérez' })
   @IsString()
+  @IsNotEmpty()
   nombreCompleto: string;
 
-  @ApiProperty({ example: '1234567 LP' })
+  @ApiProperty({ example: 'Institución X' })
   @IsString()
-  ci: string;
+  @IsNotEmpty()
+  procedenciaInstitucion: string;
 }
 
 export class CreateSolicitudDto {
