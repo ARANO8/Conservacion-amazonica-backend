@@ -132,6 +132,7 @@ export class SolicitudesService {
         montoNetoUnitario,
         vDto.dias,
         vDto.cantidadPersonas,
+        vDto.tipoDestino,
       );
 
       // Trust DTO if provided (assuming DTO sends the TOTAL for viáticos if it specifies it)

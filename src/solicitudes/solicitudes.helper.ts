@@ -46,19 +46,32 @@ export function calcularMontosViaticos(
   montoNetoUnitario: Prisma.Decimal,
   dias: number,
   personas: number,
+  tipoDestino: 'INSTITUCIONAL' | 'TERCEROS' = 'INSTITUCIONAL',
 ) {
   const subtotalNeto = redondear(montoNetoUnitario.mul(dias).mul(personas));
 
-  // Grossing Up: montoTotal = montoNeto / 0.87 (Tasa Efectiva RC-IVA 13%)
-  const montoPresupuestado = redondear(subtotalNeto.div(0.87));
+  const factor = tipoDestino === 'TERCEROS' ? 0.84 : 0.87;
 
-  // El impuesto (IVA/Retención) es la diferencia
+  // Grossing Up: montoTotal = montoNeto / factor
+  const montoPresupuestado = redondear(subtotalNeto.div(factor));
+
+  // El impuesto total es la diferencia
   const totalImpuestos = redondear(montoPresupuestado.sub(subtotalNeto));
 
-  // Mantenemos iva e it para compatibilidad con la DB, asignando el total a iva (RC-IVA)
-  // y dejando it en 0, o distribuyendo si fuera necesario. El usuario pide RC-IVA 13%.
-  const iva = totalImpuestos;
-  const it = new Prisma.Decimal(0);
+  let iva = new Prisma.Decimal(0);
+  let it = new Prisma.Decimal(0);
+
+  if (tipoDestino === 'TERCEROS') {
+    // 13% IVA, 3% IT del Bruto (Tasa efectiva 16% / 0.84)
+    // iva = Total * 0.13 = totalImpuestos * (13/16)
+    // it = Total * 0.03 = totalImpuestos * (3/16)
+    iva = redondear(totalImpuestos.mul(13).div(16));
+    it = redondear(totalImpuestos.sub(iva));
+  } else {
+    // INSTITUCIONAL: Tasa efectiva 13% / 0.87. Todo va a IVA (RC-IVA)
+    iva = totalImpuestos;
+    it = new Prisma.Decimal(0);
+  }
 
   return {
     subtotalNeto,
