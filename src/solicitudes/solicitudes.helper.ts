@@ -5,12 +5,6 @@ import {
   CreateViaticoDto,
 } from './dto/create-solicitud.dto';
 
-import {
-  IVA_RATE,
-  IT_RATE,
-  IUE_COMPRA_RATE,
-} from '../common/constants/financial.constants';
-
 function redondear(valor: Prisma.Decimal): Prisma.Decimal {
   return valor.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }
@@ -81,24 +75,54 @@ export function calcularMontosGastos(
   codigoTipoGasto?: string,
 ) {
   const subtotalNeto = redondear(montoNetoUnitario.mul(cantidad));
+  let factor = 1.0;
+
+  if (tipoDocumento === 'RECIBO') {
+    switch (codigoTipoGasto) {
+      case 'COMPRA':
+        factor = 0.92; // 8% Retención (5% IUE + 3% IT)
+        break;
+      case 'SERVICIO':
+      case 'ALQUILER':
+        factor = 0.84; // 16% Retención (13% RC-IVA/IUE + 3% IT)
+        break;
+      case 'PEAJE':
+      case 'AUTO_COMPRA':
+        factor = 1.0;
+        break;
+      default:
+        factor = 1.0;
+        break;
+    }
+  }
+
+  // Grossing Up: Total = Neto / Factor
+  const montoPresupuestado = redondear(subtotalNeto.div(factor));
+  const totalTax = redondear(montoPresupuestado.sub(subtotalNeto));
+
   let iva = new Prisma.Decimal(0);
   let it = new Prisma.Decimal(0);
   let iue = new Prisma.Decimal(0);
 
-  if (tipoDocumento === 'RECIBO') {
+  if (totalTax.gt(0)) {
     if (codigoTipoGasto === 'COMPRA') {
-      iue = redondear(subtotalNeto.mul(IUE_COMPRA_RATE));
-      it = redondear(subtotalNeto.mul(IT_RATE));
+      // 5% IUE, 3% IT de la base bruta (Total)
+      // totalTax = Total * 0.08
+      // iue = Total * 0.05 = totalTax * (5/8)
+      // it = Total * 0.03 = totalTax * (3/8)
+      iue = redondear(totalTax.mul(5).div(8));
+      it = redondear(totalTax.sub(iue)); // Para evitar errores de redondeo
     } else if (
-      codigoTipoGasto === 'ALQUILER' ||
-      codigoTipoGasto === 'SERVICIO'
+      codigoTipoGasto === 'SERVICIO' ||
+      codigoTipoGasto === 'ALQUILER'
     ) {
-      iva = redondear(subtotalNeto.mul(IVA_RATE));
-      it = redondear(subtotalNeto.mul(IT_RATE));
+      // 13% IVA (o IUE-Servicios), 3% IT
+      // iue/iva = Total * 0.13 = totalTax * (13/16)
+      // it = Total * 0.03 = totalTax * (3/16)
+      iva = redondear(totalTax.mul(13).div(16));
+      it = redondear(totalTax.sub(iva));
     }
   }
-
-  const montoPresupuestado = redondear(subtotalNeto.add(iva).add(it).add(iue));
 
   return {
     subtotalNeto,
