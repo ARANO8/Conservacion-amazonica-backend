@@ -9,6 +9,7 @@ import {
   IsEnum,
   IsArray,
   ValidateNested,
+  IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { TipoDestino, TipoDocumento } from '@prisma/client';
@@ -74,6 +75,16 @@ export class CreateViaticoDto {
   @Min(0)
   montoNeto?: number;
 
+  @ApiProperty({
+    example: 232,
+    description: 'Monto presupuestado total (incl. impuestos)',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  montoPresupuestado?: number;
+
   @ApiProperty({ example: 1, description: 'ID de la reserva de presupuesto' })
   @IsInt()
   @Min(1)
@@ -108,6 +119,15 @@ export class CreateGastoDto {
   @Min(0)
   montoNeto: number;
 
+  @ApiProperty({
+    example: 58.58,
+    minimum: 0,
+    description: 'Monto presupuestado unitario (incl. impuestos)',
+  })
+  @IsNumber()
+  @Min(0)
+  montoPresupuestado: number;
+
   @ApiProperty({ example: 'Compra de herramientas', required: false })
   @IsOptional()
   @IsString()
@@ -117,11 +137,13 @@ export class CreateGastoDto {
 export class CreateNominaDto {
   @ApiProperty({ example: 'Juan Pérez' })
   @IsString()
+  @IsNotEmpty()
   nombreCompleto: string;
 
-  @ApiProperty({ example: '1234567 LP' })
+  @ApiProperty({ example: 'Institución X' })
   @IsString()
-  ci: string;
+  @IsNotEmpty()
+  procedenciaInstitucion: string;
 }
 
 export class CreateSolicitudDto {

@@ -123,15 +123,32 @@ export class SolicitudesService {
         ? new Prisma.Decimal(vDto.montoNeto)
         : precioCatalogo;
 
-      const { subtotalNeto, iva, it, montoPresupuestado } =
-        calcularMontosViaticos(
-          montoNetoUnitario,
-          vDto.dias,
-          vDto.cantidadPersonas,
-        );
+      const {
+        subtotalNeto,
+        iva,
+        it,
+        montoPresupuestado: calcMontoPresupuestado,
+      } = calcularMontosViaticos(
+        montoNetoUnitario,
+        vDto.dias,
+        vDto.cantidadPersonas,
+        vDto.tipoDestino,
+      );
 
-      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
-      montoTotalNeto = montoTotalNeto.add(subtotalNeto);
+      // Trust DTO if provided (assuming DTO sends the TOTAL for viáticos if it specifies it)
+      // Actually, looking at vDto.montoNeto, it says 'Monto neto a recibir'.
+      // If vDto.montoPresupuestado is present, we trust it as the TOTAL for that viatico entry.
+      const finalMontoNeto = vDto.montoNeto
+        ? new Prisma.Decimal(vDto.montoNeto)
+        : subtotalNeto;
+      const finalMontoPresupuestado = vDto.montoPresupuestado
+        ? new Prisma.Decimal(vDto.montoPresupuestado)
+        : calcMontoPresupuestado;
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(
+        finalMontoPresupuestado,
+      );
+      montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       viaticosData.push({
         planificacionIndex: vDto.planificacionIndex,
@@ -141,10 +158,10 @@ export class SolicitudesService {
           dias: vDto.dias,
           cantidadPersonas: vDto.cantidadPersonas,
           costoUnitario: montoNetoUnitario,
-          montoPresupuestado: montoPresupuestado,
+          montoPresupuestado: finalMontoPresupuestado,
           iva13: iva,
           it3: it,
-          montoNeto: subtotalNeto,
+          montoNeto: finalMontoNeto,
           solicitudPresupuestoId: vDto.solicitudPresupuestoId,
         },
       });
@@ -159,16 +176,32 @@ export class SolicitudesService {
         );
       }
 
-      const { subtotalNeto, iva, it, iue, montoPresupuestado } =
-        calcularMontosGastos(
-          new Prisma.Decimal(gDto.montoNeto),
-          gDto.cantidad,
-          gDto.tipoDocumento,
-          tipoGasto.codigo,
-        );
+      const {
+        subtotalNeto: calcSubtotalNeto,
+        iva,
+        it,
+        iue,
+        montoPresupuestado: calcMontoPresupuestado,
+      } = calcularMontosGastos(
+        new Prisma.Decimal(gDto.montoNeto),
+        gDto.cantidad,
+        gDto.tipoDocumento,
+        tipoGasto.codigo,
+      );
 
-      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
-      montoTotalNeto = montoTotalNeto.add(subtotalNeto);
+      // Trust DTO if provided. For Gastos, it's usually unitary as per DTO descriptions,
+      // but let's assume the user wants to pass the total or unitary as calculated by FE.
+      const finalMontoNeto = gDto.montoNeto
+        ? new Prisma.Decimal(gDto.montoNeto).mul(gDto.cantidad)
+        : calcSubtotalNeto;
+      const finalMontoPresupuestado = gDto.montoPresupuestado
+        ? new Prisma.Decimal(gDto.montoPresupuestado).mul(gDto.cantidad)
+        : calcMontoPresupuestado;
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(
+        finalMontoPresupuestado,
+      );
+      montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       gastosData.push({
         solicitudPresupuestoId: gDto.solicitudPresupuestoId,
@@ -176,11 +209,11 @@ export class SolicitudesService {
         tipoDocumento: gDto.tipoDocumento,
         cantidad: gDto.cantidad,
         costoUnitario: new Prisma.Decimal(gDto.montoNeto),
-        montoPresupuestado: montoPresupuestado,
+        montoPresupuestado: finalMontoPresupuestado,
         iva13: iva,
         it3: it,
         iue5: iue,
-        montoNeto: subtotalNeto,
+        montoNeto: finalMontoNeto,
         detalle: gDto.detalle,
       });
     }
@@ -216,6 +249,28 @@ export class SolicitudesService {
 
     const detalles = await this.prepararInsertAnidado(createSolicitudDto);
 
+    // --- CÁLCULO DE FECHAS (Strict Separation) ---
+    let minDate: Date | null = null;
+    let maxDate: Date | null = null;
+
+    if (detalles.planificaciones && detalles.planificaciones.length > 0) {
+      minDate = detalles.planificaciones.reduce(
+        (min, p) => {
+          const current = new Date(p.fechaInicio);
+          return !min || current < min ? current : min;
+        },
+        null as Date | null,
+      );
+
+      maxDate = detalles.planificaciones.reduce(
+        (max, p) => {
+          const current = new Date(p.fechaFin);
+          return !max || current > max ? current : max;
+        },
+        null as Date | null,
+      );
+    }
+
     // 3. TRANSACCIÓN PRISMA
     if (!presupuestosIds || presupuestosIds.length === 0) {
       throw new BadRequestException(
@@ -235,6 +290,8 @@ export class SolicitudesService {
           montoTotalNeto: detalles.montoTotalNeto,
           lugarViaje,
           motivoViaje,
+          fechaInicio: minDate,
+          fechaFin: maxDate,
           estado: EstadoSolicitud.PENDIENTE,
           usuarioEmisor: { connect: { id: usuarioId } },
           aprobador: { connect: { id: aprobadorId } },
@@ -301,16 +358,21 @@ export class SolicitudesService {
         });
       }
 
-      // F. Crear Nómina
+      // F. Crear PersonaExterna (Viene de nominasTerceros)
       for (const n of detalles.nominasTerceros) {
-        await tx.nominaTerceros.create({
+        await tx.personaExterna.create({
           data: {
-            nombreCompleto: n.nombreCompleto,
-            ci: n.ci,
+            nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
+            procedenciaInstitucion: n.procedenciaInstitucion
+              .trim()
+              .toUpperCase(),
             solicitudId: solicitud.id,
           },
         });
       }
+
+      // SYNC: Recalcular subtotales de los presupuestos involucrados
+      await this.presupuestoService.recalcularTotales(solicitud.id, tx);
 
       return tx.solicitud.findUnique({
         where: { id: solicitud.id },
@@ -410,18 +472,42 @@ export class SolicitudesService {
     return this.prisma.$transaction(async (tx) => {
       let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
       let finalMontoTotalNeto = solicitud.montoTotalNeto;
+      let finalFechaInicio: Date | null = solicitud.fechaInicio;
+      let finalFechaFin: Date | null = solicitud.fechaFin;
 
       if (itemsActualizados) {
         // A. Limpiar existentes
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
-        await tx.nominaTerceros.deleteMany({ where: { solicitudId: id } });
+        await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
 
         // B. Recalcular y re-insertar
         const detalles = await this.prepararInsertAnidado(updateSolicitudDto);
         finalMontoTotalPresupuestado = detalles.montoTotalPresupuestado;
         finalMontoTotalNeto = detalles.montoTotalNeto;
+
+        // --- CÁLCULO DE FECHAS (Update - Strict Separation) ---
+        if (detalles.planificaciones && detalles.planificaciones.length > 0) {
+          finalFechaInicio = detalles.planificaciones.reduce(
+            (min, p) => {
+              const current = new Date(p.fechaInicio);
+              return !min || current < min ? current : min;
+            },
+            null as Date | null,
+          );
+
+          finalFechaFin = detalles.planificaciones.reduce(
+            (max, p) => {
+              const current = new Date(p.fechaFin);
+              return !max || current > max ? current : max;
+            },
+            null as Date | null,
+          );
+        } else {
+          finalFechaInicio = null;
+          finalFechaFin = null;
+        }
 
         // C. Re-inserción masiva (exactamente igual que el create)
         const createdPlanif: { id: number }[] = [];
@@ -461,15 +547,20 @@ export class SolicitudesService {
         }
 
         for (const n of detalles.nominasTerceros) {
-          await tx.nominaTerceros.create({
+          await tx.personaExterna.create({
             data: {
-              nombreCompleto: n.nombreCompleto,
-              ci: n.ci,
+              nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
+              procedenciaInstitucion: n.procedenciaInstitucion
+                .trim()
+                .toUpperCase(),
               solicitudId: id,
             },
           });
         }
       }
+
+      // SYNC: Recalcular subtotales de los presupuestos involucrados
+      await this.presupuestoService.recalcularTotales(id, tx);
 
       // D. Actualizar Cabecera
       return tx.solicitud.update({
@@ -480,6 +571,8 @@ export class SolicitudesService {
           descripcion,
           montoTotalPresupuestado: finalMontoTotalPresupuestado,
           montoTotalNeto: finalMontoTotalNeto,
+          fechaInicio: finalFechaInicio,
+          fechaFin: finalFechaFin,
           estado: EstadoSolicitud.PENDIENTE,
           observacion: null,
           aprobador: { connect: { id: aprobadorId } },

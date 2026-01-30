@@ -5,22 +5,10 @@ import {
   CreateViaticoDto,
 } from './dto/create-solicitud.dto';
 
-import {
-  IVA_RATE,
-  IT_RATE,
-  IUE_COMPRA_RATE,
-} from '../common/constants/financial.constants';
-
-/**
- * Redondea un Decimal a 2 posiciones decimales.
- */
 function redondear(valor: Prisma.Decimal): Prisma.Decimal {
   return valor.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 }
 
-/**
- * Valida que un viático esté dentro de los límites de su planificación.
- */
 export function validarLimitesViatico(
   vDto: CreateViaticoDto,
   planificacion: CreatePlanificacionDto,
@@ -28,14 +16,19 @@ export function validarLimitesViatico(
   const dInicio = new Date(planificacion.fechaInicio);
   const dFin = new Date(planificacion.fechaFin);
 
-  // Cálculo de días duración (IDEM a SolicitudesService)
-  const diffDays = Math.ceil(
-    (dFin.getTime() - dInicio.getTime()) / (1000 * 60 * 60 * 24),
-  );
+  const oneDay = 1000 * 60 * 60 * 24;
+
+  const diffTime = dFin.getTime() - dInicio.getTime();
+
+  const diffDays = Math.floor(diffTime / oneDay) + 1;
 
   if (vDto.dias > diffDays) {
     throw new BadRequestException(
-      'Los días de viático exceden la duración de la actividad planificada',
+      'Los días de viático exceden la duración de la actividad planificada' +
+        'Estos son los dias de la planificacion: ' +
+        diffDays +
+        'Estos son los dias del viatico: ' +
+        vDto.dias,
     );
   }
 
@@ -49,19 +42,36 @@ export function validarLimitesViatico(
   }
 }
 
-/**
- * Calcula montos para viáticos basándose en lógica ADITIVA.
- * Retorna { subtotalNeto, iva, it, montoPresupuestado } redondeados.
- */
 export function calcularMontosViaticos(
   montoNetoUnitario: Prisma.Decimal,
   dias: number,
   personas: number,
+  tipoDestino: 'INSTITUCIONAL' | 'TERCEROS' = 'INSTITUCIONAL',
 ) {
   const subtotalNeto = redondear(montoNetoUnitario.mul(dias).mul(personas));
-  const iva = redondear(subtotalNeto.mul(IVA_RATE));
-  const it = redondear(subtotalNeto.mul(IT_RATE));
-  const montoPresupuestado = redondear(subtotalNeto.add(iva).add(it));
+
+  const factor = tipoDestino === 'TERCEROS' ? 0.84 : 0.87;
+
+  // Grossing Up: montoTotal = montoNeto / factor
+  const montoPresupuestado = redondear(subtotalNeto.div(factor));
+
+  // El impuesto total es la diferencia
+  const totalImpuestos = redondear(montoPresupuestado.sub(subtotalNeto));
+
+  let iva = new Prisma.Decimal(0);
+  let it = new Prisma.Decimal(0);
+
+  if (tipoDestino === 'TERCEROS') {
+    // 13% IVA, 3% IT del Bruto (Tasa efectiva 16% / 0.84)
+    // iva = Total * 0.13 = totalImpuestos * (13/16)
+    // it = Total * 0.03 = totalImpuestos * (3/16)
+    iva = redondear(totalImpuestos.mul(13).div(16));
+    it = redondear(totalImpuestos.sub(iva));
+  } else {
+    // INSTITUCIONAL: Tasa efectiva 13% / 0.87. Todo va a IVA (RC-IVA)
+    iva = totalImpuestos;
+    it = new Prisma.Decimal(0);
+  }
 
   return {
     subtotalNeto,
@@ -71,10 +81,6 @@ export function calcularMontosViaticos(
   };
 }
 
-/**
- * Calcula montos para gastos basándose en lógica ADITIVA y tipo de documento.
- * Retorna { subtotalNeto, iva, it, iue, montoPresupuestado } redondeados.
- */
 export function calcularMontosGastos(
   montoNetoUnitario: Prisma.Decimal,
   cantidad: number,
@@ -82,24 +88,54 @@ export function calcularMontosGastos(
   codigoTipoGasto?: string,
 ) {
   const subtotalNeto = redondear(montoNetoUnitario.mul(cantidad));
+  let factor = 1.0;
+
+  if (tipoDocumento === 'RECIBO') {
+    switch (codigoTipoGasto) {
+      case 'COMPRA':
+        factor = 0.92; // 8% Retención (5% IUE + 3% IT)
+        break;
+      case 'SERVICIO':
+      case 'ALQUILER':
+        factor = 0.84; // 16% Retención (13% RC-IVA/IUE + 3% IT)
+        break;
+      case 'PEAJE':
+      case 'AUTO_COMPRA':
+        factor = 1.0;
+        break;
+      default:
+        factor = 1.0;
+        break;
+    }
+  }
+
+  // Grossing Up: Total = Neto / Factor
+  const montoPresupuestado = redondear(subtotalNeto.div(factor));
+  const totalTax = redondear(montoPresupuestado.sub(subtotalNeto));
+
   let iva = new Prisma.Decimal(0);
   let it = new Prisma.Decimal(0);
   let iue = new Prisma.Decimal(0);
 
-  if (tipoDocumento === 'RECIBO') {
+  if (totalTax.gt(0)) {
     if (codigoTipoGasto === 'COMPRA') {
-      iue = redondear(subtotalNeto.mul(IUE_COMPRA_RATE));
-      it = redondear(subtotalNeto.mul(IT_RATE));
+      // 5% IUE, 3% IT de la base bruta (Total)
+      // totalTax = Total * 0.08
+      // iue = Total * 0.05 = totalTax * (5/8)
+      // it = Total * 0.03 = totalTax * (3/8)
+      iue = redondear(totalTax.mul(5).div(8));
+      it = redondear(totalTax.sub(iue)); // Para evitar errores de redondeo
     } else if (
-      codigoTipoGasto === 'ALQUILER' ||
-      codigoTipoGasto === 'SERVICIO'
+      codigoTipoGasto === 'SERVICIO' ||
+      codigoTipoGasto === 'ALQUILER'
     ) {
-      iva = redondear(subtotalNeto.mul(IVA_RATE));
-      it = redondear(subtotalNeto.mul(IT_RATE));
+      // 13% IVA (o IUE-Servicios), 3% IT
+      // iue/iva = Total * 0.13 = totalTax * (13/16)
+      // it = Total * 0.03 = totalTax * (3/16)
+      iva = redondear(totalTax.mul(13).div(16));
+      it = redondear(totalTax.sub(iva));
     }
   }
-
-  const montoPresupuestado = redondear(subtotalNeto.add(iva).add(it).add(iue));
 
   return {
     subtotalNeto,

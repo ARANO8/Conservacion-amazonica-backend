@@ -194,7 +194,6 @@ async function main() {
     { nombre: 'Compra', codigo: 'COMPRA' },
     { nombre: 'Alquiler', codigo: 'ALQUILER' },
     { nombre: 'Servicio', codigo: 'SERVICIO' },
-    { nombre: 'Recibo CPS', codigo: 'RECIBO_CPS' },
     { nombre: 'Peaje', codigo: 'PEAJE' },
     { nombre: 'AutoCompra', codigo: 'AUTO_COMPRA' },
   ];
