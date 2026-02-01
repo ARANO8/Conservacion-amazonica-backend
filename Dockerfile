@@ -30,4 +30,4 @@ COPY prisma/seed.ts ./dist/prisma/seeds
 EXPOSE 3000
 
 # Comando para iniciar
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main"]
