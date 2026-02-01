@@ -2,6 +2,8 @@
 FROM node:20-alpine
 
 # Instalamos pnpm (gestor de paquetes)
+RUN apk add --no-cache openssl
+
 RUN npm install -g pnpm
 
 # Creamos la carpeta de trabajo
@@ -21,6 +23,8 @@ RUN npx prisma generate
 
 # Construimos la aplicación
 RUN pnpm build
+
+COPY prisma/seed.ts ./dist/prisma/seeds
 
 # Exponemos el puerto 3000
 EXPOSE 3000
