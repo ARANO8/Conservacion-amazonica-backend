@@ -1,14 +1,335 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- ENUMS ---
+
+enum Rol {
+  ADMIN
+  TESORERO
+  USUARIO
+}
+
+enum EstadoSolicitud {
+  PENDIENTE
+  OBSERVADO
+  DESEMBOLSADO
+  EJECUTADO
+}
+
+enum EstadoPoa {
+  ACTIVO
+  BLOQUEADO
+}
+
+enum AccionHistorial {
+  APROBADO
+  RECHAZADO
+  DERIVADO
+}
+
+enum TipoDestino {
+  INSTITUCIONAL
+  TERCEROS
+}
+
+enum TipoDocumento {
+  FACTURA
+  RECIBO
+}
+
+enum EstadoReserva {
+  RESERVADO
+  CONFIRMADO
+}
+
+// --- MODELOS ---
+
+model Usuario { 
+  id             Int      @id @default(autoincrement())
+  email          String   @unique
+  password       String
+  nombreCompleto String
+  rol            Rol      @default(USUARIO)
+  cargo          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+
+  solicitudesEmitidas     Solicitud[] @relation("Emisor")
+  solicitudesPorAprobar   Solicitud[] @relation("AprobadorSolicitud")
+  solicitudesBeneficiadas Solicitud[] @relation("Beneficiario")
+  historialAprobaciones   HistorialAprobacion[]
+  notificaciones          Notificacion[]
+  presupuestos            SolicitudPresupuesto[]
+}
+
+model Proyecto {
+  id     Int    @id @default(autoincrement())
+  nombre String
+  deletedAt DateTime?
+
+  estructuras EstructuraProgramatica[]
+}
+
+model Grupo {
+  id     Int    @id @default(autoincrement())
+  nombre String
+  deletedAt DateTime?
+
+  estructuras EstructuraProgramatica[]
+}
+
+model Partida {
+  id     Int    @id @default(autoincrement())
+  nombre String
+  deletedAt DateTime?
+
+  estructuras EstructuraProgramatica[]
+}
+
+model CodigoPresupuestario {
+  id             Int    @id @default(autoincrement())
+  codigoCompleto String
+
+  poas Poa[]
+}
+
+model Actividad {
+  id                 Int    @id @default(autoincrement())
+  detalleDescripcion String
+
+  poas Poa[]
+}
+
+model EstructuraProgramatica {
+  id         Int      @id @default(autoincrement())
+  proyectoId Int
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id])
+  grupoId    Int
+  grupo      Grupo    @relation(fields: [grupoId], references: [id])
+  partidaId  Int
+  partida    Partida  @relation(fields: [partidaId], references: [id])
+
+  poas Poa[]
+
+  @@unique([proyectoId, grupoId, partidaId])
+}
+
+model Poa {
+  id                   Int       @id @default(autoincrement())
+  codigoPoa            String
+  cantidad             Int
+  costoUnitario        Decimal   @db.Decimal(10, 2)
+  costoTotal           Decimal   @db.Decimal(10, 2)
+  estado               EstadoPoa @default(ACTIVO)
+  deletedAt            DateTime?
+
+  estructuraId Int
+  estructura   EstructuraProgramatica @relation(fields: [estructuraId], references: [id])
+
+  codigoPresupuestarioId Int
+  codigoPresupuestario   CodigoPresupuestario @relation(fields: [codigoPresupuestarioId], references: [id])
+
+  actividadId Int
+  actividad   Actividad @relation(fields: [actividadId], references: [id])
+
+  solicitudes SolicitudPresupuesto[]
+}
+
+model Solicitud {
+  id                Int             @id @default(autoincrement())
+  codigoSolicitud   String          @unique
+  descripcion       String?
+  fechaSolicitud    DateTime        @default(now())
+  motivoViaje       String?
+  lugarViaje        String?
+  fechaInicio       DateTime?
+  fechaFin          DateTime?
+  codigoDesembolso  String?
+  montoTotalNeto           Decimal         @default(0) @db.Decimal(10, 2)
+  montoTotalPresupuestado  Decimal         @default(0) @db.Decimal(10, 2)
+  estado                   EstadoSolicitud @default(PENDIENTE)
+  observacion              String?
+  deletedAt         DateTime?
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("Emisor", fields: [usuarioEmisorId], references: [id])
+
+  aprobadorId Int?
+  aprobador   Usuario? @relation("AprobadorSolicitud", fields: [aprobadorId], references: [id])
+
+  usuarioBeneficiadoId Int?
+  usuarioBeneficiado   Usuario? @relation("Beneficiario", fields: [usuarioBeneficiadoId], references: [id])
+
+  presupuestos SolicitudPresupuesto[]
+
+  planificaciones     Planificacion[]
+  nominasTerceros     NominaTerceros[]
+
+  historialAprobaciones HistorialAprobacion[]
+  notificaciones        Notificacion[]
+  rendicion             Rendicion?
+  viaticos              Viatico[]
+  gastos                Gasto[]
+  personasExternas      PersonaExterna[]
+}
+
+model HistorialAprobacion {
+  id          Int             @id @default(autoincrement())
+  accion      AccionHistorial
+  comentario  String?
+  fechaAccion DateTime        @default(now())
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  usuarioActorId Int
+  usuarioActor   Usuario @relation(fields: [usuarioActorId], references: [id])
+}
+
+model Notificacion {
+  id            Int      @id @default(autoincrement())
+  mensaje       String
+  leido         Boolean  @default(false)
+  fechaCreacion DateTime @default(now())
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  solicitudId Int?
+  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
+}
+
+model Rendicion {
+  id              Int      @id @default(autoincrement())
+  fechaRendicion  DateTime @default(now())
+  montoRespaldado Decimal  @db.Decimal(10, 2)
+  saldoADevolver  Decimal  @db.Decimal(10, 2)
+  observaciones   String?
+
+  solicitudId Int       @unique
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+}
+
+model SolicitudPresupuesto {
+  id                    Int           @id @default(autoincrement())
+  estado                EstadoReserva @default(RESERVADO)
+  expiresAt             DateTime?
+  subtotalNeto          Decimal       @default(0) @db.Decimal(10, 2)
+  subtotalPresupuestado Decimal       @default(0) @db.Decimal(10, 2)
+
+  solicitudId Int?
+  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
+
+  usuarioId Int?
+  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+
+  poaId Int
+  poa   Poa @relation(fields: [poaId], references: [id])
+
+  viaticos Viatico[]
+  gastos   Gasto[]
+
+  @@unique([solicitudId, poaId])
+}
+
+model Planificacion {
+  id                            Int      @id @default(autoincrement())
+  actividadProgramada           String
+  cantidadPersonasInstitucional Int      @default(0)
+  cantidadPersonasTerceros      Int      @default(0)
+  fechaInicio                   DateTime
+  fechaFin                      DateTime
+  diasCalculados                Int
+
+  solicitudId                   Int
+  solicitud                     Solicitud @relation(fields: [solicitudId], references: [id])
+  viaticos    Viatico[]
+}
+
+model Concepto {
+  id                  Int       @id @default(autoincrement())
+  nombre              String    @unique
+  precioInstitucional Decimal   @db.Decimal(10, 2)
+  precioTerceros      Decimal   @db.Decimal(10, 2)
+  viaticos            Viatico[]
+}
+
+model Viatico {
+  id               Int         @id @default(autoincrement())
+  tipoDestino      TipoDestino
+  dias             Int
+  cantidadPersonas Int         @default(1)
+  costoUnitario      Decimal     @db.Decimal(10, 2)
+  montoPresupuestado Decimal     @db.Decimal(10, 2)
+  iva13              Decimal     @db.Decimal(10, 2)
+  it3                Decimal     @db.Decimal(10, 2)
+  montoNeto          Decimal     @db.Decimal(10, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  solicitudPresupuestoId Int
+  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id])
+
+  planificacionId Int
+  planificacion   Planificacion @relation(fields: [planificacionId], references: [id])
+
+  conceptoId Int
+  concepto   Concepto @relation(fields: [conceptoId], references: [id])
+}
+
+model TipoGasto {
+  id     Int     @id @default(autoincrement())
+  nombre String
+  codigo String  @unique
+  gastos Gasto[]
+}
+
+model Gasto {
+  id             Int           @id @default(autoincrement())
+  tipoDocumento  TipoDocumento
+  cantidad       Int
+  costoUnitario      Decimal       @db.Decimal(10, 2)
+  montoPresupuestado Decimal       @db.Decimal(10, 2)
+  iva13              Decimal       @db.Decimal(10, 2)
+  it3                Decimal       @db.Decimal(10, 2)
+  iue5               Decimal       @db.Decimal(10, 2)
+  montoNeto          Decimal       @db.Decimal(10, 2)
+  detalle        String?
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  solicitudPresupuestoId Int
+  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id])
+
+  tipoGastoId Int
+  tipoGasto   TipoGasto @relation(fields: [tipoGastoId], references: [id])
+}
+
+model PersonaExterna {
+  id                     Int       @id @default(autoincrement())
+  nombreCompleto         String
+  procedenciaInstitucion String
+  solicitudId            Int
+  solicitud              Solicitud @relation(fields: [solicitudId], references: [id])
+}
+
+model NominaTerceros {
+  id             Int       @id @default(autoincrement())
+  nombreCompleto String
+  ci             String
+  solicitudId    Int
+  solicitud      Solicitud @relation(fields: [solicitudId], references: [id])
+}
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "../ERD.md"
 }

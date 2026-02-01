@@ -1,3 +1,17 @@
 {
-    "material-icon-theme.activeIconPack": "nest"
+    "material-icon-theme.activeIconPack": "nest",
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "SIFIN Local",
+            "group": "localhost",
+            "database": "amazonica_db",
+            "username": "admin",
+            "password": "root"
+        }
+    ]
 }
