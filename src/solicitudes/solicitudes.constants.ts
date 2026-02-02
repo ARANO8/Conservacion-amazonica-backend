@@ -22,6 +22,7 @@ export const SOLICITUD_INCLUDE: Prisma.SolicitudInclude = {
       tipoGasto: true,
     },
   },
+  planificaciones: true,
   nominasTerceros: true,
   personasExternas: true,
   presupuestos: {
