@@ -318,16 +318,18 @@ export class SolicitudesService {
       for (const p of detalles.planificaciones) {
         const d1 = new Date(p.fechaInicio);
         const d2 = new Date(p.fechaFin);
-        const diff = Math.ceil(
-          (d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24),
-        );
+        // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
+        const diasFinales =
+          p.dias !== undefined
+            ? Number(p.dias)
+            : Math.ceil((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
 
         const cp = await tx.planificacion.create({
           data: {
             actividadProgramada: p.actividad,
             fechaInicio: d1,
             fechaFin: d2,
-            diasCalculados: diff,
+            diasCalculados: diasFinales,
             cantidadPersonasInstitucional: p.cantInstitucional,
             cantidadPersonasTerceros: p.cantTerceros,
             solicitudId: solicitud.id,
@@ -514,14 +516,20 @@ export class SolicitudesService {
         for (const p of detalles.planificaciones) {
           const d1 = new Date(p.fechaInicio);
           const d2 = new Date(p.fechaFin);
+          // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
+          const diasFinales =
+            p.dias !== undefined
+              ? Number(p.dias)
+              : Math.ceil(
+                  (d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24),
+                );
+
           const cp = await tx.planificacion.create({
             data: {
               actividadProgramada: p.actividad,
               fechaInicio: d1,
               fechaFin: d2,
-              diasCalculados: Math.ceil(
-                (d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24),
-              ),
+              diasCalculados: diasFinales,
               cantidadPersonasInstitucional: p.cantInstitucional,
               cantidadPersonasTerceros: p.cantTerceros,
               solicitudId: id,

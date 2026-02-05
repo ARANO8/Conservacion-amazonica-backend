@@ -173,7 +173,7 @@ CONFIRMADO CONFIRMADO
     Int cantidadPersonasTerceros 
     DateTime fechaInicio 
     DateTime fechaFin 
-    Int diasCalculados 
+    Decimal diasCalculados 
     }
   
 
@@ -188,7 +188,7 @@ CONFIRMADO CONFIRMADO
   "Viatico" {
     Int id "🗝️"
     TipoDestino tipoDestino 
-    Int dias 
+    Decimal dias 
     Int cantidadPersonas 
     Decimal costoUnitario 
     Decimal montoPresupuestado 
