@@ -220,7 +220,6 @@ model Rendicion {
 model SolicitudPresupuesto {
   id                    Int           @id @default(autoincrement())
   estado                EstadoReserva @default(RESERVADO)
-  expiresAt             DateTime?
   subtotalNeto          Decimal       @default(0) @db.Decimal(10, 2)
   subtotalPresupuestado Decimal       @default(0) @db.Decimal(10, 2)
 

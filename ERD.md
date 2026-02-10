@@ -160,7 +160,6 @@ CONFIRMADO CONFIRMADO
   "SolicitudPresupuesto" {
     Int id "🗝️"
     EstadoReserva estado 
-    DateTime expiresAt "❓"
     Decimal subtotalNeto 
     Decimal subtotalPresupuestado 
     }

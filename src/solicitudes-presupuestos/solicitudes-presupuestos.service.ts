@@ -3,19 +3,14 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
-  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReservarFuenteDto } from './dto/reservar-fuente.dto';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { EstadoReserva, Prisma } from '@prisma/client';
 import { PoaService } from '../poa/poa.service';
-import { RESERVA_TTL_MS } from './solicitudes-presupuestos.constants';
 
 @Injectable()
 export class SolicitudPresupuestoService {
-  private readonly logger = new Logger(SolicitudPresupuestoService.name);
-
   private readonly RESERVA_INCLUDE = {
     poa: {
       include: {
@@ -48,10 +43,7 @@ export class SolicitudPresupuestoService {
           solicitudId: null, // CRITICAL: Only reuse if not yet linked to a solicitud
           OR: [
             { estado: EstadoReserva.CONFIRMADO },
-            {
-              estado: EstadoReserva.RESERVADO,
-              expiresAt: { gt: new Date() },
-            },
+            { estado: EstadoReserva.RESERVADO },
           ],
         },
       });
@@ -71,7 +63,6 @@ export class SolicitudPresupuestoService {
           where: { id: existing.id },
           data: {
             estado: EstadoReserva.RESERVADO,
-            expiresAt: new Date(Date.now() + RESERVA_TTL_MS),
             usuarioId,
           },
           include: this.RESERVA_INCLUDE,
@@ -96,7 +87,6 @@ export class SolicitudPresupuestoService {
         data: {
           poaId,
           estado: EstadoReserva.RESERVADO,
-          expiresAt: new Date(Date.now() + RESERVA_TTL_MS),
           usuarioId,
         },
         include: this.RESERVA_INCLUDE,
@@ -138,24 +128,9 @@ export class SolicitudPresupuestoService {
       },
       data: {
         estado: EstadoReserva.CONFIRMADO,
-        expiresAt: null,
         solicitudId,
       },
     });
-  }
-
-  @Cron(CronExpression.EVERY_10_MINUTES)
-  async cronLimpiarReservas() {
-    const result = await this.prisma.solicitudPresupuesto.deleteMany({
-      where: {
-        estado: EstadoReserva.RESERVADO,
-        expiresAt: { lt: new Date() },
-      },
-    });
-
-    if (result.count > 0) {
-      this.logger.log(`Se liberaron ${result.count} reservas expiradas.`);
-    }
   }
 
   async remove(id: number, usuarioId: number) {
@@ -243,7 +218,6 @@ export class SolicitudPresupuestoService {
       where: {
         usuarioId,
         estado: EstadoReserva.RESERVADO,
-        expiresAt: { gt: new Date() },
       },
       include: this.RESERVA_INCLUDE,
     });

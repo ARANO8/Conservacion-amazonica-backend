@@ -308,7 +308,6 @@ export class SolicitudesService {
         },
         data: {
           estado: EstadoReserva.CONFIRMADO,
-          expiresAt: null,
           solicitudId: solicitud.id,
         },
       });
