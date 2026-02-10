@@ -45,13 +45,6 @@ TERCEROS TERCEROS
 RECIBO RECIBO
         }
     
-
-
-        EstadoReserva {
-            RESERVADO RESERVADO
-CONFIRMADO CONFIRMADO
-        }
-    
   "Usuario" {
     Int id "🗝️"
     String email 
@@ -159,7 +152,6 @@ CONFIRMADO CONFIRMADO
 
   "SolicitudPresupuesto" {
     Int id "🗝️"
-    EstadoReserva estado 
     Decimal subtotalNeto 
     Decimal subtotalPresupuestado 
     }
@@ -249,9 +241,7 @@ CONFIRMADO CONFIRMADO
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
-    "SolicitudPresupuesto" |o--|| "EstadoReserva" : "enum:estado"
-    "SolicitudPresupuesto" }o--|o "Solicitud" : "solicitud"
-    "SolicitudPresupuesto" }o--|o "Usuario" : "usuario"
+    "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
     "Planificacion" }o--|| "Solicitud" : "solicitud"
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"

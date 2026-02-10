@@ -43,10 +43,6 @@ enum TipoDocumento {
   RECIBO
 }
 
-enum EstadoReserva {
-  RESERVADO
-  CONFIRMADO
-}
 
 // --- MODELOS ---
 
@@ -66,7 +62,6 @@ model Usuario {
   solicitudesBeneficiadas Solicitud[] @relation("Beneficiario")
   historialAprobaciones   HistorialAprobacion[]
   notificaciones          Notificacion[]
-  presupuestos            SolicitudPresupuesto[]
 }
 
 model Proyecto {
@@ -219,15 +214,11 @@ model Rendicion {
 
 model SolicitudPresupuesto {
   id                    Int           @id @default(autoincrement())
-  estado                EstadoReserva @default(RESERVADO)
   subtotalNeto          Decimal       @default(0) @db.Decimal(10, 2)
   subtotalPresupuestado Decimal       @default(0) @db.Decimal(10, 2)
 
-  solicitudId Int?
-  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
-
-  usuarioId Int?
-  usuario   Usuario? @relation(fields: [usuarioId], references: [id])
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
 
   poaId Int
   poa   Poa @relation(fields: [poaId], references: [id])

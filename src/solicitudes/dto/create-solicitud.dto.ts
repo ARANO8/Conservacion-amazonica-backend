@@ -100,17 +100,17 @@ export class CreateViaticoDto {
   @Min(0)
   montoPresupuestado?: number;
 
-  @ApiProperty({ example: 1, description: 'ID de la reserva de presupuesto' })
+  @ApiProperty({ example: 1, description: 'ID de la línea POA asociada' })
   @IsInt()
   @Min(1)
-  solicitudPresupuestoId: number;
+  poaId: number;
 }
 
 export class CreateGastoDto {
-  @ApiProperty({ example: 1, description: 'ID de la reserva de presupuesto' })
+  @ApiProperty({ example: 1, description: 'ID de la línea POA asociada' })
   @IsInt()
   @Min(1)
-  solicitudPresupuestoId: number;
+  poaId: number;
 
   @ApiProperty({ example: 1 })
   @IsInt()
@@ -164,12 +164,11 @@ export class CreateNominaDto {
 export class CreateSolicitudDto {
   @ApiProperty({
     example: [1, 2],
-    description:
-      'IDs de los registros de reserva de presupuesto (SolicitudPresupuesto)',
+    description: 'IDs de las líneas POA seleccionadas',
   })
   @IsArray()
   @IsInt({ each: true })
-  presupuestosIds: number[];
+  poaIds: number[];
 
   @ApiProperty({ example: 2, description: 'ID del usuario aprobador' })
   @IsInt()

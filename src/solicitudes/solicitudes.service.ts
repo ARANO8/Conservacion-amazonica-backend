@@ -10,13 +10,7 @@ import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
 import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
-import {
-  Rol,
-  EstadoSolicitud,
-  Solicitud,
-  Prisma,
-  EstadoReserva,
-} from '@prisma/client';
+import { Rol, EstadoSolicitud, Solicitud, Prisma } from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
 import {
@@ -57,11 +51,18 @@ export class SolicitudesService {
     viaticosData: {
       data: Omit<
         Prisma.ViaticoUncheckedCreateInput,
-        'solicitudId' | 'planificacionId'
+        'solicitudId' | 'planificacionId' | 'solicitudPresupuestoId'
       >;
       planificacionIndex: number;
+      poaId: number;
     }[];
-    gastosData: Omit<Prisma.GastoUncheckedCreateInput, 'solicitudId'>[];
+    gastosData: {
+      data: Omit<
+        Prisma.GastoUncheckedCreateInput,
+        'solicitudId' | 'solicitudPresupuestoId'
+      >;
+      poaId: number;
+    }[];
     planificaciones: import('./dto/create-solicitud.dto').CreatePlanificacionDto[];
     nominasTerceros: import('./dto/create-solicitud.dto').CreateNominaDto[];
   }> {
@@ -88,13 +89,19 @@ export class SolicitudesService {
     const viaticosData: {
       data: Omit<
         Prisma.ViaticoUncheckedCreateInput,
-        'solicitudId' | 'planificacionId'
+        'solicitudId' | 'planificacionId' | 'solicitudPresupuestoId'
       >;
       planificacionIndex: number;
+      poaId: number;
     }[] = [];
 
-    const gastosData: Omit<Prisma.GastoUncheckedCreateInput, 'solicitudId'>[] =
-      [];
+    const gastosData: {
+      data: Omit<
+        Prisma.GastoUncheckedCreateInput,
+        'solicitudId' | 'solicitudPresupuestoId'
+      >;
+      poaId: number;
+    }[] = [];
 
     // --- Procesar Viáticos ---
     for (const vDto of viaticos) {
@@ -152,6 +159,7 @@ export class SolicitudesService {
 
       viaticosData.push({
         planificacionIndex: vDto.planificacionIndex,
+        poaId: vDto.poaId,
         data: {
           conceptoId: vDto.conceptoId,
           tipoDestino: vDto.tipoDestino,
@@ -162,7 +170,6 @@ export class SolicitudesService {
           iva13: iva,
           it3: it,
           montoNeto: finalMontoNeto,
-          solicitudPresupuestoId: vDto.solicitudPresupuestoId,
         },
       });
     }
@@ -204,17 +211,19 @@ export class SolicitudesService {
       montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       gastosData.push({
-        solicitudPresupuestoId: gDto.solicitudPresupuestoId,
-        tipoGastoId: gDto.tipoGastoId,
-        tipoDocumento: gDto.tipoDocumento,
-        cantidad: gDto.cantidad,
-        costoUnitario: new Prisma.Decimal(gDto.montoNeto),
-        montoPresupuestado: finalMontoPresupuestado,
-        iva13: iva,
-        it3: it,
-        iue5: iue,
-        montoNeto: finalMontoNeto,
-        detalle: gDto.detalle,
+        poaId: gDto.poaId,
+        data: {
+          tipoGastoId: gDto.tipoGastoId,
+          tipoDocumento: gDto.tipoDocumento,
+          cantidad: gDto.cantidad,
+          costoUnitario: new Prisma.Decimal(gDto.montoNeto),
+          montoPresupuestado: finalMontoPresupuestado,
+          iva13: iva,
+          it3: it,
+          iue5: iue,
+          montoNeto: finalMontoNeto,
+          detalle: gDto.detalle,
+        },
       });
     }
 
@@ -232,13 +241,8 @@ export class SolicitudesService {
     createSolicitudDto: CreateSolicitudDto,
     usuarioId: number,
   ): Promise<Solicitud> {
-    const {
-      presupuestosIds,
-      descripcion,
-      aprobadorId,
-      lugarViaje,
-      motivoViaje,
-    } = createSolicitudDto;
+    const { poaIds, descripcion, aprobadorId, lugarViaje, motivoViaje } =
+      createSolicitudDto;
 
     // VALIDACIÓN: Evitar Auto-Aprobación
     if (aprobadorId === usuarioId) {
@@ -272,9 +276,9 @@ export class SolicitudesService {
     }
 
     // 3. TRANSACCIÓN PRISMA
-    if (!presupuestosIds || presupuestosIds.length === 0) {
+    if (!poaIds || poaIds.length === 0) {
       throw new BadRequestException(
-        'Debes seleccionar al menos un presupuesto reservado',
+        'Debes seleccionar al menos una partida presupuestaria',
       );
     }
 
@@ -299,18 +303,14 @@ export class SolicitudesService {
         },
       });
 
-      // B. Confirmar Reservas (Dentro de la misma transacción para evitar P2003)
-      await tx.solicitudPresupuesto.updateMany({
-        where: {
-          id: { in: presupuestosIds },
-          usuarioId,
-          estado: EstadoReserva.RESERVADO,
-        },
-        data: {
-          estado: EstadoReserva.CONFIRMADO,
-          solicitudId: solicitud.id,
-        },
-      });
+      // B. Crear SolicitudPresupuesto (transaccional, save-at-end)
+      const presupuestosMap = new Map<number, number>(); // poaId → SolicitudPresupuesto.id
+      for (const poaId of poaIds) {
+        const sp = await tx.solicitudPresupuesto.create({
+          data: { poaId, solicitudId: solicitud.id },
+        });
+        presupuestosMap.set(poaId, sp.id);
+      }
 
       // C. Crear Planificaciones y mapear IDs
       const createdPlanificaciones: { id: number }[] = [];
@@ -343,6 +343,7 @@ export class SolicitudesService {
           data: {
             ...vItem.data,
             solicitudId: solicitud.id,
+            solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
             planificacionId:
               createdPlanificaciones[vItem.planificacionIndex].id,
           },
@@ -353,8 +354,9 @@ export class SolicitudesService {
       for (const gRecord of detalles.gastosData) {
         await tx.gasto.create({
           data: {
-            ...gRecord,
+            ...gRecord.data,
             solicitudId: solicitud.id,
+            solicitudPresupuestoId: presupuestosMap.get(gRecord.poaId)!,
           },
         });
       }
@@ -477,11 +479,14 @@ export class SolicitudesService {
       let finalFechaFin: Date | null = solicitud.fechaFin;
 
       if (itemsActualizados) {
-        // A. Limpiar existentes
+        // A. Limpiar existentes (orden: hijos primero por FK)
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
+        await tx.solicitudPresupuesto.deleteMany({
+          where: { solicitudId: id },
+        });
 
         // B. Recalcular y re-insertar
         const detalles = await this.prepararInsertAnidado(updateSolicitudDto);
@@ -508,6 +513,16 @@ export class SolicitudesService {
         } else {
           finalFechaInicio = null;
           finalFechaFin = null;
+        }
+
+        // B.5 Recrear SolicitudPresupuesto
+        const updatePoaIds = updateSolicitudDto.poaIds ?? [];
+        const presupuestosMap = new Map<number, number>();
+        for (const poaId of updatePoaIds) {
+          const sp = await tx.solicitudPresupuesto.create({
+            data: { poaId, solicitudId: id },
+          });
+          presupuestosMap.set(poaId, sp.id);
         }
 
         // C. Re-inserción masiva (exactamente igual que el create)
@@ -542,6 +557,7 @@ export class SolicitudesService {
             data: {
               ...v.data,
               solicitudId: id,
+              solicitudPresupuestoId: presupuestosMap.get(v.poaId)!,
               planificacionId: createdPlanif[v.planificacionIndex].id,
             },
           });
@@ -549,7 +565,11 @@ export class SolicitudesService {
 
         for (const g of detalles.gastosData) {
           await tx.gasto.create({
-            data: { ...g, solicitudId: id },
+            data: {
+              ...g.data,
+              solicitudId: id,
+              solicitudPresupuestoId: presupuestosMap.get(g.poaId)!,
+            },
           });
         }
 
