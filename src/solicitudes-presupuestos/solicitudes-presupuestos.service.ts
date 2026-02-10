@@ -10,6 +10,7 @@ import { ReservarFuenteDto } from './dto/reservar-fuente.dto';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { EstadoReserva, Prisma } from '@prisma/client';
 import { PoaService } from '../poa/poa.service';
+import { RESERVA_TTL_MS } from './solicitudes-presupuestos.constants';
 
 @Injectable()
 export class SolicitudPresupuestoService {
@@ -70,7 +71,7 @@ export class SolicitudPresupuestoService {
           where: { id: existing.id },
           data: {
             estado: EstadoReserva.RESERVADO,
-            expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+            expiresAt: new Date(Date.now() + RESERVA_TTL_MS),
             usuarioId,
           },
           include: this.RESERVA_INCLUDE,
@@ -95,7 +96,7 @@ export class SolicitudPresupuestoService {
         data: {
           poaId,
           estado: EstadoReserva.RESERVADO,
-          expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+          expiresAt: new Date(Date.now() + RESERVA_TTL_MS),
           usuarioId,
         },
         include: this.RESERVA_INCLUDE,

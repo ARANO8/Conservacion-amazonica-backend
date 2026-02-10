@@ -36,6 +36,17 @@ export class CreatePlanificacionDto {
   @IsInt()
   @Min(0)
   cantTerceros: number;
+
+  @ApiProperty({
+    example: 2.5,
+    description:
+      'Días explícitos (opcional). Si no se envía, se calcula automáticamente.',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  dias?: number;
 }
 
 export class CreateViaticoDto {
@@ -55,9 +66,13 @@ export class CreateViaticoDto {
   @IsEnum(TipoDestino)
   tipoDestino: TipoDestino;
 
-  @ApiProperty({ example: 3, minimum: 1 })
-  @IsInt()
-  @Min(1)
+  @ApiProperty({
+    example: 2.5,
+    minimum: 0.5,
+    description: 'Días de viático (permite decimales)',
+  })
+  @IsNumber()
+  @Min(0.5)
   dias: number;
 
   @ApiProperty({ example: 1, minimum: 1 })

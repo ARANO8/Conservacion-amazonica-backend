@@ -15,13 +15,36 @@ export const SOLICITUD_INCLUDE: Prisma.SolicitudInclude = {
   viaticos: {
     include: {
       concepto: true,
+      solicitudPresupuesto: {
+        include: {
+          poa: {
+            include: {
+              estructura: {
+                include: { partida: true },
+              },
+            },
+          },
+        },
+      },
     },
   },
   gastos: {
     include: {
       tipoGasto: true,
+      solicitudPresupuesto: {
+        include: {
+          poa: {
+            include: {
+              estructura: {
+                include: { partida: true },
+              },
+            },
+          },
+        },
+      },
     },
   },
+  planificaciones: true,
   nominasTerceros: true,
   personasExternas: true,
   presupuestos: {
