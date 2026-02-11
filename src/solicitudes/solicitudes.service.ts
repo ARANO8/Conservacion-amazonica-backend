@@ -19,6 +19,11 @@ import {
   validarLimitesViatico,
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
+import { PoaService } from '../poa/poa.service';
+
+type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
+  include: typeof SOLICITUD_INCLUDE;
+}>;
 
 @Injectable()
 export class SolicitudesService {
@@ -26,6 +31,7 @@ export class SolicitudesService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => SolicitudPresupuestoService))
     private presupuestoService: SolicitudPresupuestoService,
+    private poaService: PoaService,
   ) {}
 
   private async generarCodigo(): Promise<string> {
@@ -390,23 +396,28 @@ export class SolicitudesService {
     return result;
   }
 
-  async findAll(usuario: { id: number; rol: Rol }): Promise<Solicitud[]> {
+  async findAll(usuario: {
+    id: number;
+    rol: Rol;
+  }): Promise<SolicitudConRelaciones[]> {
     const where: Prisma.SolicitudWhereInput = { deletedAt: null };
 
     if (usuario.rol === Rol.USUARIO) {
       where.OR = [{ usuarioEmisorId: usuario.id }, { aprobadorId: usuario.id }];
     }
 
-    return this.prisma.solicitud.findMany({
+    const solicitudes = await this.prisma.solicitud.findMany({
       where,
       include: SOLICITUD_INCLUDE,
       orderBy: {
         fechaSolicitud: 'desc',
       },
     });
+
+    return Promise.all(solicitudes.map((s) => this.enriquecerConSaldos(s)));
   }
 
-  async findOne(id: number): Promise<Solicitud> {
+  async findOne(id: number): Promise<SolicitudConRelaciones> {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
       include: SOLICITUD_INCLUDE,
@@ -416,6 +427,22 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
+    return this.enriquecerConSaldos(solicitud);
+  }
+
+  private async enriquecerConSaldos(
+    solicitud: SolicitudConRelaciones,
+  ): Promise<SolicitudConRelaciones> {
+    if (solicitud.presupuestos) {
+      await Promise.all(
+        solicitud.presupuestos.map(async (sp) => {
+          if (sp.poa) {
+            // @ts-expect-error - addSaldoDisponible adds extra fields not in Prisma type
+            sp.poa = await this.poaService.addSaldoDisponible(sp.poa);
+          }
+        }),
+      );
+    }
     return solicitud;
   }
 
