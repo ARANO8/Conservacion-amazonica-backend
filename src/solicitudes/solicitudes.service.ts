@@ -437,7 +437,6 @@ export class SolicitudesService {
       await Promise.all(
         solicitud.presupuestos.map(async (sp) => {
           if (sp.poa) {
-            // @ts-expect-error - addSaldoDisponible adds extra fields not in Prisma type
             sp.poa = await this.poaService.addSaldoDisponible(sp.poa);
           }
         }),
