@@ -49,7 +49,7 @@ async function processCSV(
     return;
   }
 
-  const fileStream = fs.createReadStream(filePath, { encoding: 'latin1' }); // Latin1 suele ser mejor para estos CSVs con eñes
+  const fileStream = fs.createReadStream(filePath, { encoding: 'utf-8' });
   const rl = readline.createInterface({
     input: fileStream,
     crlfDelay: Infinity,
