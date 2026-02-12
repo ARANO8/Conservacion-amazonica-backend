@@ -8,7 +8,7 @@ export const USER_SAFE_SELECT = {
   rol: true,
 };
 
-export const SOLICITUD_INCLUDE: Prisma.SolicitudInclude = {
+export const SOLICITUD_INCLUDE = {
   usuarioEmisor: { select: USER_SAFE_SELECT },
   aprobador: { select: USER_SAFE_SELECT },
   usuarioBeneficiado: { select: USER_SAFE_SELECT },
@@ -66,4 +66,4 @@ export const SOLICITUD_INCLUDE: Prisma.SolicitudInclude = {
       gastos: true,
     },
   },
-};
+} satisfies Prisma.SolicitudInclude;

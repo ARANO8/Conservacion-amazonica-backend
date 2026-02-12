@@ -17,36 +17,6 @@ function cleanAmount(val: string): number {
 }
 
 /**
- * Genera el correo corporativo: [PrimeraLetraNombre][PrimerApellido]@conservacionamazonica.org.bo
- */
-function generateEmail(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length < 2)
-    return `${fullName.toLowerCase().replace(/\s+/g, '')}@conservacionamazonica.org.bo`;
-
-  const firstName = parts[0];
-  // En Bolivia/Latam: [Nombre1] [Nombre2] [Apellido Paterno] [Apellido Materno]
-  // MARCOS FERNANDO TERÁN VALENZUELA (4 parts) -> TERÁN is parts[2]
-  // MARCOS TERÁN VALENZUELA (3 parts) -> TERÁN is parts[1]
-  // MARCOS TERÁN (2 parts) -> TERÁN is parts[1]
-  let firstSurname = parts[1]; // Default para 2 y 3 partes
-  if (parts.length >= 4) {
-    firstSurname = parts[2]; // Para 4 o más partes, asumimos 2 nombres
-  }
-
-  const normalize = (str: string) =>
-    str
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Quitar tildes
-      .replace(/ñ/g, 'n')
-      .replace(/Ñ/g, 'N')
-      .toLowerCase();
-
-  const email = `${normalize(firstName[0])}${normalize(firstSurname)}@conservacionamazonica.org.bo`;
-  return email;
-}
-
-/**
  * Parser de CSV robusto para manejar comas dentro de comillas
  */
 function parseCSVLine(line: string): string[] {
@@ -79,7 +49,7 @@ async function processCSV(
     return;
   }
 
-  const fileStream = fs.createReadStream(filePath, { encoding: 'latin1' }); // Latin1 suele ser mejor para estos CSVs con eñes
+  const fileStream = fs.createReadStream(filePath, { encoding: 'utf-8' });
   const rl = readline.createInterface({
     input: fileStream,
     crlfDelay: Infinity,
@@ -111,8 +81,7 @@ async function main() {
   // 1. Usuarios
   let userCount = 0;
   await processCSV('Usuario.csv', async (row) => {
-    const [nombre, cargo, rolStr] = row;
-    const email = generateEmail(nombre);
+    const [nombre, email, cargo, rolStr] = row;
     const rol = (Rol[rolStr as keyof typeof Rol] || Rol.USUARIO) as Rol;
 
     await prisma.usuario.upsert({
