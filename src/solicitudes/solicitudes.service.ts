@@ -189,27 +189,29 @@ export class SolicitudesService {
         );
       }
 
+      const netoTotalDto = new Prisma.Decimal(gDto.montoNeto);
+
       const {
-        subtotalNeto: calcSubtotalNeto,
         iva,
         it,
         iue,
         montoPresupuestado: calcMontoPresupuestado,
       } = calcularMontosGastos(
-        new Prisma.Decimal(gDto.montoNeto),
-        gDto.cantidad,
+        netoTotalDto,
+        1, // Tratamos el monto del DTO como el total final para el cálculo de impuestos
         gDto.tipoDocumento,
         tipoGasto.codigo,
       );
 
-      // Trust DTO if provided. For Gastos, it's usually unitary as per DTO descriptions,
-      // but let's assume the user wants to pass the total or unitary as calculated by FE.
-      const finalMontoNeto = gDto.montoNeto
-        ? new Prisma.Decimal(gDto.montoNeto).mul(gDto.cantidad)
-        : calcSubtotalNeto;
+      // El DTO ya envía el TOTAL (no el unitario), evitamos multiplicar de nuevo
+      const finalMontoNeto = netoTotalDto;
       const finalMontoPresupuestado = gDto.montoPresupuestado
-        ? new Prisma.Decimal(gDto.montoPresupuestado).mul(gDto.cantidad)
+        ? new Prisma.Decimal(gDto.montoPresupuestado)
         : calcMontoPresupuestado;
+
+      // Calculo del unitario para la base de datos (Guard Clause contra división por cero)
+      const costoUnitarioReal =
+        gDto.cantidad > 0 ? netoTotalDto.div(gDto.cantidad) : netoTotalDto;
 
       montoTotalPresupuestado = montoTotalPresupuestado.add(
         finalMontoPresupuestado,
@@ -222,7 +224,7 @@ export class SolicitudesService {
           tipoGastoId: gDto.tipoGastoId,
           tipoDocumento: gDto.tipoDocumento,
           cantidad: gDto.cantidad,
-          costoUnitario: new Prisma.Decimal(gDto.montoNeto),
+          costoUnitario: costoUnitarioReal,
           montoPresupuestado: finalMontoPresupuestado,
           iva13: iva,
           it3: it,
@@ -426,6 +428,11 @@ export class SolicitudesService {
     if (!solicitud) {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
+
+    console.log(
+      '📦 [AUDITORIA BACKEND] Solicitud obtenida:',
+      JSON.stringify(solicitud, null, 2),
+    );
 
     return this.enriquecerConSaldos(solicitud);
   }
