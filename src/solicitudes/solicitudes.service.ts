@@ -326,10 +326,12 @@ export class SolicitudesService {
         const d1 = new Date(p.fechaInicio);
         const d2 = new Date(p.fechaFin);
         // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
+        const diferenciaMilisegundos = d2.getTime() - d1.getTime();
+        const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
         const diasFinales =
-          p.dias !== undefined
+          p.dias !== undefined && p.dias !== null
             ? Number(p.dias)
-            : Math.ceil((d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+            : Number(diasExactos.toFixed(2));
 
         const cp = await tx.planificacion.create({
           data: {
@@ -564,12 +566,12 @@ export class SolicitudesService {
           const d1 = new Date(p.fechaInicio);
           const d2 = new Date(p.fechaFin);
           // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
+          const diferenciaMilisegundos = d2.getTime() - d1.getTime();
+          const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
           const diasFinales =
-            p.dias !== undefined
+            p.dias !== undefined && p.dias !== null
               ? Number(p.dias)
-              : Math.ceil(
-                  (d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24),
-                );
+              : Number(diasExactos.toFixed(2));
 
           const cp = await tx.planificacion.create({
             data: {
