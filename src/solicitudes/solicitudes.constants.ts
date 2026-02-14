@@ -8,20 +8,43 @@ export const USER_SAFE_SELECT = {
   rol: true,
 };
 
-export const SOLICITUD_INCLUDE: Prisma.SolicitudInclude = {
+export const SOLICITUD_INCLUDE = {
   usuarioEmisor: { select: USER_SAFE_SELECT },
   aprobador: { select: USER_SAFE_SELECT },
   usuarioBeneficiado: { select: USER_SAFE_SELECT },
   viaticos: {
     include: {
       concepto: true,
+      solicitudPresupuesto: {
+        include: {
+          poa: {
+            include: {
+              estructura: {
+                include: { partida: true },
+              },
+            },
+          },
+        },
+      },
     },
   },
   gastos: {
     include: {
       tipoGasto: true,
+      solicitudPresupuesto: {
+        include: {
+          poa: {
+            include: {
+              estructura: {
+                include: { partida: true },
+              },
+            },
+          },
+        },
+      },
     },
   },
+  planificaciones: true,
   nominasTerceros: true,
   personasExternas: true,
   presupuestos: {
@@ -43,4 +66,4 @@ export const SOLICITUD_INCLUDE: Prisma.SolicitudInclude = {
       gastos: true,
     },
   },
-};
+} satisfies Prisma.SolicitudInclude;

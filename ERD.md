@@ -45,13 +45,6 @@ TERCEROS TERCEROS
 RECIBO RECIBO
         }
     
-
-
-        EstadoReserva {
-            RESERVADO RESERVADO
-CONFIRMADO CONFIRMADO
-        }
-    
   "Usuario" {
     Int id "🗝️"
     String email 
@@ -159,8 +152,6 @@ CONFIRMADO CONFIRMADO
 
   "SolicitudPresupuesto" {
     Int id "🗝️"
-    EstadoReserva estado 
-    DateTime expiresAt "❓"
     Decimal subtotalNeto 
     Decimal subtotalPresupuestado 
     }
@@ -173,7 +164,7 @@ CONFIRMADO CONFIRMADO
     Int cantidadPersonasTerceros 
     DateTime fechaInicio 
     DateTime fechaFin 
-    Int diasCalculados 
+    Decimal diasCalculados 
     }
   
 
@@ -188,7 +179,7 @@ CONFIRMADO CONFIRMADO
   "Viatico" {
     Int id "🗝️"
     TipoDestino tipoDestino 
-    Int dias 
+    Decimal dias 
     Int cantidadPersonas 
     Decimal costoUnitario 
     Decimal montoPresupuestado 
@@ -250,9 +241,7 @@ CONFIRMADO CONFIRMADO
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
-    "SolicitudPresupuesto" |o--|| "EstadoReserva" : "enum:estado"
-    "SolicitudPresupuesto" }o--|o "Solicitud" : "solicitud"
-    "SolicitudPresupuesto" }o--|o "Usuario" : "usuario"
+    "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
     "Planificacion" }o--|| "Solicitud" : "solicitud"
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"

@@ -36,6 +36,17 @@ export class CreatePlanificacionDto {
   @IsInt()
   @Min(0)
   cantTerceros: number;
+
+  @ApiProperty({
+    example: 2.5,
+    description:
+      'Días explícitos (opcional). Si no se envía, se calcula automáticamente.',
+    required: false,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  dias?: number;
 }
 
 export class CreateViaticoDto {
@@ -55,9 +66,13 @@ export class CreateViaticoDto {
   @IsEnum(TipoDestino)
   tipoDestino: TipoDestino;
 
-  @ApiProperty({ example: 3, minimum: 1 })
-  @IsInt()
-  @Min(1)
+  @ApiProperty({
+    example: 2.5,
+    minimum: 0.5,
+    description: 'Días de viático (permite decimales)',
+  })
+  @IsNumber()
+  @Min(0.5)
   dias: number;
 
   @ApiProperty({ example: 1, minimum: 1 })
@@ -85,17 +100,17 @@ export class CreateViaticoDto {
   @Min(0)
   montoPresupuestado?: number;
 
-  @ApiProperty({ example: 1, description: 'ID de la reserva de presupuesto' })
+  @ApiProperty({ example: 1, description: 'ID de la línea POA asociada' })
   @IsInt()
   @Min(1)
-  solicitudPresupuestoId: number;
+  poaId: number;
 }
 
 export class CreateGastoDto {
-  @ApiProperty({ example: 1, description: 'ID de la reserva de presupuesto' })
+  @ApiProperty({ example: 1, description: 'ID de la línea POA asociada' })
   @IsInt()
   @Min(1)
-  solicitudPresupuestoId: number;
+  poaId: number;
 
   @ApiProperty({ example: 1 })
   @IsInt()
@@ -144,17 +159,31 @@ export class CreateNominaDto {
   @IsString()
   @IsNotEmpty()
   procedenciaInstitucion: string;
+
+  @ApiProperty({ example: 0, required: false })
+  @IsNumber()
+  @IsOptional()
+  montoNeto?: number;
+
+  @ApiProperty({ example: 0, required: false })
+  @IsNumber()
+  @IsOptional()
+  montoPresupuestado?: number;
+
+  @ApiProperty({ example: 0, required: false })
+  @IsNumber()
+  @IsOptional()
+  monto?: number;
 }
 
 export class CreateSolicitudDto {
   @ApiProperty({
     example: [1, 2],
-    description:
-      'IDs de los registros de reserva de presupuesto (SolicitudPresupuesto)',
+    description: 'IDs de las líneas POA seleccionadas',
   })
   @IsArray()
   @IsInt({ each: true })
-  presupuestosIds: number[];
+  poaIds: number[];
 
   @ApiProperty({ example: 2, description: 'ID del usuario aprobador' })
   @IsInt()

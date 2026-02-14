@@ -13,25 +13,6 @@ export function validarLimitesViatico(
   vDto: CreateViaticoDto,
   planificacion: CreatePlanificacionDto,
 ): void {
-  const dInicio = new Date(planificacion.fechaInicio);
-  const dFin = new Date(planificacion.fechaFin);
-
-  const oneDay = 1000 * 60 * 60 * 24;
-
-  const diffTime = dFin.getTime() - dInicio.getTime();
-
-  const diffDays = Math.floor(diffTime / oneDay) + 1;
-
-  if (vDto.dias > diffDays) {
-    throw new BadRequestException(
-      'Los días de viático exceden la duración de la actividad planificada' +
-        'Estos son los dias de la planificacion: ' +
-        diffDays +
-        'Estos son los dias del viatico: ' +
-        vDto.dias,
-    );
-  }
-
   const totalCapacidadPlanificada =
     planificacion.cantInstitucional + planificacion.cantTerceros;
 

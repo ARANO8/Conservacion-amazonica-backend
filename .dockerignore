@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.next/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment variables
+.env
+.env.local
+.env.production
+.env*.local
+
+# Git
+.git/
+.gitignore
+
+# Tests
+test/
+coverage/
+*.spec.ts
+*.test.ts
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Documentation and local scripts
+README.md
+ERD.md
+*.sql
+
+# Tools and configurations not needed in the production image
+.husky/
+.prettierrc
+eslint.config.mjs
+commitlint.config.mjs
+
+# Docker files
+Dockerfile
+docker-compose.yml
+.dockerignore

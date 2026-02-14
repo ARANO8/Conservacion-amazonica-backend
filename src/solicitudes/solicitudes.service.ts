@@ -10,13 +10,7 @@ import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
 import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
-import {
-  Rol,
-  EstadoSolicitud,
-  Solicitud,
-  Prisma,
-  EstadoReserva,
-} from '@prisma/client';
+import { Rol, EstadoSolicitud, Solicitud, Prisma } from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
 import {
@@ -25,6 +19,11 @@ import {
   validarLimitesViatico,
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
+import { PoaService } from '../poa/poa.service';
+
+type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
+  include: typeof SOLICITUD_INCLUDE;
+}>;
 
 @Injectable()
 export class SolicitudesService {
@@ -32,6 +31,7 @@ export class SolicitudesService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => SolicitudPresupuestoService))
     private presupuestoService: SolicitudPresupuestoService,
+    private poaService: PoaService,
   ) {}
 
   private async generarCodigo(): Promise<string> {
@@ -57,11 +57,18 @@ export class SolicitudesService {
     viaticosData: {
       data: Omit<
         Prisma.ViaticoUncheckedCreateInput,
-        'solicitudId' | 'planificacionId'
+        'solicitudId' | 'planificacionId' | 'solicitudPresupuestoId'
       >;
       planificacionIndex: number;
+      poaId: number;
     }[];
-    gastosData: Omit<Prisma.GastoUncheckedCreateInput, 'solicitudId'>[];
+    gastosData: {
+      data: Omit<
+        Prisma.GastoUncheckedCreateInput,
+        'solicitudId' | 'solicitudPresupuestoId'
+      >;
+      poaId: number;
+    }[];
     planificaciones: import('./dto/create-solicitud.dto').CreatePlanificacionDto[];
     nominasTerceros: import('./dto/create-solicitud.dto').CreateNominaDto[];
   }> {
@@ -88,13 +95,19 @@ export class SolicitudesService {
     const viaticosData: {
       data: Omit<
         Prisma.ViaticoUncheckedCreateInput,
-        'solicitudId' | 'planificacionId'
+        'solicitudId' | 'planificacionId' | 'solicitudPresupuestoId'
       >;
       planificacionIndex: number;
+      poaId: number;
     }[] = [];
 
-    const gastosData: Omit<Prisma.GastoUncheckedCreateInput, 'solicitudId'>[] =
-      [];
+    const gastosData: {
+      data: Omit<
+        Prisma.GastoUncheckedCreateInput,
+        'solicitudId' | 'solicitudPresupuestoId'
+      >;
+      poaId: number;
+    }[] = [];
 
     // --- Procesar Viáticos ---
     for (const vDto of viaticos) {
@@ -152,6 +165,7 @@ export class SolicitudesService {
 
       viaticosData.push({
         planificacionIndex: vDto.planificacionIndex,
+        poaId: vDto.poaId,
         data: {
           conceptoId: vDto.conceptoId,
           tipoDestino: vDto.tipoDestino,
@@ -162,7 +176,6 @@ export class SolicitudesService {
           iva13: iva,
           it3: it,
           montoNeto: finalMontoNeto,
-          solicitudPresupuestoId: vDto.solicitudPresupuestoId,
         },
       });
     }
@@ -176,27 +189,29 @@ export class SolicitudesService {
         );
       }
 
+      const netoTotalDto = new Prisma.Decimal(gDto.montoNeto);
+
       const {
-        subtotalNeto: calcSubtotalNeto,
         iva,
         it,
         iue,
         montoPresupuestado: calcMontoPresupuestado,
       } = calcularMontosGastos(
-        new Prisma.Decimal(gDto.montoNeto),
-        gDto.cantidad,
+        netoTotalDto,
+        1, // Tratamos el monto del DTO como el total final para el cálculo de impuestos
         gDto.tipoDocumento,
         tipoGasto.codigo,
       );
 
-      // Trust DTO if provided. For Gastos, it's usually unitary as per DTO descriptions,
-      // but let's assume the user wants to pass the total or unitary as calculated by FE.
-      const finalMontoNeto = gDto.montoNeto
-        ? new Prisma.Decimal(gDto.montoNeto).mul(gDto.cantidad)
-        : calcSubtotalNeto;
+      // El DTO ya envía el TOTAL (no el unitario), evitamos multiplicar de nuevo
+      const finalMontoNeto = netoTotalDto;
       const finalMontoPresupuestado = gDto.montoPresupuestado
-        ? new Prisma.Decimal(gDto.montoPresupuestado).mul(gDto.cantidad)
+        ? new Prisma.Decimal(gDto.montoPresupuestado)
         : calcMontoPresupuestado;
+
+      // Calculo del unitario para la base de datos (Guard Clause contra división por cero)
+      const costoUnitarioReal =
+        gDto.cantidad > 0 ? netoTotalDto.div(gDto.cantidad) : netoTotalDto;
 
       montoTotalPresupuestado = montoTotalPresupuestado.add(
         finalMontoPresupuestado,
@@ -204,17 +219,19 @@ export class SolicitudesService {
       montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       gastosData.push({
-        solicitudPresupuestoId: gDto.solicitudPresupuestoId,
-        tipoGastoId: gDto.tipoGastoId,
-        tipoDocumento: gDto.tipoDocumento,
-        cantidad: gDto.cantidad,
-        costoUnitario: new Prisma.Decimal(gDto.montoNeto),
-        montoPresupuestado: finalMontoPresupuestado,
-        iva13: iva,
-        it3: it,
-        iue5: iue,
-        montoNeto: finalMontoNeto,
-        detalle: gDto.detalle,
+        poaId: gDto.poaId,
+        data: {
+          tipoGastoId: gDto.tipoGastoId,
+          tipoDocumento: gDto.tipoDocumento,
+          cantidad: gDto.cantidad,
+          costoUnitario: costoUnitarioReal,
+          montoPresupuestado: finalMontoPresupuestado,
+          iva13: iva,
+          it3: it,
+          iue5: iue,
+          montoNeto: finalMontoNeto,
+          detalle: gDto.detalle,
+        },
       });
     }
 
@@ -232,13 +249,8 @@ export class SolicitudesService {
     createSolicitudDto: CreateSolicitudDto,
     usuarioId: number,
   ): Promise<Solicitud> {
-    const {
-      presupuestosIds,
-      descripcion,
-      aprobadorId,
-      lugarViaje,
-      motivoViaje,
-    } = createSolicitudDto;
+    const { poaIds, descripcion, aprobadorId, lugarViaje, motivoViaje } =
+      createSolicitudDto;
 
     // VALIDACIÓN: Evitar Auto-Aprobación
     if (aprobadorId === usuarioId) {
@@ -272,9 +284,9 @@ export class SolicitudesService {
     }
 
     // 3. TRANSACCIÓN PRISMA
-    if (!presupuestosIds || presupuestosIds.length === 0) {
+    if (!poaIds || poaIds.length === 0) {
       throw new BadRequestException(
-        'Debes seleccionar al menos un presupuesto reservado',
+        'Debes seleccionar al menos una partida presupuestaria',
       );
     }
 
@@ -299,35 +311,34 @@ export class SolicitudesService {
         },
       });
 
-      // B. Confirmar Reservas (Dentro de la misma transacción para evitar P2003)
-      await tx.solicitudPresupuesto.updateMany({
-        where: {
-          id: { in: presupuestosIds },
-          usuarioId,
-          estado: EstadoReserva.RESERVADO,
-        },
-        data: {
-          estado: EstadoReserva.CONFIRMADO,
-          expiresAt: null,
-          solicitudId: solicitud.id,
-        },
-      });
+      // B. Crear SolicitudPresupuesto (transaccional, save-at-end)
+      const presupuestosMap = new Map<number, number>(); // poaId → SolicitudPresupuesto.id
+      for (const poaId of poaIds) {
+        const sp = await tx.solicitudPresupuesto.create({
+          data: { poaId, solicitudId: solicitud.id },
+        });
+        presupuestosMap.set(poaId, sp.id);
+      }
 
       // C. Crear Planificaciones y mapear IDs
       const createdPlanificaciones: { id: number }[] = [];
       for (const p of detalles.planificaciones) {
         const d1 = new Date(p.fechaInicio);
         const d2 = new Date(p.fechaFin);
-        const diff = Math.ceil(
-          (d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24),
-        );
+        // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
+        const diferenciaMilisegundos = d2.getTime() - d1.getTime();
+        const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
+        const diasFinales =
+          p.dias !== undefined && p.dias !== null
+            ? Number(p.dias)
+            : Number(diasExactos.toFixed(2));
 
         const cp = await tx.planificacion.create({
           data: {
             actividadProgramada: p.actividad,
             fechaInicio: d1,
             fechaFin: d2,
-            diasCalculados: diff,
+            diasCalculados: diasFinales,
             cantidadPersonasInstitucional: p.cantInstitucional,
             cantidadPersonasTerceros: p.cantTerceros,
             solicitudId: solicitud.id,
@@ -342,6 +353,7 @@ export class SolicitudesService {
           data: {
             ...vItem.data,
             solicitudId: solicitud.id,
+            solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
             planificacionId:
               createdPlanificaciones[vItem.planificacionIndex].id,
           },
@@ -352,8 +364,9 @@ export class SolicitudesService {
       for (const gRecord of detalles.gastosData) {
         await tx.gasto.create({
           data: {
-            ...gRecord,
+            ...gRecord.data,
             solicitudId: solicitud.id,
+            solicitudPresupuestoId: presupuestosMap.get(gRecord.poaId)!,
           },
         });
       }
@@ -387,23 +400,28 @@ export class SolicitudesService {
     return result;
   }
 
-  async findAll(usuario: { id: number; rol: Rol }): Promise<Solicitud[]> {
+  async findAll(usuario: {
+    id: number;
+    rol: Rol;
+  }): Promise<SolicitudConRelaciones[]> {
     const where: Prisma.SolicitudWhereInput = { deletedAt: null };
 
     if (usuario.rol === Rol.USUARIO) {
       where.OR = [{ usuarioEmisorId: usuario.id }, { aprobadorId: usuario.id }];
     }
 
-    return this.prisma.solicitud.findMany({
+    const solicitudes = await this.prisma.solicitud.findMany({
       where,
       include: SOLICITUD_INCLUDE,
       orderBy: {
         fechaSolicitud: 'desc',
       },
     });
+
+    return Promise.all(solicitudes.map((s) => this.enriquecerConSaldos(s)));
   }
 
-  async findOne(id: number): Promise<Solicitud> {
+  async findOne(id: number) {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
       include: SOLICITUD_INCLUDE,
@@ -413,6 +431,55 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
+    const solicitudCompleta = await this.prisma.solicitud.findUnique({
+      where: { id },
+      include: {
+        usuarioEmisor: true,
+        aprobador: true,
+        usuarioBeneficiado: true,
+        historialAprobaciones: {
+          include: { usuarioActor: true },
+          orderBy: { fechaAccion: 'desc' },
+        },
+        presupuestos: {
+          include: {
+            poa: {
+              include: {
+                estructura: { include: { proyecto: true } },
+                codigoPresupuestario: true,
+                actividad: true,
+              },
+            },
+          },
+        },
+        planificaciones: true,
+        viaticos: { include: { concepto: true } },
+        gastos: { include: { tipoGasto: true } },
+        personasExternas: true,
+        nominasTerceros: true,
+        rendicion: true,
+      },
+    });
+
+    if (!solicitudCompleta) {
+      throw new NotFoundException(`Error al recuperar solicitud ${id}`);
+    }
+
+    return solicitudCompleta;
+  }
+
+  private async enriquecerConSaldos(
+    solicitud: SolicitudConRelaciones,
+  ): Promise<SolicitudConRelaciones> {
+    if (solicitud.presupuestos) {
+      await Promise.all(
+        solicitud.presupuestos.map(async (sp) => {
+          if (sp.poa) {
+            sp.poa = await this.poaService.addSaldoDisponible(sp.poa);
+          }
+        }),
+      );
+    }
     return solicitud;
   }
 
@@ -476,11 +543,14 @@ export class SolicitudesService {
       let finalFechaFin: Date | null = solicitud.fechaFin;
 
       if (itemsActualizados) {
-        // A. Limpiar existentes
+        // A. Limpiar existentes (orden: hijos primero por FK)
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
+        await tx.solicitudPresupuesto.deleteMany({
+          where: { solicitudId: id },
+        });
 
         // B. Recalcular y re-insertar
         const detalles = await this.prepararInsertAnidado(updateSolicitudDto);
@@ -509,19 +579,35 @@ export class SolicitudesService {
           finalFechaFin = null;
         }
 
+        // B.5 Recrear SolicitudPresupuesto
+        const updatePoaIds = updateSolicitudDto.poaIds ?? [];
+        const presupuestosMap = new Map<number, number>();
+        for (const poaId of updatePoaIds) {
+          const sp = await tx.solicitudPresupuesto.create({
+            data: { poaId, solicitudId: id },
+          });
+          presupuestosMap.set(poaId, sp.id);
+        }
+
         // C. Re-inserción masiva (exactamente igual que el create)
         const createdPlanif: { id: number }[] = [];
         for (const p of detalles.planificaciones) {
           const d1 = new Date(p.fechaInicio);
           const d2 = new Date(p.fechaFin);
+          // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
+          const diferenciaMilisegundos = d2.getTime() - d1.getTime();
+          const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
+          const diasFinales =
+            p.dias !== undefined && p.dias !== null
+              ? Number(p.dias)
+              : Number(diasExactos.toFixed(2));
+
           const cp = await tx.planificacion.create({
             data: {
               actividadProgramada: p.actividad,
               fechaInicio: d1,
               fechaFin: d2,
-              diasCalculados: Math.ceil(
-                (d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24),
-              ),
+              diasCalculados: diasFinales,
               cantidadPersonasInstitucional: p.cantInstitucional,
               cantidadPersonasTerceros: p.cantTerceros,
               solicitudId: id,
@@ -535,6 +621,7 @@ export class SolicitudesService {
             data: {
               ...v.data,
               solicitudId: id,
+              solicitudPresupuestoId: presupuestosMap.get(v.poaId)!,
               planificacionId: createdPlanif[v.planificacionIndex].id,
             },
           });
@@ -542,7 +629,11 @@ export class SolicitudesService {
 
         for (const g of detalles.gastosData) {
           await tx.gasto.create({
-            data: { ...g, solicitudId: id },
+            data: {
+              ...g.data,
+              solicitudId: id,
+              solicitudPresupuestoId: presupuestosMap.get(g.poaId)!,
+            },
           });
         }
 

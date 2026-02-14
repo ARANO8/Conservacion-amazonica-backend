@@ -1,2 +1,3 @@
-UPDATE "Usuario"
-SET "password" = '$2a$12$wbhVNc2q5wLlKnryn3F8SOjhR2YYregnGlRB.R2VmhNNhnrhMpYBe';
+SELECT column_name
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'Viatico';

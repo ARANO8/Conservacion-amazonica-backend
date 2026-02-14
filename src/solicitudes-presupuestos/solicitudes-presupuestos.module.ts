@@ -1,12 +1,9 @@
 import { Module } from '@nestjs/common';
-import { SolicitudPresupuestoService } from './solicitudes-presupuestos.service';
-import { SolicitudPresupuestoController } from './solicitudes-presupuestos.controller';
 import { PrismaModule } from '../prisma/prisma.module';
-import { PoaModule } from '../poa/poa.module';
+import { SolicitudPresupuestoService } from './solicitudes-presupuestos.service';
 
 @Module({
-  imports: [PrismaModule, PoaModule],
-  controllers: [SolicitudPresupuestoController],
+  imports: [PrismaModule],
   providers: [SolicitudPresupuestoService],
   exports: [SolicitudPresupuestoService],
 })
