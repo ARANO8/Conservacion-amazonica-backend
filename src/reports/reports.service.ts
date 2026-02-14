@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { TDocumentDefinitions, CustomTableLayout } from 'pdfmake/interfaces';
+import { TDocumentDefinitions } from 'pdfmake/interfaces';
 import { formatDate, formatCurrency } from '../shared/utils/formatters.util';
 
 // Definición de interfaces para tipado estricto y satisfacer ESLint
@@ -13,20 +13,30 @@ export interface SolicitudReportData {
   montoTotalNeto: number | string | { toString(): string };
   usuarioEmisor?: {
     nombreCompleto?: string | null;
+    cargo?: string | null;
   } | null;
-  poa?: {
-    actividad?: {
-      detalleDescripcion?: string | null;
-    } | null;
-    estructura?: {
-      proyecto?: {
-        nombre?: string | null;
+  aprobador?: {
+    nombreCompleto?: string | null;
+  } | null;
+  usuarioBeneficiado?: {
+    nombreCompleto?: string | null;
+  } | null;
+  presupuestos?: Array<{
+    poa?: {
+      codigoPoa?: string | null;
+      actividad?: {
+        detalleDescripcion?: string | null;
+      } | null;
+      estructura?: {
+        proyecto?: {
+          nombre?: string | null;
+        } | null;
+      } | null;
+      codigoPresupuestario?: {
+        codigoCompleto?: string | null;
       } | null;
     } | null;
-    codigoPresupuestario?: {
-      codigoCompleto?: string | null;
-    } | null;
-  } | null;
+  }> | null;
   planificaciones?: Array<{
     fechaInicio: Date | string | null;
     fechaFin: Date | string | null;
@@ -58,17 +68,19 @@ export interface SolicitudReportData {
   }> | null;
 }
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 @Injectable()
 export class ReportsService {
   constructor() {}
 
   async generateSolicitudPdf(solicitud: SolicitudReportData): Promise<Buffer> {
-    // 1. Cargar el módulo (usando require para compatibilidad con pdfmake/js/printer)
+    // 1. Cargar el módulo
     /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
     const PdfPrinterLib = require('pdfmake/js/printer');
     const PdfPrinter = PdfPrinterLib.default || PdfPrinterLib;
 
-    // 2. Fuentes Estándar (Helvetica)
     const fonts = {
       Roboto: {
         normal: 'Helvetica',
@@ -78,253 +90,16 @@ export class ReportsService {
       },
     };
 
-    // 3. Instanciación
     const printer = new PdfPrinter(fonts);
 
     const docDefinition: TDocumentDefinitions = {
       content: [
-        // Encabezado
-        {
-          columns: [
-            {
-              text: 'Conservación Amazónica - ACEAA',
-              style: 'orgTitle',
-            },
-            {
-              text: [
-                { text: 'SOLICITUD DE FONDOS\n', style: 'header' },
-                { text: solicitud.codigoSolicitud, style: 'code' },
-              ],
-              alignment: 'right',
-            },
-          ],
-        },
-        {
-          text: `Fecha de impresión: ${formatDate(new Date())}`,
-          alignment: 'right',
-          fontSize: 8,
-          margin: [0, 5, 0, 15],
-        },
-
-        // Sección 1: Datos Generales
-        { text: 'DATOS GENERALES', style: 'sectionHeader' },
-        {
-          table: {
-            widths: ['25%', '75%'],
-            body: [
-              [
-                'Solicitante:',
-                {
-                  text: solicitud.usuarioEmisor?.nombreCompleto || 'N/A',
-                  bold: true,
-                },
-              ],
-              [
-                'Proyecto:',
-                solicitud.poa?.estructura?.proyecto?.nombre || 'N/A',
-              ],
-              [
-                'Actividad POA:',
-                solicitud.poa?.actividad?.detalleDescripcion || 'N/A',
-              ],
-              [
-                'Código Presupuestario:',
-                solicitud.poa?.codigoPresupuestario?.codigoCompleto || 'N/A',
-              ],
-              ['Lugar del Viaje:', solicitud.lugarViaje || 'N/A'],
-              ['Motivo del Viaje:', solicitud.motivoViaje || 'N/A'],
-              [
-                'Fechas:',
-                `Del ${formatDate(solicitud.fechaInicio)} al ${formatDate(solicitud.fechaFin)}`,
-              ],
-            ] as any,
-          },
-          layout: 'noBorders' as unknown as CustomTableLayout,
-          margin: [0, 0, 0, 20],
-        },
-
-        // Sección 2: Itinerario (Planificación)
-        { text: 'ITINERARIO (PLANIFICACIÓN)', style: 'sectionHeader' },
-        {
-          table: {
-            headerRows: 1,
-            widths: ['20%', '20%', '40%', '20%'],
-            body: [
-              [
-                { text: 'Fecha Inicio', style: 'tableHeader' },
-                { text: 'Fecha Fin', style: 'tableHeader' },
-                { text: 'Actividad', style: 'tableHeader' },
-                { text: 'Cant. Personas', style: 'tableHeader' },
-              ],
-              ...(solicitud.planificaciones || []).map((p) => [
-                formatDate(p.fechaInicio),
-                formatDate(p.fechaFin),
-                p.actividadProgramada,
-                `Inst: ${p.cantidadPersonasInstitucional} / Terc: ${p.cantidadPersonasTerceros}`,
-              ]),
-            ] as any,
-          },
-          margin: [0, 0, 0, 20],
-        },
-
-        // Sección 3: Detalle Económico
-        { text: 'DETALLE ECONÓMICO', style: 'sectionHeader' },
-        {
-          table: {
-            headerRows: 1,
-            widths: ['*', 'auto', 'auto', 'auto', 'auto'],
-            body: [
-              [
-                { text: 'Concepto / Tipo', style: 'tableHeader' },
-                { text: 'Detalle', style: 'tableHeader' },
-                { text: 'Cant/Días', style: 'tableHeader' },
-                { text: 'Costo Unit.', style: 'tableHeader' },
-                { text: 'TOTAL', style: 'tableHeader' },
-              ],
-              // Viáticos
-              ...(solicitud.viaticos || []).map((v) => [
-                `Viático: ${v.concepto?.nombre || 'N/A'}`,
-                v.tipoDestino,
-                `${v.dias} días x ${v.cantidadPersonas} pers`,
-                formatCurrency(v.costoUnitario),
-                {
-                  text: formatCurrency(v.montoPresupuestado),
-                  alignment: 'right',
-                },
-              ]),
-              // Gastos
-              ...(solicitud.gastos || []).map((g) => [
-                `Gasto: ${g.tipoGasto?.nombre || 'N/A'}`,
-                g.detalle || g.tipoDocumento,
-                g.cantidad,
-                formatCurrency(g.costoUnitario),
-                {
-                  text: formatCurrency(g.montoPresupuestado),
-                  alignment: 'right',
-                },
-              ]),
-              // Totales
-              [
-                {
-                  text: 'TOTAL SOLICITADO',
-                  colSpan: 4,
-                  bold: true,
-                  alignment: 'right',
-                },
-                {},
-                {},
-                {},
-                {
-                  text: formatCurrency(solicitud.montoTotalPresupuestado),
-                  bold: true,
-                  alignment: 'right',
-                },
-              ],
-              [
-                {
-                  text: 'MONTO NETO',
-                  colSpan: 4,
-                  bold: true,
-                  alignment: 'right',
-                },
-                {},
-                {},
-                {},
-                {
-                  text: formatCurrency(solicitud.montoTotalNeto),
-                  bold: true,
-                  alignment: 'right',
-                  color: 'darkblue',
-                },
-              ],
-            ] as any,
-          },
-          margin: [0, 0, 0, 40],
-        },
-
-        // Sección 4: Firmas
-        {
-          columns: [
-            {
-              stack: [
-                { text: '', margin: [0, 50, 0, 0] },
-                {
-                  canvas: [
-                    {
-                      type: 'line',
-                      x1: 0,
-                      y1: 0,
-                      x2: 120,
-                      y2: 0,
-                      lineWidth: 1,
-                    },
-                  ],
-                },
-                {
-                  text: 'Solicitante',
-                  alignment: 'center',
-                  fontSize: 9,
-                  margin: [0, 5, 0, 0],
-                },
-                {
-                  text: solicitud.usuarioEmisor?.nombreCompleto || '',
-                  alignment: 'center',
-                  fontSize: 8,
-                  italics: true,
-                },
-              ],
-              alignment: 'center',
-            },
-            {
-              stack: [
-                { text: '', margin: [0, 50, 0, 0] },
-                {
-                  canvas: [
-                    {
-                      type: 'line',
-                      x1: 0,
-                      y1: 0,
-                      x2: 120,
-                      y2: 0,
-                      lineWidth: 1,
-                    },
-                  ],
-                },
-                {
-                  text: 'Inmediato Superior',
-                  alignment: 'center',
-                  fontSize: 9,
-                  margin: [0, 5, 0, 0],
-                },
-              ],
-              alignment: 'center',
-            },
-            {
-              stack: [
-                { text: '', margin: [0, 50, 0, 0] },
-                {
-                  canvas: [
-                    {
-                      type: 'line',
-                      x1: 0,
-                      y1: 0,
-                      x2: 120,
-                      y2: 0,
-                      lineWidth: 1,
-                    },
-                  ],
-                },
-                {
-                  text: 'Autorización (Tesorería)',
-                  alignment: 'center',
-                  fontSize: 9,
-                  margin: [0, 5, 0, 0],
-                },
-              ],
-              alignment: 'center',
-            },
-          ],
-        },
+        this.buildHeader(solicitud),
+        this.buildDatosGenerales(solicitud),
+        // Se ha elminado la seccion ITINERARIO
+        this.buildDetalleEconomico(solicitud),
+        this.buildDatosBancarios(),
+        this.buildFirmas(solicitud),
       ],
       styles: {
         orgTitle: { fontSize: 10, italics: true, color: 'gray' },
@@ -336,7 +111,12 @@ export class ReportsService {
           background: '#eeeeee',
           margin: [0, 10, 0, 10],
         },
-        tableHeader: { fontSize: 10, bold: true, fillColor: '#f3f3f3' },
+        tableHeader: {
+          fontSize: 10,
+          bold: true,
+          fillColor: '#4bae32',
+          color: '#ffffff',
+        },
       },
       defaultStyle: {
         font: 'Roboto',
@@ -364,5 +144,338 @@ export class ReportsService {
       }
     });
     /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+  }
+
+  private formatUTCDate(date: Date | string | null | undefined): string {
+    if (!date) return 'N/A';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'N/A';
+    return `${d.getUTCDate().toString().padStart(2, '0')}/${(d.getUTCMonth() + 1).toString().padStart(2, '0')}/${d.getUTCFullYear()}`;
+  }
+
+  private buildHeader(solicitud: SolicitudReportData): any {
+    let logoDef: any = {
+      text: 'Conservación Amazónica - ACEAA',
+      style: 'orgTitle',
+    };
+
+    try {
+      const logoPath = path.join(process.cwd(), 'logo.png');
+      if (fs.existsSync(logoPath)) {
+        const logoBase64 = fs.readFileSync(logoPath).toString('base64');
+        logoDef = {
+          image: `data:image/png;base64,${logoBase64}`,
+          width: 150,
+        };
+      }
+    } catch (error) {
+      console.warn('No se pudo cargar el logo:', error);
+    }
+
+    return [
+      {
+        columns: [
+          logoDef,
+          {
+            text: [
+              { text: 'SOLICITUD DE FONDOS\n', style: 'header' },
+              { text: solicitud.codigoSolicitud, style: 'code' },
+            ],
+            alignment: 'right',
+          },
+        ],
+      },
+      {
+        text: `Fecha de impresión: ${formatDate(new Date())}`,
+        alignment: 'right',
+        fontSize: 8,
+        margin: [0, 5, 0, 15],
+      },
+    ];
+  }
+
+  private buildDatosGenerales(solicitud: SolicitudReportData): any {
+    // Helper para deduplicar arrays
+    const uniqueJoin = (arr: (string | null | undefined)[]) =>
+      [...new Set(arr.filter(Boolean))].join(' | ') || 'N/A';
+
+    const codigosPoa = uniqueJoin(
+      solicitud.presupuestos?.map((p) => p.poa?.codigoPoa) || [],
+    );
+    const proyectos = uniqueJoin(
+      solicitud.presupuestos?.map((p) => p.poa?.estructura?.proyecto?.nombre) ||
+        [],
+    );
+    const actividadesPoa = uniqueJoin(
+      solicitud.presupuestos?.map(
+        (p) => p.poa?.actividad?.detalleDescripcion,
+      ) || [],
+    );
+    const codigosActividad = uniqueJoin(
+      solicitud.presupuestos?.map(
+        (p) => p.poa?.codigoPresupuestario?.codigoCompleto,
+      ) || [],
+    );
+
+    return [
+      { text: 'DATOS GENERALES', style: 'sectionHeader' },
+      {
+        table: {
+          widths: ['25%', '75%'],
+          body: [
+            ['A:', 'MARCOS FERNANDO TERÁN VALENZUELA - Director Ejecutivo'],
+            [
+              'Vía:',
+              `${solicitud.aprobador?.nombreCompleto || 'N/A'} - Director del Proyecto`,
+            ],
+            [
+              'Desembolso a:',
+              solicitud.usuarioBeneficiado?.nombreCompleto ||
+                solicitud.usuarioEmisor?.nombreCompleto ||
+                'N/A',
+            ],
+            ['Código POA:', codigosPoa],
+            ['Proyecto:', proyectos],
+            ['Actividad POA:', actividadesPoa],
+            ['Código Actividad:', codigosActividad],
+            ['Lugar del Viaje:', solicitud.lugarViaje || 'N/A'],
+            ['Motivo del Viaje:', solicitud.motivoViaje || 'N/A'],
+            [
+              'Fechas:',
+              `Del ${this.formatUTCDate(solicitud.fechaInicio)} al ${this.formatUTCDate(solicitud.fechaFin)}`,
+            ],
+          ],
+        },
+        layout: 'noBorders',
+        margin: [0, 0, 0, 20],
+      },
+    ];
+  }
+
+  private buildDetalleEconomico(solicitud: SolicitudReportData): any {
+    return [
+      { text: 'DETALLE ECONÓMICO', style: 'sectionHeader' },
+      {
+        table: {
+          headerRows: 1,
+          widths: ['*', 'auto', 'auto', 'auto', 'auto'],
+          body: [
+            [
+              { text: 'Concepto / Tipo', style: 'tableHeader' },
+              { text: 'Detalle', style: 'tableHeader' },
+              { text: 'Cant/Días', style: 'tableHeader' },
+              { text: 'Costo Unit.', style: 'tableHeader' },
+              { text: 'TOTAL', style: 'tableHeader' },
+            ],
+            // Viáticos
+            ...(solicitud.viaticos || []).map((v) => [
+              `Viático: ${v.concepto?.nombre || 'N/A'}`,
+              v.tipoDestino,
+              `${v.dias} días x ${v.cantidadPersonas} pers`,
+              formatCurrency(v.costoUnitario),
+              {
+                text: formatCurrency(v.montoPresupuestado),
+                alignment: 'right',
+              },
+            ]),
+            // Gastos
+            ...(solicitud.gastos || []).map((g) => [
+              `Gasto: ${g.tipoGasto?.nombre || 'N/A'}`,
+              g.detalle || g.tipoDocumento,
+              g.cantidad,
+              formatCurrency(g.costoUnitario),
+              {
+                text: formatCurrency(g.montoPresupuestado),
+                alignment: 'right',
+              },
+            ]),
+            // Totales
+            [
+              {
+                text: 'TOTAL SOLICITADO',
+                colSpan: 4,
+                bold: true,
+                alignment: 'right',
+              },
+              {},
+              {},
+              {},
+              {
+                text: formatCurrency(solicitud.montoTotalPresupuestado),
+                bold: true,
+                alignment: 'right',
+              },
+            ],
+            [
+              {
+                text: 'MONTO NETO',
+                colSpan: 4,
+                bold: true,
+                alignment: 'right',
+              },
+              {},
+              {},
+              {},
+              {
+                text: formatCurrency(solicitud.montoTotalNeto),
+                bold: true,
+                alignment: 'right',
+                color: 'darkblue',
+              },
+            ],
+          ],
+        },
+        margin: [0, 0, 0, 20],
+      },
+    ];
+  }
+
+  private buildDatosBancarios(): any {
+    return [
+      {
+        table: {
+          widths: ['*'],
+          body: [
+            [
+              {
+                text: 'DATOS BANCARIOS (Llenar solo si aplica)',
+                fillColor: '#eeeeee',
+                bold: true,
+              },
+            ],
+            [
+              {
+                text: [
+                  'Cuenta Bancaria:\n\n',
+                  'Nombre: ______________________   N° Cuenta: ______________________   Banco: ______________________\n\n',
+                  'N° Transferencia: ______________________\n\n',
+                  'Fecha de emisión: ______________________',
+                ],
+                margin: [0, 10, 0, 10],
+              },
+            ],
+          ],
+        },
+        margin: [0, 0, 0, 40],
+      },
+    ];
+  }
+
+  private buildFirmas(solicitud: SolicitudReportData): any {
+    return [
+      {
+        columns: [
+          {
+            stack: [
+              { text: '', margin: [0, 50, 0, 0] },
+              {
+                canvas: [
+                  {
+                    type: 'line',
+                    x1: 0,
+                    y1: 0,
+                    x2: 140,
+                    y2: 0,
+                    lineWidth: 1,
+                  },
+                ],
+              },
+              {
+                text: 'Solicitado por:',
+                alignment: 'center',
+                fontSize: 9,
+                margin: [0, 5, 0, 0],
+                bold: true,
+              },
+              {
+                text: solicitud.usuarioEmisor?.nombreCompleto || '',
+                alignment: 'center',
+                fontSize: 8,
+              },
+              {
+                text: solicitud.usuarioEmisor?.cargo || 'Cargo no definido',
+                alignment: 'center',
+                fontSize: 8,
+                italics: true,
+              },
+            ],
+            alignment: 'center',
+          },
+          {
+            stack: [
+              { text: '', margin: [0, 50, 0, 0] },
+              {
+                canvas: [
+                  {
+                    type: 'line',
+                    x1: 0,
+                    y1: 0,
+                    x2: 140,
+                    y2: 0,
+                    lineWidth: 1,
+                  },
+                ],
+              },
+              {
+                text: 'Revisado por:',
+                alignment: 'center',
+                fontSize: 9,
+                margin: [0, 5, 0, 0],
+                bold: true,
+              },
+              {
+                text:
+                  solicitud.aprobador?.nombreCompleto || '__________________',
+                alignment: 'center',
+                fontSize: 8,
+              },
+              {
+                text: 'Director del Proyecto',
+                alignment: 'center',
+                fontSize: 8,
+                italics: true,
+              },
+            ],
+            alignment: 'center',
+          },
+          {
+            stack: [
+              { text: '', margin: [0, 50, 0, 0] },
+              {
+                canvas: [
+                  {
+                    type: 'line',
+                    x1: 0,
+                    y1: 0,
+                    x2: 140,
+                    y2: 0,
+                    lineWidth: 1,
+                  },
+                ],
+              },
+              {
+                text: 'Aprobado por:',
+                alignment: 'center',
+                fontSize: 9,
+                margin: [0, 5, 0, 0],
+                bold: true,
+              },
+              {
+                text: 'MARCOS FERNANDO TERÁN VALENZUELA',
+                alignment: 'center',
+                fontSize: 8,
+              },
+              {
+                text: 'Director Ejecutivo',
+                alignment: 'center',
+                fontSize: 8,
+                italics: true,
+              },
+            ],
+            alignment: 'center',
+          },
+        ],
+      },
+    ];
   }
 }

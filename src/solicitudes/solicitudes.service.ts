@@ -421,7 +421,7 @@ export class SolicitudesService {
     return Promise.all(solicitudes.map((s) => this.enriquecerConSaldos(s)));
   }
 
-  async findOne(id: number): Promise<SolicitudConRelaciones> {
+  async findOne(id: number) {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
       include: SOLICITUD_INCLUDE,
@@ -431,7 +431,41 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
-    return this.enriquecerConSaldos(solicitud);
+    const solicitudCompleta = await this.prisma.solicitud.findUnique({
+      where: { id },
+      include: {
+        usuarioEmisor: true,
+        aprobador: true,
+        usuarioBeneficiado: true,
+        historialAprobaciones: {
+          include: { usuarioActor: true },
+          orderBy: { fechaAccion: 'desc' },
+        },
+        presupuestos: {
+          include: {
+            poa: {
+              include: {
+                estructura: { include: { proyecto: true } },
+                codigoPresupuestario: true,
+                actividad: true,
+              },
+            },
+          },
+        },
+        planificaciones: true,
+        viaticos: { include: { concepto: true } },
+        gastos: { include: { tipoGasto: true } },
+        personasExternas: true,
+        nominasTerceros: true,
+        rendicion: true,
+      },
+    });
+
+    if (!solicitudCompleta) {
+      throw new NotFoundException(`Error al recuperar solicitud ${id}`);
+    }
+
+    return solicitudCompleta;
   }
 
   private async enriquecerConSaldos(
