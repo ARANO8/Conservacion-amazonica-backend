@@ -431,11 +431,6 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
-    console.log(
-      '📦 [AUDITORIA BACKEND] Solicitud obtenida:',
-      JSON.stringify(solicitud, null, 2),
-    );
-
     return this.enriquecerConSaldos(solicitud);
   }
 
