@@ -223,7 +223,16 @@ RECIBO RECIBO
     String ci 
     }
   
+
+  "CuentaBancaria" {
+    Int id "🗝️"
+    String numeroCuenta 
+    String banco 
+    String moneda 
+    }
+  
     "Usuario" |o--|| "Rol" : "enum:rol"
+    "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
     "EstructuraProgramatica" }o--|| "Grupo" : "grupo"
     "EstructuraProgramatica" }o--|| "Partida" : "partida"

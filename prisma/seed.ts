@@ -98,6 +98,24 @@ async function main() {
     userCount++;
   });
 
+  // 1.5 Cuentas Bancarias
+  console.log('🏦 Seeding Cuentas Bancarias...');
+  let cuentaCount = 0;
+  await processCSV('cuentasBancarias.csv', async (row) => {
+    const [numeroCuenta, banco, moneda] = row;
+    if (numeroCuenta === 'numeroCuenta') return; // Skip header
+    await prisma.cuentaBancaria.upsert({
+      where: { numeroCuenta },
+      update: {},
+      create: {
+        numeroCuenta,
+        banco: banco || 'BISA S.A.',
+        moneda: moneda || 'M/N',
+      },
+    });
+    cuentaCount++;
+  });
+
   // 2. Catálogos Maestros (Precarga)
   await processCSV('Proyecto.csv', async (row) => {
     const nombre = row[0];
@@ -315,6 +333,7 @@ async function main() {
 
   console.log(`✅ Seeding completado.`);
   console.log(`--- Resumen ---`);
+  console.log(`Cuentas Bancarias: ${cuentaCount}`);
   console.log(`Usuarios: ${userCount}`);
   console.log(`Estructuras: ${estructuraMap.size}`);
   console.log(`Filas POA: ${poaCount}`);

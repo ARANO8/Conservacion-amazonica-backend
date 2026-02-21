@@ -69,6 +69,9 @@ model Proyecto {
   nombre String
   deletedAt DateTime?
 
+  cuentaBancariaId Int?
+  cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+
   estructuras EstructuraProgramatica[]
 }
 
@@ -319,6 +322,16 @@ model NominaTerceros {
   solicitudId    Int
   solicitud      Solicitud @relation(fields: [solicitudId], references: [id])
 }
+
+model CuentaBancaria {
+  id           Int        @id @default(autoincrement())
+  numeroCuenta String     @unique
+  banco        String     @default("BISA S.A.")
+  moneda       String     @default("M/N")
+
+  proyectos    Proyecto[]
+}
+
 generator erd {
   provider = "prisma-erd-generator"
   output   = "../ERD.md"
