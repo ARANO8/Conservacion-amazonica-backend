@@ -445,7 +445,11 @@ export class SolicitudesService {
           include: {
             poa: {
               include: {
-                estructura: { include: { proyecto: true } },
+                estructura: {
+                  include: {
+                    proyecto: { include: { cuentaBancaria: true } },
+                  },
+                },
                 codigoPresupuestario: true,
                 actividad: true,
               },

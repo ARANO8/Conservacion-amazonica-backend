@@ -331,6 +331,47 @@ async function main() {
     poaCount++;
   });
 
+  // 5. Vincular Cuentas Bancarias con Proyectos
+  console.log('🔗 Vinculando Cuentas Bancarias con Proyectos...');
+  const relacionCuentas: Record<string, string[]> = {
+    '34-6839-001-8': ['EROL_2', 'GIZ', 'MOORE'],
+    '34-6839-002-6': ['AAF9_PANDO', 'AAF_FORT', 'AAF9_BENI', 'AAF_10'],
+    '34-6839-003-4': ['BID_PV'],
+    '34-6839-005-1': ['RE_WILD', 'RE_WILD_2', 'AFD'],
+    '34-6839-008-5': ['FCF_3'],
+    '34-6839-009-3': ['KATZ'],
+    '34-6839-012-3': ['SUECIA_PV'],
+    '34-6839-017-4': ['RECURSOS_PROPIOS'],
+    '34-6839-018-2': ['AKAM_CCAM', 'IIED'],
+    '34-6839-020-4': ['DOROTHY', 'RAINFOREST'],
+  };
+
+  for (const [numeroCuenta, proyectos] of Object.entries(relacionCuentas)) {
+    const cuenta = await prisma.cuentaBancaria.findUnique({
+      where: { numeroCuenta },
+    });
+
+    if (!cuenta) {
+      console.warn(`⚠️ Cuenta no encontrada: ${numeroCuenta}`);
+      continue;
+    }
+
+    for (const nombreProyecto of proyectos) {
+      if (nombreProyecto === 'KATZ') {
+        await prisma.proyecto.upsert({
+          where: { id: proyectoMap.get('KATZ') || -1 }, // Usar ID del mapa si existe
+          update: { cuentaBancariaId: cuenta.id },
+          create: { nombre: 'KATZ', cuentaBancariaId: cuenta.id },
+        });
+      } else {
+        await prisma.proyecto.updateMany({
+          where: { nombre: nombreProyecto },
+          data: { cuentaBancariaId: cuenta.id },
+        });
+      }
+    }
+  }
+
   console.log(`✅ Seeding completado.`);
   console.log(`--- Resumen ---`);
   console.log(`Cuentas Bancarias: ${cuentaCount}`);

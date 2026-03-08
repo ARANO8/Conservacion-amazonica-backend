@@ -14,6 +14,7 @@ import { ProyectosModule } from './catalogos/proyectos/proyectos.module';
 import { CodigosPresupuestariosModule } from './catalogos/codigos-presupuestarios/codigos-presupuestarios.module';
 import { ReportsModule } from './reports/reports.module';
 import { SolicitudPresupuestoModule } from './solicitudes-presupuestos/solicitudes-presupuestos.module';
+import { CuentasBancariasModule } from './catalogos/cuentas-bancarias/cuentas-bancarias.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { SolicitudPresupuestoModule } from './solicitudes-presupuestos/solicitud
     CodigosPresupuestariosModule,
     ReportsModule,
     SolicitudPresupuestoModule,
+    CuentasBancariasModule,
   ],
 })
 export class AppModule {}
