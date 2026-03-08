@@ -57,9 +57,9 @@ export class SolicitudesService {
     viaticosData: {
       data: Omit<
         Prisma.ViaticoUncheckedCreateInput,
-        'solicitudId' | 'planificacionId' | 'solicitudPresupuestoId'
+        'solicitudId' | 'solicitudPresupuestoId'
       >;
-      planificacionIndex: number;
+      planificacionIndexes: number[];
       poaId: number;
     }[];
     gastosData: {
@@ -71,12 +71,14 @@ export class SolicitudesService {
     }[];
     planificaciones: import('./dto/create-solicitud.dto').CreatePlanificacionDto[];
     nominasTerceros: import('./dto/create-solicitud.dto').CreateNominaDto[];
+    hospedajes: import('./dto/create-solicitud.dto').CreateHospedajeDto[];
   }> {
     const {
       planificaciones = [],
       viaticos = [],
       gastos = [],
       nominasTerceros = [],
+      hospedajes = [],
     } = dto;
 
     // 1. PRE-CARGA DE CATÁLOGOS (Optimización O(1))
@@ -95,9 +97,9 @@ export class SolicitudesService {
     const viaticosData: {
       data: Omit<
         Prisma.ViaticoUncheckedCreateInput,
-        'solicitudId' | 'planificacionId' | 'solicitudPresupuestoId'
+        'solicitudId' | 'solicitudPresupuestoId'
       >;
-      planificacionIndex: number;
+      planificacionIndexes: number[];
       poaId: number;
     }[] = [];
 
@@ -118,14 +120,19 @@ export class SolicitudesService {
         );
       }
 
-      const planif = planificaciones[vDto.planificacionIndex];
-      if (!planif) {
-        throw new BadRequestException(
-          `Índice de planificación ${vDto.planificacionIndex} es inválido`,
-        );
+      for (const idx of vDto.planificacionIndexes) {
+        if (!planificaciones[idx]) {
+          throw new BadRequestException(
+            `Índice de planificación ${idx} es inválido`,
+          );
+        }
       }
 
-      validarLimitesViatico(vDto, planif);
+      // Validamos contra la primera planificación del array (por simplicidad en el helper)
+      validarLimitesViatico(
+        vDto,
+        planificaciones[vDto.planificacionIndexes[0]],
+      );
 
       const precioCatalogo =
         vDto.tipoDestino === 'INSTITUCIONAL'
@@ -164,7 +171,7 @@ export class SolicitudesService {
       montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       viaticosData.push({
-        planificacionIndex: vDto.planificacionIndex,
+        planificacionIndexes: vDto.planificacionIndexes,
         poaId: vDto.poaId,
         data: {
           conceptoId: vDto.conceptoId,
@@ -178,6 +185,12 @@ export class SolicitudesService {
           montoNeto: finalMontoNeto,
         },
       });
+    }
+
+    // --- Procesar Hospedajes ---
+    for (const hDto of hospedajes) {
+      montoTotalPresupuestado = montoTotalPresupuestado.add(hDto.costoTotal);
+      montoTotalNeto = montoTotalNeto.add(hDto.costoTotal);
     }
 
     // --- Procesar Gastos ---
@@ -242,6 +255,7 @@ export class SolicitudesService {
       gastosData,
       planificaciones,
       nominasTerceros,
+      hospedajes,
     };
   }
 
@@ -354,8 +368,21 @@ export class SolicitudesService {
             ...vItem.data,
             solicitudId: solicitud.id,
             solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
-            planificacionId:
-              createdPlanificaciones[vItem.planificacionIndex].id,
+            planificaciones: {
+              connect: vItem.planificacionIndexes.map((idx) => ({
+                id: createdPlanificaciones[idx].id,
+              })),
+            },
+          },
+        });
+      }
+
+      // E. Crear Hospedajes
+      for (const h of detalles.hospedajes) {
+        await tx.hospedaje.create({
+          data: {
+            ...h,
+            solicitudId: solicitud.id,
           },
         });
       }
@@ -457,8 +484,14 @@ export class SolicitudesService {
           },
         },
         planificaciones: true,
-        viaticos: { include: { concepto: true } },
+        viaticos: {
+          include: {
+            concepto: true,
+            planificaciones: true,
+          },
+        },
         gastos: { include: { tipoGasto: true } },
+        hospedajes: true,
         personasExternas: true,
         nominasTerceros: true,
         rendicion: true,
@@ -550,6 +583,7 @@ export class SolicitudesService {
         // A. Limpiar existentes (orden: hijos primero por FK)
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
+        await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
         await tx.solicitudPresupuesto.deleteMany({
@@ -626,7 +660,11 @@ export class SolicitudesService {
               ...v.data,
               solicitudId: id,
               solicitudPresupuestoId: presupuestosMap.get(v.poaId)!,
-              planificacionId: createdPlanif[v.planificacionIndex].id,
+              planificaciones: {
+                connect: v.planificacionIndexes.map((idx) => ({
+                  id: createdPlanif[idx].id,
+                })),
+              },
             },
           });
         }
@@ -637,6 +675,15 @@ export class SolicitudesService {
               ...g.data,
               solicitudId: id,
               solicitudPresupuestoId: presupuestosMap.get(g.poaId)!,
+            },
+          });
+        }
+
+        for (const h of detalles.hospedajes) {
+          await tx.hospedaje.create({
+            data: {
+              ...h,
+              solicitudId: id,
             },
           });
         }
