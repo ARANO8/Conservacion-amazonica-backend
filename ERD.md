@@ -231,6 +231,19 @@ RECIBO RECIBO
     String moneda 
     }
   
+
+  "Hospedaje" {
+    Int id "🗝️"
+    String region 
+    String destino 
+    Int personas 
+    Int noches 
+    Float cantidadUnitaria 
+    Float costoTotal 
+    Float iva 
+    Float it 
+    }
+  
     "Usuario" |o--|| "Rol" : "enum:rol"
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
@@ -253,10 +266,10 @@ RECIBO RECIBO
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
     "Planificacion" }o--|| "Solicitud" : "solicitud"
+    "Planificacion" o{--}o "Viatico" : ""
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"
     "Viatico" }o--|| "Solicitud" : "solicitud"
     "Viatico" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
-    "Viatico" }o--|| "Planificacion" : "planificacion"
     "Viatico" }o--|| "Concepto" : "concepto"
     "Gasto" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Gasto" }o--|| "Solicitud" : "solicitud"
@@ -264,4 +277,6 @@ RECIBO RECIBO
     "Gasto" }o--|| "TipoGasto" : "tipoGasto"
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
     "NominaTerceros" }o--|| "Solicitud" : "solicitud"
+    "Hospedaje" }o--|| "Solicitud" : "solicitud"
+    "Hospedaje" }o--|| "Poa" : "poa"
 ```
