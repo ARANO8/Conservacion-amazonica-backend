@@ -51,12 +51,13 @@ export class CreatePlanificacionDto {
 
 export class CreateViaticoDto {
   @ApiProperty({
-    example: 0,
-    description: 'Índice de la planificación relacionada',
+    example: [0],
+    description: 'Índices de las planificaciones relacionadas',
+    type: [Number],
   })
-  @IsInt()
-  @Min(0)
-  planificacionIndex: number;
+  @IsArray()
+  @IsInt({ each: true })
+  planificacionIndexes: number[];
 
   @ApiProperty({ example: 1, description: 'ID del Concepto (Viático)' })
   @IsInt()
@@ -144,9 +145,57 @@ export class CreateGastoDto {
   montoPresupuestado: number;
 
   @ApiProperty({ example: 'Compra de herramientas', required: false })
+  @IsString()
   @IsOptional()
   @IsString()
   detalle?: string;
+}
+
+export class CreateHospedajeDto {
+  @ApiProperty({ example: 1, description: 'ID de la línea POA asociada' })
+  @IsInt()
+  @Min(1)
+  poaId: number;
+
+  @ApiProperty({ example: 'Eje troncal' })
+  @IsString()
+  @IsNotEmpty()
+  region: string;
+
+  @ApiProperty({ example: 'La Paz' })
+  @IsString()
+  @IsNotEmpty()
+  destino: string;
+
+  @ApiProperty({ example: 1, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  personas: number;
+
+  @ApiProperty({ example: 2, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  noches: number;
+
+  @ApiProperty({ example: 150.0 })
+  @IsNumber()
+  @Min(0)
+  cantidadUnitaria: number;
+
+  @ApiProperty({ example: 300.0 })
+  @IsNumber()
+  @Min(0)
+  costoTotal: number;
+
+  @ApiProperty({ example: 39.0 })
+  @IsNumber()
+  @Min(0)
+  iva: number;
+
+  @ApiProperty({ example: 9.0 })
+  @IsNumber()
+  @Min(0)
+  it: number;
 }
 
 export class CreateNominaDto {
@@ -235,4 +284,11 @@ export class CreateSolicitudDto {
   @ValidateNested({ each: true })
   @Type(() => CreateNominaDto)
   nominasTerceros: CreateNominaDto[];
+
+  @ApiProperty({ type: [CreateHospedajeDto], required: false })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CreateHospedajeDto)
+  hospedajes: CreateHospedajeDto[];
 }

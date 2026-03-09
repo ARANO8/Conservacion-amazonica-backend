@@ -69,6 +69,9 @@ model Proyecto {
   nombre String
   deletedAt DateTime?
 
+  cuentaBancariaId Int?
+  cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+
   estructuras EstructuraProgramatica[]
 }
 
@@ -135,6 +138,7 @@ model Poa {
   actividad   Actividad @relation(fields: [actividadId], references: [id])
 
   solicitudes SolicitudPresupuesto[]
+  hospedajes  Hospedaje[]
 }
 
 model Solicitud {
@@ -173,6 +177,7 @@ model Solicitud {
   viaticos              Viatico[]
   gastos                Gasto[]
   personasExternas      PersonaExterna[]
+  hospedajes            Hospedaje[]
 }
 
 model HistorialAprobacion {
@@ -268,8 +273,7 @@ model Viatico {
   solicitudPresupuestoId Int
   solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id])
 
-  planificacionId Int
-  planificacion   Planificacion @relation(fields: [planificacionId], references: [id])
+  planificaciones Planificacion[]
 
   conceptoId Int
   concepto   Concepto @relation(fields: [conceptoId], references: [id])
@@ -319,7 +323,34 @@ model NominaTerceros {
   solicitudId    Int
   solicitud      Solicitud @relation(fields: [solicitudId], references: [id])
 }
+
+model CuentaBancaria {
+  id           Int        @id @default(autoincrement())
+  numeroCuenta String     @unique
+  banco        String     @default("BISA S.A.")
+  moneda       String     @default("M/N")
+
+  proyectos    Proyecto[]
+}
+
 generator erd {
   provider = "prisma-erd-generator"
   output   = "../ERD.md"
+}
+model Hospedaje {
+  id               Int       @id @default(autoincrement())
+  region           String    // "Eje troncal", "Ciudades Intermedias", "Bolivia Norte", "Pueblos"
+  destino          String    // Ej: "La Paz", "Sucre", "Rurrenabaque"
+  personas         Int
+  noches           Int
+  cantidadUnitaria Float
+  costoTotal       Float     // personas * noches * cantidadUnitaria
+  iva              Float     // 13% del costoTotal
+  it               Float     // 3% del costoTotal
+
+  solicitudId      Int
+  solicitud        Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  poaId            Int
+  poa              Poa       @relation(fields: [poaId], references: [id])
 }
