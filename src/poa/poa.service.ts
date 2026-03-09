@@ -10,7 +10,11 @@ type PoaDetailed = Prisma.PoaGetPayload<{
   include: {
     estructura: {
       include: {
-        proyecto: true;
+        proyecto: {
+          include: {
+            cuentaBancaria: true;
+          };
+        };
         grupo: true;
         partida: true;
       };
@@ -91,7 +95,11 @@ export class PoaService {
         include: {
           estructura: {
             include: {
-              proyecto: true,
+              proyecto: {
+                include: {
+                  cuentaBancaria: true,
+                },
+              },
               grupo: true,
               partida: true,
             },
@@ -125,7 +133,11 @@ export class PoaService {
       include: {
         estructura: {
           include: {
-            proyecto: true,
+            proyecto: {
+              include: {
+                cuentaBancaria: true,
+              },
+            },
             grupo: true,
             partida: true,
           },
@@ -415,6 +427,7 @@ export class PoaService {
               select: {
                 id: true,
                 nombre: true,
+                cuentaBancaria: true,
               },
             },
             grupo: {
