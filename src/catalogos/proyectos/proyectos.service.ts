@@ -11,6 +11,7 @@ export class ProyectosService {
       select: {
         id: true,
         nombre: true,
+        cuentaBancaria: true,
       },
       orderBy: { nombre: 'asc' },
     });
@@ -34,6 +35,7 @@ export class ProyectosService {
       select: {
         id: true,
         nombre: true,
+        cuentaBancaria: true,
       },
       distinct: ['id'],
       orderBy: { nombre: 'asc' },

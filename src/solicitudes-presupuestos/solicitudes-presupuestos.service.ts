@@ -18,11 +18,24 @@ export class SolicitudPresupuestoService {
       },
     });
 
+    // 2. Buscamos todos los hospedajes de la solicitud (para agruparlos por POA)
+    const hospedajes = await client.hospedaje.findMany({
+      where: { solicitudId },
+    });
+
+    console.log('--- DEBUG RECALCULAR TOTALES ---');
+    console.log('Hospedajes leídos desde TX:', hospedajes.length);
+    console.log(
+      'Hospedaje POAs (Tipo):',
+      hospedajes.map((h) => `${h.poaId} (${typeof h.poaId})`),
+    );
+
     let totalSolicitudPresupuestado = new Prisma.Decimal(0);
     let totalSolicitudNeto = new Prisma.Decimal(0);
 
     for (const p of presupuestos) {
-      // 2. Sumamos viaticos
+      console.log(`Presupuesto POA (Tipo): ${p.poaId} (${typeof p.poaId})`);
+      // 3. Sumamos viaticos
       const sumViaticosPresupuestado = p.viaticos.reduce(
         (acc, v) => acc.add(v.montoPresupuestado),
         new Prisma.Decimal(0),
@@ -32,7 +45,7 @@ export class SolicitudPresupuestoService {
         new Prisma.Decimal(0),
       );
 
-      // 3. Sumamos gastos
+      // 4. Sumamos gastos
       const sumGastosPresupuestado = p.gastos.reduce(
         (acc, g) => acc.add(g.montoPresupuestado),
         new Prisma.Decimal(0),
@@ -42,10 +55,31 @@ export class SolicitudPresupuestoService {
         new Prisma.Decimal(0),
       );
 
-      const subtotalP = sumViaticosPresupuestado.add(sumGastosPresupuestado);
-      const subtotalN = sumViaticosNeto.add(sumGastosNeto);
+      // 5. Filtrar y sumar hospedajes del POA correspondiente
+      const hospPoa = hospedajes.filter(
+        (h) => Number(h.poaId) === Number(p.poaId),
+      );
+      const sumHospedajesNeto = hospPoa.reduce(
+        (acc, h) => acc.add(new Prisma.Decimal(h.costoTotal)),
+        new Prisma.Decimal(0),
+      );
+      const sumHospedajesPresupuestado = hospPoa.reduce(
+        (acc, h) =>
+          acc
+            .add(new Prisma.Decimal(h.costoTotal))
+            .add(new Prisma.Decimal(h.iva))
+            .add(new Prisma.Decimal(h.it)),
+        new Prisma.Decimal(0),
+      );
 
-      // 4. Actualizamos el presupuesto
+      const subtotalP = sumViaticosPresupuestado
+        .add(sumGastosPresupuestado)
+        .add(sumHospedajesPresupuestado);
+      const subtotalN = sumViaticosNeto
+        .add(sumGastosNeto)
+        .add(sumHospedajesNeto);
+
+      // 6. Actualizamos el presupuesto
       await client.solicitudPresupuesto.update({
         where: { id: p.id },
         data: {
@@ -58,7 +92,7 @@ export class SolicitudPresupuestoService {
       totalSolicitudNeto = totalSolicitudNeto.add(subtotalN);
     }
 
-    // 5. Sincronizar totales en la Solicitud
+    // 7. Sincronizar totales en la Solicitud
     await client.solicitud.update({
       where: { id: solicitudId },
       data: {

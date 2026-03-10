@@ -15,6 +15,7 @@ export const SOLICITUD_INCLUDE = {
   viaticos: {
     include: {
       concepto: true,
+      planificaciones: true,
       solicitudPresupuesto: {
         include: {
           poa: {
@@ -45,6 +46,7 @@ export const SOLICITUD_INCLUDE = {
     },
   },
   planificaciones: true,
+  hospedajes: true,
   nominasTerceros: true,
   personasExternas: true,
   presupuestos: {
