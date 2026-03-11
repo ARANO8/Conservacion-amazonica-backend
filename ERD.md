@@ -45,6 +45,15 @@ TERCEROS TERCEROS
 RECIBO RECIBO
         }
     
+
+
+        EstadoRendicion {
+            PENDIENTE PENDIENTE
+APROBADA APROBADA
+OBSERVADA OBSERVADA
+RECHAZADA RECHAZADA
+        }
+    
   "Usuario" {
     Int id "🗝️"
     String email 
@@ -145,8 +154,27 @@ RECIBO RECIBO
     Int id "🗝️"
     DateTime fechaRendicion 
     Decimal montoRespaldado 
-    Decimal saldoADevolver 
+    Decimal saldoLiquido 
+    EstadoRendicion estado 
     String observaciones "❓"
+    }
+  
+
+  "GastoRendicion" {
+    Int id "🗝️"
+    TipoDocumento tipoDocumento 
+    String nroDocumento 
+    DateTime fecha 
+    String detalle 
+    Decimal monto 
+    }
+  
+
+  "DeclaracionJurada" {
+    Int id "🗝️"
+    DateTime fecha 
+    String detalle 
+    Decimal monto 
     }
   
 
@@ -262,7 +290,11 @@ RECIBO RECIBO
     "HistorialAprobacion" }o--|| "Usuario" : "usuarioActor"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
+    "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
+    "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
+    "GastoRendicion" }o--|| "Rendicion" : "rendicion"
+    "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
     "Planificacion" }o--|| "Solicitud" : "solicitud"
