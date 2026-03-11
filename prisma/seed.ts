@@ -49,7 +49,7 @@ async function processCSV(
     return;
   }
 
-  const fileStream = fs.createReadStream(filePath, { encoding: 'utf-8' });
+  const fileStream = fs.createReadStream(filePath, { encoding: 'latin1' });
   const rl = readline.createInterface({
     input: fileStream,
     crlfDelay: Infinity,
@@ -68,7 +68,7 @@ async function main() {
   const passwordHash =
     '$2a$12$wbhVNc2q5wLlKnryn3F8SOjhR2YYregnGlRB.R2VmhNNhnrhMpYBe';
 
-  // Mapas para caché en memoria
+  // Mapas para cach en memoria (Cach Agresivo)
   const proyectoMap = new Map<string, number>();
   const grupoMap = new Map<string, number>();
   const partidaMap = new Map<string, number>();
@@ -76,7 +76,7 @@ async function main() {
   const codigoPresupMap = new Map<string, number>();
   const estructuraMap = new Map<string, number>();
 
-  console.log('🚀 Iniciando Seeding...');
+  console.log('🚀 Iniciando Seeding Optimizado...');
 
   // 1. Usuarios
   let userCount = 0;
@@ -116,43 +116,8 @@ async function main() {
     cuentaCount++;
   });
 
-  // 2. Catálogos Maestros (Precarga)
-  await processCSV('Proyecto.csv', async (row) => {
-    const nombre = row[0];
-    const p = await prisma.proyecto.create({ data: { nombre } });
-    proyectoMap.set(nombre, p.id);
-  });
-
-  await processCSV('Grupo.csv', async (row) => {
-    const nombre = row[0];
-    const g = await prisma.grupo.create({ data: { nombre } });
-    grupoMap.set(nombre, g.id);
-  });
-
-  await processCSV('Partida.csv', async (row) => {
-    const nombre = row[0];
-    const p = await prisma.partida.create({ data: { nombre } });
-    partidaMap.set(nombre, p.id);
-  });
-
-  await processCSV('Actividad.csv', async (row) => {
-    const detalle = row[0];
-    const a = await prisma.actividad.create({
-      data: { detalleDescripcion: detalle },
-    });
-    actividadMap.set(detalle, a.id);
-  });
-
-  await processCSV('Codigo_Presupuestario.csv', async (row) => {
-    const codigo = row[0];
-    const c = await prisma.codigoPresupuestario.create({
-      data: { codigoCompleto: codigo },
-    });
-    codigoPresupMap.set(codigo, c.id);
-  });
-
-  // 2.5 Conceptos (REAL PRODUCTION DATA)
-  console.log('💰 Seeding Conceptos (Limpieza y Carga Real)...');
+  // 2. Conceptos (REAL PRODUCTION DATA)
+  console.log('💰 Seeding Conceptos...');
   await processCSV('Concepto.csv', async (row) => {
     const [nombre, institucional, terceros] = row;
     await prisma.concepto.upsert({
@@ -169,8 +134,8 @@ async function main() {
     });
   });
 
-  // 2.6 Tipos de Gasto (REAL PRODUCTION DATA)
-  console.log('📦 Seeding Tipos de Gasto (Limpieza y Carga Real)...');
+  // 3. Tipos de Gasto (REAL PRODUCTION DATA)
+  console.log('📦 Seeding Tipos de Gasto...');
   await processCSV('TipoGasto.csv', async (row) => {
     const [nombre, codigo] = row;
     await prisma.tipoGasto.upsert({
@@ -180,58 +145,16 @@ async function main() {
     });
   });
 
-  // 3. Estructura Programática (Relaciones Ternarias Maestras)
-  await processCSV('ProyectoGrupoPartida.csv', async (row) => {
-    const [proy, grup, part] = row;
-
-    // Auto-Healing para catálogos faltantes en el maestro de relaciones
-    if (!proyectoMap.has(proy)) {
-      const p = await prisma.proyecto.create({ data: { nombre: proy } });
-      proyectoMap.set(proy, p.id);
-    }
-    if (!grupoMap.has(grup)) {
-      const g = await prisma.grupo.create({ data: { nombre: grup } });
-      grupoMap.set(grup, g.id);
-    }
-    if (!partidaMap.has(part)) {
-      const p = await prisma.partida.create({ data: { nombre: part } });
-      partidaMap.set(part, p.id);
-    }
-
-    const pId = proyectoMap.get(proy)!;
-    const gId = grupoMap.get(grup)!;
-    const prId = partidaMap.get(part)!;
-
-    const key = `${proy}|${grup}|${part}`;
-
-    const est = await prisma.estructuraProgramatica.upsert({
-      where: {
-        proyectoId_grupoId_partidaId: {
-          proyectoId: pId,
-          grupoId: gId,
-          partidaId: prId,
-        },
-      },
-      update: {},
-      create: {
-        proyectoId: pId,
-        grupoId: gId,
-        partidaId: prId,
-      },
-    });
-    estructuraMap.set(key, est.id);
-  });
-
   /**
-   * Asegurar que un registro de catálogo exista (Auto-Healing).
+   * Helper: Buscar en Map o crear en BD (Optimizado)
    */
-  async function ensureCatalog(
+  async function getOrCreate(
     map: Map<string, number>,
     name: string | undefined,
     model: { create: (args: { data: any }) => Promise<{ id: number }> },
     field: string,
   ): Promise<number> {
-    const val = name || STICKY_PLACEHOLDER;
+    const val = (name || STICKY_PLACEHOLDER).trim();
     const cachedId = map.get(val);
     if (cachedId !== undefined) return cachedId;
 
@@ -243,7 +166,8 @@ async function main() {
     return record.id;
   }
 
-  // 4. Inserción del POA
+  // 4. Inserción del POA (Fuente única de Verdad)
+  console.log('📄 Procesando POA.csv (Estructura Dinámica)...');
   let poaCount = 0;
   await processCSV('POA.csv', async (row) => {
     const [
@@ -258,24 +182,15 @@ async function main() {
       costoTotal,
     ] = row;
 
-    // Asegurar elementos de la estructura
-    const pId = await ensureCatalog(
-      proyectoMap,
-      proy,
-      prisma.proyecto,
-      'nombre',
-    );
-    const gId = await ensureCatalog(grupoMap, grup, prisma.grupo, 'nombre');
-    const prId = await ensureCatalog(
-      partidaMap,
-      part,
-      prisma.partida,
-      'nombre',
-    );
+    // A. Asegurar Catlogos (Proyecto, Grupo, Partida)
+    const pId = await getOrCreate(proyectoMap, proy, prisma.proyecto, 'nombre');
+    const gId = await getOrCreate(grupoMap, grup, prisma.grupo, 'nombre');
+    const prId = await getOrCreate(partidaMap, part, prisma.partida, 'nombre');
 
-    // Asegurar estructura
+    // B. Asegurar Estructura Programtica (Relacin Ternaria)
     const key = `${proy || STICKY_PLACEHOLDER}|${grup || STICKY_PLACEHOLDER}|${part || STICKY_PLACEHOLDER}`;
     let estId: number;
+
     if (estructuraMap.has(key)) {
       estId = estructuraMap.get(key)!;
     } else {
@@ -296,29 +211,26 @@ async function main() {
       });
       estId = est.id;
       estructuraMap.set(key, estId);
-      console.log(
-        `⚠️ Nueva estructura creada dinámicamente: [${proy || '?'}]-[${grup || '?'}]-[${part || '?'}]`,
-      );
     }
 
-    // Asegurar Actividad y Código Presupuestario
-    const actId = await ensureCatalog(
+    // C. Asegurar Actividad y Cdigo Presupuestario
+    const actId = await getOrCreate(
       actividadMap,
       actividadDetalle,
       prisma.actividad,
       'detalleDescripcion',
     );
-    const cpId = await ensureCatalog(
+    const cpId = await getOrCreate(
       codigoPresupMap,
       codPresup,
       prisma.codigoPresupuestario,
       'codigoCompleto',
     );
 
-    // Crear POA
+    // D. Crear POA
     await prisma.poa.create({
       data: {
-        codigoPoa: codPoa || STICKY_PLACEHOLDER,
+        codigoPoa: (codPoa || STICKY_PLACEHOLDER).trim(),
         cantidad: parseInt(cant) || 0,
         costoUnitario: cleanAmount(costoUnit),
         costoTotal: cleanAmount(costoTotal),
@@ -352,23 +264,16 @@ async function main() {
     });
 
     if (!cuenta) {
-      console.warn(`⚠️ Cuenta no encontrada: ${numeroCuenta}`);
+      console.warn(` Cuenta no encontrada: ${numeroCuenta}`);
       continue;
     }
 
     for (const nombreProyecto of proyectos) {
-      if (nombreProyecto === 'KATZ') {
-        await prisma.proyecto.upsert({
-          where: { id: proyectoMap.get('KATZ') || -1 }, // Usar ID del mapa si existe
-          update: { cuentaBancariaId: cuenta.id },
-          create: { nombre: 'KATZ', cuentaBancariaId: cuenta.id },
-        });
-      } else {
-        await prisma.proyecto.updateMany({
-          where: { nombre: nombreProyecto },
-          data: { cuentaBancariaId: cuenta.id },
-        });
-      }
+      // Intentar vincular solo si el proyecto existe
+      await prisma.proyecto.updateMany({
+        where: { nombre: nombreProyecto },
+        data: { cuentaBancariaId: cuenta.id },
+      });
     }
   }
 
