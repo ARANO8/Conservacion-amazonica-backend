@@ -21,6 +21,11 @@ export interface SolicitudReportData {
   usuarioBeneficiado?: {
     nombreCompleto?: string | null;
   } | null;
+  cuentaBancaria?: {
+    numeroCuenta?: string | null;
+    banco?: string | null;
+    moneda?: string | null;
+  } | null;
   presupuestos?: Array<{
     poa?: {
       codigoPoa?: string | null;
@@ -30,6 +35,11 @@ export interface SolicitudReportData {
       estructura?: {
         proyecto?: {
           nombre?: string | null;
+          cuentaBancaria?: {
+            numeroCuenta?: string | null;
+            banco?: string | null;
+            moneda?: string | null;
+          } | null;
         } | null;
       } | null;
       codigoPresupuestario?: {
@@ -82,9 +92,9 @@ export class ReportsService {
         solicitud.codigoSolicitud,
       );
 
-      // 1. Cargar el módulo
+      // 1. Cargar el módulo (nota: case-sensitive en Linux, debe ser 'Printer' con mayúscula)
       /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-      const PdfPrinterLib = require('pdfmake/js/printer');
+      const PdfPrinterLib = require('pdfmake/js/Printer');
       const PdfPrinter = PdfPrinterLib.default || PdfPrinterLib;
 
       const fonts = {
@@ -105,7 +115,7 @@ export class ReportsService {
           this.buildDatosGenerales(solicitud),
           // Se ha elminado la seccion ITINERARIO
           this.buildDetalleEconomico(solicitud),
-          this.buildDatosBancarios(),
+          this.buildDatosBancarios(solicitud),
           this.buildFirmas(solicitud),
         ],
         styles: {
@@ -354,28 +364,52 @@ export class ReportsService {
     ];
   }
 
-  private buildDatosBancarios(): any {
+  private buildDatosBancarios(solicitud: SolicitudReportData): any {
     return [
       {
         table: {
-          widths: ['*'],
+          widths: ['50%', '50%'],
           body: [
             [
               {
-                text: 'DATOS BANCARIOS (Llenar solo si aplica)',
+                text: 'DATOS BANCARIOS',
                 fillColor: '#eeeeee',
                 bold: true,
+                colSpan: 2,
+              },
+              {},
+            ],
+            [
+              {
+                text: 'Banco:',
+                bold: true,
+                margin: [5, 10, 5, 5],
+              },
+              {
+                text: solicitud.cuentaBancaria?.banco || '',
+                margin: [5, 10, 5, 5],
               },
             ],
             [
               {
-                text: [
-                  'Cuenta Bancaria:\n\n',
-                  'Nombre: ______________________   N° Cuenta: ______________________   Banco: ______________________\n\n',
-                  'N° Transferencia: ______________________\n\n',
-                  'Fecha de emisión: ______________________',
-                ],
-                margin: [0, 10, 0, 10],
+                text: 'Número de Cuenta:',
+                bold: true,
+                margin: [5, 10, 5, 5],
+              },
+              {
+                text: solicitud.cuentaBancaria?.numeroCuenta || '',
+                margin: [5, 10, 5, 5],
+              },
+            ],
+            [
+              {
+                text: 'Moneda:',
+                bold: true,
+                margin: [5, 10, 5, 5],
+              },
+              {
+                text: solicitud.cuentaBancaria?.moneda || '',
+                margin: [5, 10, 5, 5],
               },
             ],
           ],

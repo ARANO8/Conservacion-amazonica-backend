@@ -55,7 +55,11 @@ export const SOLICITUD_INCLUDE = {
         include: {
           estructura: {
             include: {
-              proyecto: true,
+              proyecto: {
+                include: {
+                  cuentaBancaria: true,
+                },
+              },
               grupo: true,
               partida: true,
             },

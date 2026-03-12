@@ -236,6 +236,25 @@ export class SolicitudesController {
       return mapped;
     });
 
+    // Extraer cuenta bancaria del primer proyecto de los presupuestos
+    // (asume que todos los presupuestos tienen el mismo proyecto/cuenta)
+    let cuentaBancaria: any = undefined;
+    const presupuestos = solicitud.presupuestos || [];
+    if (presupuestos.length > 0) {
+      const firstPresupuesto = presupuestos[0];
+      if (firstPresupuesto?.poa?.estructura?.proyecto?.cuentaBancaria) {
+        cuentaBancaria = {
+          numeroCuenta:
+            firstPresupuesto.poa.estructura.proyecto.cuentaBancaria
+              .numeroCuenta,
+          banco: firstPresupuesto.poa.estructura.proyecto.cuentaBancaria.banco,
+          moneda:
+            firstPresupuesto.poa.estructura.proyecto.cuentaBancaria.moneda,
+        };
+        console.log('[PDF Mapping] Cuenta bancaria extraída:', cuentaBancaria);
+      }
+    }
+
     const result: SolicitudReportData = {
       codigoSolicitud: solicitud.codigoSolicitud || '',
       lugarViaje: solicitud.lugarViaje,
@@ -260,7 +279,7 @@ export class SolicitudesController {
             nombreCompleto: solicitud.usuarioBeneficiado.nombreCompleto,
           }
         : undefined,
-      presupuestos: (solicitud.presupuestos || []).map((p: any) => ({
+      presupuestos: presupuestos.map((p: any) => ({
         poa: p.poa
           ? {
               codigoPoa: p.poa.codigoPoa,
@@ -279,6 +298,7 @@ export class SolicitudesController {
       })),
       viaticos,
       gastos,
+      cuentaBancaria,
     };
 
     console.log('[PDF Mapping] Mapeo completado exitosamente');

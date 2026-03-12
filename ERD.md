@@ -54,6 +54,16 @@ OBSERVADA OBSERVADA
 RECHAZADA RECHAZADA
         }
     
+
+
+        TipoNotificacion {
+            SOLICITUD_ASIGNADA SOLICITUD_ASIGNADA
+SOLICITUD_DERIVADA SOLICITUD_DERIVADA
+SOLICITUD_APROBADA SOLICITUD_APROBADA
+SOLICITUD_OBSERVADA SOLICITUD_OBSERVADA
+RENDICION_PENDIENTE RENDICION_PENDIENTE
+        }
+    
   "Usuario" {
     Int id "🗝️"
     String email 
@@ -144,9 +154,13 @@ RECHAZADA RECHAZADA
 
   "Notificacion" {
     Int id "🗝️"
+    String titulo 
     String mensaje 
-    Boolean leido 
-    DateTime fechaCreacion 
+    TipoNotificacion tipo 
+    Boolean leida 
+    String urlDestino "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
     }
   
 
@@ -288,6 +302,7 @@ RECHAZADA RECHAZADA
     "HistorialAprobacion" |o--|| "AccionHistorial" : "enum:accion"
     "HistorialAprobacion" }o--|| "Solicitud" : "solicitud"
     "HistorialAprobacion" }o--|| "Usuario" : "usuarioActor"
+    "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
