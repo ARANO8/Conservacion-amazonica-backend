@@ -44,10 +44,18 @@ enum TipoDocumento {
 }
 
 enum EstadoRendicion {
-  PENDIENTE
-  APROBADA
-  OBSERVADA
-  RECHAZADA
+   PENDIENTE
+   APROBADA
+   OBSERVADA
+   RECHAZADA
+}
+
+enum TipoNotificacion {
+   SOLICITUD_ASIGNADA
+   SOLICITUD_DERIVADA
+   SOLICITUD_APROBADA
+   SOLICITUD_OBSERVADA
+   RENDICION_PENDIENTE
 }
 
 // --- MODELOS ---
@@ -200,16 +208,20 @@ model HistorialAprobacion {
 }
 
 model Notificacion {
-  id            Int      @id @default(autoincrement())
-  mensaje       String
-  leido         Boolean  @default(false)
-  fechaCreacion DateTime @default(now())
+   id            Int                 @id @default(autoincrement())
+   titulo        String
+   mensaje       String
+   tipo          TipoNotificacion    @default(SOLICITUD_ASIGNADA)
+   leida         Boolean             @default(false)
+   urlDestino    String?
+   createdAt     DateTime            @default(now())
+   updatedAt     DateTime            @updatedAt
 
-  usuarioId Int
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+   usuarioId Int
+   usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
-  solicitudId Int?
-  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
+   solicitudId Int?
+   solicitud   Solicitud? @relation(fields: [solicitudId], references: [id], onDelete: SetNull)
 }
 
 model Rendicion {
