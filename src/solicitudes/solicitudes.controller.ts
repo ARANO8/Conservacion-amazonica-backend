@@ -165,12 +165,26 @@ export class SolicitudesController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
     try {
+      console.log(`[PDF] Iniciando generación de PDF para solicitud ID: ${id}`);
+
       const solicitud = await this.solicitudesService.findOne(id);
+      console.log(`[PDF] Solicitud obtenida:`, {
+        codigoSolicitud: solicitud.codigoSolicitud,
+        hasEmisor: !!solicitud.usuarioEmisor,
+        hasAprobador: !!solicitud.aprobador,
+        hasBeneficiado: !!solicitud.usuarioBeneficiado,
+        viaticosCount: solicitud.viaticos?.length || 0,
+        gastosCount: solicitud.gastos?.length || 0,
+      });
 
       // Mapear datos de Solicitud a SolicitudReportData
       const reportData = this.mapSolicitudToReportData(solicitud);
+      console.log(`[PDF] Datos mapeados correctamente`);
 
       const buffer = await this.reportsService.generateSolicitudPdf(reportData);
+      console.log(
+        `[PDF] PDF generado exitosamente, tamaño: ${buffer.length} bytes`,
+      );
 
       res.set({
         'Content-Type': 'application/pdf',
@@ -180,22 +194,49 @@ export class SolicitudesController {
 
       return new StreamableFile(buffer);
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('[PDF] Error generando PDF:', error);
+      if (error instanceof Error) {
+        console.error('[PDF] Stack trace:', error.stack);
+      }
       throw error;
     }
   }
 
-  /**
-   * Mapea los datos de la Solicitud a formato SolicitudReportData
-   */
-  /**
-   * Mapea los datos de la Solicitud a formato SolicitudReportData
-   * para la generación del PDF. Requiere `any` debido a la complejidad
-   * del mapeo dinámico de relaciones de Prisma.
-   */
   /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
   private mapSolicitudToReportData(solicitud: any): SolicitudReportData {
-    return {
+    console.log('[PDF Mapping] Iniciando mapeo de datos de solicitud');
+
+    // Mapear viaticos con validación
+    const viaticos = (solicitud.viaticos || []).map((v: any, idx: number) => {
+      const mapped = {
+        tipoDestino: v.tipoDestino || '',
+        dias: v.dias || 0,
+        cantidadPersonas: v.cantidadPersonas || 0,
+        costoUnitario: v.costoUnitario,
+        montoPresupuestado: v.montoPresupuestado,
+        montoNeto: v.montoNeto,
+        concepto: v.concepto ? { nombre: v.concepto.nombre } : undefined,
+      };
+      console.log(`[PDF Mapping] Viatico ${idx}:`, mapped);
+      return mapped;
+    });
+
+    // Mapear gastos con validación
+    const gastos = (solicitud.gastos || []).map((g: any, idx: number) => {
+      const mapped = {
+        detalle: g.detalle,
+        tipoDocumento: g.tipoDocumento || '',
+        cantidad: g.cantidad || 0,
+        costoUnitario: g.costoUnitario,
+        montoPresupuestado: g.montoPresupuestado,
+        montoNeto: g.montoNeto,
+        tipoGasto: g.tipoGasto ? { nombre: g.tipoGasto.nombre } : undefined,
+      };
+      console.log(`[PDF Mapping] Gasto ${idx}:`, mapped);
+      return mapped;
+    });
+
+    const result: SolicitudReportData = {
       codigoSolicitud: solicitud.codigoSolicitud || '',
       lugarViaje: solicitud.lugarViaje,
       motivoViaje: solicitud.motivoViaje,
@@ -236,25 +277,11 @@ export class SolicitudesController {
         cantidadPersonasInstitucional: plan.cantidadPersonasInstitucional,
         cantidadPersonasTerceros: plan.cantidadPersonasTerceros,
       })),
-      viaticos: (solicitud.viaticos || []).map((v: any) => ({
-        tipoDestino: v.tipoDestino || '',
-        dias: v.dias || 0,
-        cantidadPersonas: v.cantidadPersonas || 0,
-        costoUnitario: v.costoUnitario,
-        montoPresupuestado: v.montoPresupuestado,
-        montoNeto: v.montoNeto,
-        concepto: v.concepto ? { nombre: v.concepto.nombre } : undefined,
-      })),
-      gastos: (solicitud.gastos || []).map((g: any) => ({
-        detalle: g.detalle,
-        tipoDocumento: g.tipoDocumento || '',
-        cantidad: g.cantidad || 0,
-        costoUnitario: g.costoUnitario,
-        montoPresupuestado: g.montoPresupuestado,
-        montoNeto: g.montoNeto,
-        tipoGasto: g.tipoGasto ? { nombre: g.tipoGasto.nombre } : undefined,
-      })),
+      viaticos,
+      gastos,
     };
+
+    console.log('[PDF Mapping] Mapeo completado exitosamente');
+    return result;
   }
-  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 }
