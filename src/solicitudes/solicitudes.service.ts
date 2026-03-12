@@ -20,6 +20,7 @@ import {
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
 import { PoaService } from '../poa/poa.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
 type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
@@ -32,6 +33,7 @@ export class SolicitudesService {
     @Inject(forwardRef(() => SolicitudPresupuestoService))
     private presupuestoService: SolicitudPresupuestoService,
     private poaService: PoaService,
+    private notificacionesService: NotificacionesService,
   ) {}
 
   private async generarCodigo(): Promise<string> {
@@ -424,6 +426,16 @@ export class SolicitudesService {
       throw new BadRequestException('Fallo al crear la solicitud');
     }
 
+    // Crear notificación para el aprobador asignado
+    await this.notificacionesService.crearNotificacion({
+      titulo: 'Nueva solicitud asignada',
+      mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
+      tipo: 'SOLICITUD_ASIGNADA',
+      usuarioId: aprobadorId,
+      solicitudId: result.id,
+      urlDestino: `/solicitudes/${result.id}`,
+    });
+
     return result;
   }
 
@@ -786,11 +798,24 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma.solicitud.update({
-      where: { id },
-      data: { aprobadorId: nuevoAprobadorId },
-      include: SOLICITUD_INCLUDE,
-    });
+    return this.prisma.solicitud
+      .update({
+        where: { id },
+        data: { aprobadorId: nuevoAprobadorId },
+        include: SOLICITUD_INCLUDE,
+      })
+      .then(async (solicitudActualizada) => {
+        // Crear notificación para el nuevo aprobador
+        await this.notificacionesService.crearNotificacion({
+          titulo: 'Solicitud derivada',
+          mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
+          tipo: 'SOLICITUD_DERIVADA',
+          usuarioId: nuevoAprobadorId,
+          solicitudId: solicitudActualizada.id,
+          urlDestino: `/solicitudes/${solicitudActualizada.id}`,
+        });
+        return solicitudActualizada;
+      });
   }
 
   async observar(
@@ -812,15 +837,28 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma.solicitud.update({
-      where: { id },
-      data: {
-        estado: EstadoSolicitud.OBSERVADO,
-        observacion: observarDto.observacion,
-        aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
-      },
-      include: SOLICITUD_INCLUDE,
-    });
+    return this.prisma.solicitud
+      .update({
+        where: { id },
+        data: {
+          estado: EstadoSolicitud.OBSERVADO,
+          observacion: observarDto.observacion,
+          aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
+        },
+        include: SOLICITUD_INCLUDE,
+      })
+      .then(async (solicitudActualizada) => {
+        // Crear notificación para el usuario emisor
+        await this.notificacionesService.crearNotificacion({
+          titulo: 'Solicitud observada',
+          mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido observada y requiere correcciones`,
+          tipo: 'SOLICITUD_OBSERVADA',
+          usuarioId: solicitud.usuarioEmisorId,
+          solicitudId: solicitudActualizada.id,
+          urlDestino: `/solicitudes/${solicitudActualizada.id}`,
+        });
+        return solicitudActualizada;
+      });
   }
 
   async desembolsar(
@@ -842,14 +880,27 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma.solicitud.update({
-      where: { id },
-      data: {
-        estado: EstadoSolicitud.DESEMBOLSADO,
-        codigoDesembolso: desembolsarDto.codigoDesembolso,
-        aprobadorId: null, // Finalizado
-      },
-      include: SOLICITUD_INCLUDE,
-    });
+    return this.prisma.solicitud
+      .update({
+        where: { id },
+        data: {
+          estado: EstadoSolicitud.DESEMBOLSADO,
+          codigoDesembolso: desembolsarDto.codigoDesembolso,
+          aprobadorId: null, // Finalizado
+        },
+        include: SOLICITUD_INCLUDE,
+      })
+      .then(async (solicitudActualizada) => {
+        // Crear notificación para el usuario emisor
+        await this.notificacionesService.crearNotificacion({
+          titulo: 'Solicitud desembolsada',
+          mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada exitosamente`,
+          tipo: 'SOLICITUD_APROBADA',
+          usuarioId: solicitudActualizada.usuarioEmisorId,
+          solicitudId: solicitudActualizada.id,
+          urlDestino: `/solicitudes/${solicitudActualizada.id}`,
+        });
+        return solicitudActualizada;
+      });
   }
 }
