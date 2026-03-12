@@ -30,6 +30,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Request, Response } from 'express';
 import { ReportsService } from '../reports/reports.service';
+import type { SolicitudReportData } from '../reports/reports.service';
 import { Rol } from '@prisma/client';
 
 interface RequestWithUser extends Request {
@@ -163,17 +164,97 @@ export class SolicitudesController {
     @Param('id', ParseIntPipe) id: number,
     @Res({ passthrough: true }) res: Response,
   ): Promise<StreamableFile> {
-    const solicitud = await this.solicitudesService.findOne(id);
-    const buffer = await this.reportsService.generateSolicitudPdf(
-      solicitud as unknown as import('../reports/reports.service').SolicitudReportData,
-    );
+    try {
+      const solicitud = await this.solicitudesService.findOne(id);
 
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `inline; filename="Solicitud-${solicitud.codigoSolicitud}.pdf"`,
-      'Content-Length': buffer.length.toString(),
-    });
+      // Mapear datos de Solicitud a SolicitudReportData
+      const reportData = this.mapSolicitudToReportData(solicitud);
 
-    return new StreamableFile(buffer);
+      const buffer = await this.reportsService.generateSolicitudPdf(reportData);
+
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="Solicitud-${solicitud.codigoSolicitud}.pdf"`,
+        'Content-Length': buffer.length.toString(),
+      });
+
+      return new StreamableFile(buffer);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      throw error;
+    }
   }
+
+  /**
+   * Mapea los datos de la Solicitud a formato SolicitudReportData
+   */
+  /**
+   * Mapea los datos de la Solicitud a formato SolicitudReportData
+   * para la generación del PDF. Requiere `any` debido a la complejidad
+   * del mapeo dinámico de relaciones de Prisma.
+   */
+  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+  private mapSolicitudToReportData(solicitud: any): SolicitudReportData {
+    return {
+      codigoSolicitud: solicitud.codigoSolicitud || '',
+      lugarViaje: solicitud.lugarViaje,
+      motivoViaje: solicitud.motivoViaje,
+      fechaInicio: solicitud.fechaInicio,
+      fechaFin: solicitud.fechaFin,
+      montoTotalPresupuestado: solicitud.montoTotalPresupuestado,
+      montoTotalNeto: solicitud.montoTotalNeto,
+      usuarioEmisor: solicitud.usuarioEmisor
+        ? {
+            nombreCompleto: solicitud.usuarioEmisor.nombreCompleto,
+            cargo: solicitud.usuarioEmisor.cargo,
+          }
+        : undefined,
+      aprobador: solicitud.aprobador
+        ? {
+            nombreCompleto: solicitud.aprobador.nombreCompleto,
+          }
+        : undefined,
+      usuarioBeneficiado: solicitud.usuarioBeneficiado
+        ? {
+            nombreCompleto: solicitud.usuarioBeneficiado.nombreCompleto,
+          }
+        : undefined,
+      presupuestos: (solicitud.presupuestos || []).map((p: any) => ({
+        poa: p.poa
+          ? {
+              codigoPoa: p.poa.codigoPoa,
+              actividad: p.poa.actividad,
+              estructura: p.poa.estructura,
+              codigoPresupuestario: p.poa.codigoPresupuestario,
+            }
+          : undefined,
+      })),
+      planificaciones: (solicitud.planificaciones || []).map((plan: any) => ({
+        fechaInicio: plan.fechaInicio,
+        fechaFin: plan.fechaFin,
+        actividadProgramada: plan.actividadProgramada,
+        cantidadPersonasInstitucional: plan.cantidadPersonasInstitucional,
+        cantidadPersonasTerceros: plan.cantidadPersonasTerceros,
+      })),
+      viaticos: (solicitud.viaticos || []).map((v: any) => ({
+        tipoDestino: v.tipoDestino || '',
+        dias: v.dias || 0,
+        cantidadPersonas: v.cantidadPersonas || 0,
+        costoUnitario: v.costoUnitario,
+        montoPresupuestado: v.montoPresupuestado,
+        montoNeto: v.montoNeto,
+        concepto: v.concepto ? { nombre: v.concepto.nombre } : undefined,
+      })),
+      gastos: (solicitud.gastos || []).map((g: any) => ({
+        detalle: g.detalle,
+        tipoDocumento: g.tipoDocumento || '',
+        cantidad: g.cantidad || 0,
+        costoUnitario: g.costoUnitario,
+        montoPresupuestado: g.montoPresupuestado,
+        montoNeto: g.montoNeto,
+        tipoGasto: g.tipoGasto ? { nombre: g.tipoGasto.nombre } : undefined,
+      })),
+    };
+  }
+  /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 }
