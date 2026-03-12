@@ -39,6 +39,19 @@ function parseCSVLine(line: string): string[] {
   return result.map((v) => v.replace(/^"|"$/g, '')); // Quitar comillas exteriores
 }
 
+/**
+ * Mapa de codificación por archivo CSV
+ * POA.csv utiliza Latin-1 (ISO-8859-1) porque proviene de fuente externa
+ * Los demás archivos utilizan UTF-8
+ */
+const CSV_ENCODING_MAP: Record<string, BufferEncoding> = {
+  'POA.csv': 'latin1',
+  'Usuario.csv': 'utf8',
+  'Concepto.csv': 'utf8',
+  'TipoGasto.csv': 'utf8',
+  'cuentasBancarias.csv': 'utf8',
+};
+
 async function processCSV(
   filename: string,
   callback: (row: string[]) => Promise<void>,
@@ -49,7 +62,9 @@ async function processCSV(
     return;
   }
 
-  const fileStream = fs.createReadStream(filePath, { encoding: 'latin1' });
+  // Determinar codificación del archivo, por defecto UTF-8
+  const encoding = CSV_ENCODING_MAP[filename] || 'utf8';
+  const fileStream = fs.createReadStream(filePath, { encoding });
   const rl = readline.createInterface({
     input: fileStream,
     crlfDelay: Infinity,
