@@ -427,13 +427,19 @@ export class SolicitudesService {
     }
 
     // Crear notificación para el aprobador asignado
+    console.log('[SolicitudesService] Intentando crear notificación:', {
+      aprobadorId,
+      solicitudId: result.id,
+      codigoSolicitud: result.codigoSolicitud,
+    });
+
     await this.notificacionesService.crearNotificacion({
       titulo: 'Nueva solicitud asignada',
       mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
       tipo: 'SOLICITUD_ASIGNADA',
       usuarioId: aprobadorId,
       solicitudId: result.id,
-      urlDestino: `/solicitudes/${result.id}`,
+      urlDestino: `/dashboard/inbox/${result.id}`,
     });
 
     return result;
@@ -812,7 +818,7 @@ export class SolicitudesService {
           tipo: 'SOLICITUD_DERIVADA',
           usuarioId: nuevoAprobadorId,
           solicitudId: solicitudActualizada.id,
-          urlDestino: `/solicitudes/${solicitudActualizada.id}`,
+          urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
         });
         return solicitudActualizada;
       });
@@ -855,7 +861,7 @@ export class SolicitudesService {
           tipo: 'SOLICITUD_OBSERVADA',
           usuarioId: solicitud.usuarioEmisorId,
           solicitudId: solicitudActualizada.id,
-          urlDestino: `/solicitudes/${solicitudActualizada.id}`,
+          urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
         });
         return solicitudActualizada;
       });
@@ -898,7 +904,7 @@ export class SolicitudesService {
           tipo: 'SOLICITUD_APROBADA',
           usuarioId: solicitudActualizada.usuarioEmisorId,
           solicitudId: solicitudActualizada.id,
-          urlDestino: `/solicitudes/${solicitudActualizada.id}`,
+          urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
         });
         return solicitudActualizada;
       });

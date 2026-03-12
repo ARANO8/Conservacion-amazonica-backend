@@ -89,7 +89,14 @@ export class NotificacionesService {
     solicitudId?: number;
     urlDestino?: string;
   }) {
-    return this.prisma.notificacion.create({
+    console.log('[NotificacionesService] Creando notificación:', {
+      usuarioId: data.usuarioId,
+      tipo: data.tipo,
+      titulo: data.titulo,
+      solicitudId: data.solicitudId,
+    });
+
+    const resultado = await this.prisma.notificacion.create({
       data: {
         titulo: data.titulo,
         mensaje: data.mensaje,
@@ -108,6 +115,13 @@ export class NotificacionesService {
         },
       },
     });
+
+    console.log('[NotificacionesService] Notificación creada exitosamente:', {
+      id: resultado.id,
+      usuarioId: resultado.usuarioId,
+    });
+
+    return resultado;
   }
 
   async eliminarNotificacion(notificacionId: number, usuarioId: number) {
