@@ -281,10 +281,10 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     String destino 
     Int personas 
     Int noches 
-    Float cantidadUnitaria 
-    Float costoTotal 
-    Float iva 
-    Float it 
+    Decimal cantidadUnitaria 
+    Decimal costoTotal 
+    Decimal iva 
+    Decimal it 
     }
   
     "Usuario" |o--|| "Rol" : "enum:rol"

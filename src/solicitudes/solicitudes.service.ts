@@ -36,9 +36,9 @@ export class SolicitudesService {
     private notificacionesService: NotificacionesService,
   ) {}
 
-  private async generarCodigo(): Promise<string> {
+  private async generarCodigo(tx: Prisma.TransactionClient): Promise<string> {
     const anioActual = new Date().getFullYear();
-    const count = await this.prisma.solicitud.count({
+    const count = await tx.solicitud.count({
       where: {
         fechaSolicitud: {
           gte: new Date(`${anioActual}-01-01`),
@@ -130,20 +130,25 @@ export class SolicitudesService {
         }
       }
 
-      // Validamos contra la primera planificación del array (por simplicidad en el helper)
-      validarLimitesViatico(
-        vDto,
-        planificaciones[vDto.planificacionIndexes[0]],
-      );
+      // Validamos la capacidad contra cada planificación referenciada por el viático
+      for (const idx of vDto.planificacionIndexes) {
+        validarLimitesViatico(vDto, planificaciones[idx]);
+      }
 
       const precioCatalogo =
         vDto.tipoDestino === 'INSTITUCIONAL'
           ? concepto.precioInstitucional
           : concepto.precioTerceros;
 
-      const montoNetoUnitario = vDto.montoNeto
-        ? new Prisma.Decimal(vDto.montoNeto)
-        : precioCatalogo;
+      // montoNeto (si se provee) es el VALOR TOTAL (días * personas * unitario).
+      // Derivamos el precio unitario para los cálculos de impuestos y almacenamiento.
+      const divisorUnidad = vDto.dias * vDto.cantidadPersonas;
+      const costoUnitario: Prisma.Decimal =
+        vDto.montoNeto != null
+          ? divisorUnidad > 0
+            ? new Prisma.Decimal(vDto.montoNeto).div(divisorUnidad)
+            : new Prisma.Decimal(vDto.montoNeto)
+          : precioCatalogo;
 
       const {
         subtotalNeto,
@@ -151,18 +156,17 @@ export class SolicitudesService {
         it,
         montoPresupuestado: calcMontoPresupuestado,
       } = calcularMontosViaticos(
-        montoNetoUnitario,
+        costoUnitario,
         vDto.dias,
         vDto.cantidadPersonas,
         vDto.tipoDestino,
       );
 
-      // Trust DTO if provided (assuming DTO sends the TOTAL for viáticos if it specifies it)
-      // Actually, looking at vDto.montoNeto, it says 'Monto neto a recibir'.
-      // If vDto.montoPresupuestado is present, we trust it as the TOTAL for that viatico entry.
-      const finalMontoNeto = vDto.montoNeto
-        ? new Prisma.Decimal(vDto.montoNeto)
-        : subtotalNeto;
+      // montoNeto provisto es el TOTAL; si no se provee, usamos el subtotal calculado
+      const finalMontoNeto =
+        vDto.montoNeto != null
+          ? new Prisma.Decimal(vDto.montoNeto)
+          : subtotalNeto;
       const finalMontoPresupuestado = vDto.montoPresupuestado
         ? new Prisma.Decimal(vDto.montoPresupuestado)
         : calcMontoPresupuestado;
@@ -180,7 +184,7 @@ export class SolicitudesService {
           tipoDestino: vDto.tipoDestino,
           dias: vDto.dias,
           cantidadPersonas: vDto.cantidadPersonas,
-          costoUnitario: montoNetoUnitario,
+          costoUnitario: costoUnitario,
           montoPresupuestado: finalMontoPresupuestado,
           iva13: iva,
           it3: it,
@@ -306,9 +310,57 @@ export class SolicitudesService {
       );
     }
 
-    const codigoSolicitud = await this.generarCodigo();
+    // Calcular monto solicitado por POA (viáticos + gastos + hospedajes)
+    const montosByPoa = new Map<number, Prisma.Decimal>();
+    for (const v of detalles.viaticosData) {
+      const prev = montosByPoa.get(v.poaId) ?? new Prisma.Decimal(0);
+      montosByPoa.set(
+        v.poaId,
+        prev.add(v.data.montoPresupuestado as Prisma.Decimal),
+      );
+    }
+    for (const g of detalles.gastosData) {
+      const prev = montosByPoa.get(g.poaId) ?? new Prisma.Decimal(0);
+      montosByPoa.set(
+        g.poaId,
+        prev.add(g.data.montoPresupuestado as Prisma.Decimal),
+      );
+    }
+    for (const h of detalles.hospedajes) {
+      const prev = montosByPoa.get(h.poaId) ?? new Prisma.Decimal(0);
+      const hospPresupuestado = new Prisma.Decimal(h.costoTotal)
+        .add(new Prisma.Decimal(h.iva))
+        .add(new Prisma.Decimal(h.it));
+      montosByPoa.set(h.poaId, prev.add(hospPresupuestado));
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 0. Generar código atómicamente dentro de la transacción (evita race condition P2002)
+      const codigoSolicitud = await this.generarCodigo(tx);
+
+      // 0'. Validar saldo disponible por POA antes de comprometer fondos
+      for (const [poaId, montoSolicitado] of montosByPoa) {
+        const poa = await tx.poa.findUnique({
+          where: { id: poaId },
+          select: { costoTotal: true },
+        });
+        if (!poa) {
+          throw new NotFoundException(`POA con ID ${poaId} no encontrado`);
+        }
+        const comprometidoRaw = await tx.solicitudPresupuesto.aggregate({
+          where: { poaId, solicitud: { deletedAt: null } },
+          _sum: { subtotalPresupuestado: true },
+        });
+        const comprometido =
+          comprometidoRaw._sum.subtotalPresupuestado ?? new Prisma.Decimal(0);
+        const saldoDisponible = poa.costoTotal.sub(comprometido);
+        if (montoSolicitado.gt(saldoDisponible)) {
+          throw new BadRequestException(
+            'Saldo insuficiente en el POA especificado',
+          );
+        }
+      }
+
       // A. Crear Solicitud
       const solicitud = await tx.solicitud.create({
         data: {
@@ -426,21 +478,22 @@ export class SolicitudesService {
       throw new BadRequestException('Fallo al crear la solicitud');
     }
 
-    // Crear notificación para el aprobador asignado
-    console.log('[SolicitudesService] Intentando crear notificación:', {
-      aprobadorId,
-      solicitudId: result.id,
-      codigoSolicitud: result.codigoSolicitud,
-    });
-
-    await this.notificacionesService.crearNotificacion({
-      titulo: 'Nueva solicitud asignada',
-      mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
-      tipo: 'SOLICITUD_ASIGNADA',
-      usuarioId: aprobadorId,
-      solicitudId: result.id,
-      urlDestino: `/dashboard/inbox/${result.id}`,
-    });
+    // Crear notificación para el aprobador asignado (fire-and-forget seguro)
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Nueva solicitud asignada',
+        mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
+        tipo: 'SOLICITUD_ASIGNADA',
+        usuarioId: aprobadorId,
+        solicitudId: result.id,
+        urlDestino: `/dashboard/inbox/${result.id}`,
+      });
+    } catch (error) {
+      console.error(
+        `[SolicitudesService] Error al crear notificación para solicitud ${result.id}:`,
+        error,
+      );
+    }
 
     return result;
   }
@@ -753,6 +806,12 @@ export class SolicitudesService {
       );
     }
 
+    if (solicitud.estado === EstadoSolicitud.DESEMBOLSADO) {
+      throw new BadRequestException(
+        'No se puede eliminar una solicitud que ya ha sido desembolsada',
+      );
+    }
+
     return this.prisma.solicitud.update({
       where: { id },
       data: { deletedAt: new Date() },
@@ -813,15 +872,22 @@ export class SolicitudesService {
         include: SOLICITUD_INCLUDE,
       })
       .then(async (solicitudActualizada) => {
-        // Crear notificación para el nuevo aprobador
-        await this.notificacionesService.crearNotificacion({
-          titulo: 'Solicitud derivada',
-          mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
-          tipo: 'SOLICITUD_DERIVADA',
-          usuarioId: nuevoAprobadorId,
-          solicitudId: solicitudActualizada.id,
-          urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
-        });
+        try {
+          // Crear notificación para el nuevo aprobador
+          await this.notificacionesService.crearNotificacion({
+            titulo: 'Solicitud derivada',
+            mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
+            tipo: 'SOLICITUD_DERIVADA',
+            usuarioId: nuevoAprobadorId,
+            solicitudId: solicitudActualizada.id,
+            urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
+          });
+        } catch (error) {
+          console.error(
+            `[SolicitudesService] Error al crear notificación (derivar) para solicitud ${solicitudActualizada.id}:`,
+            error,
+          );
+        }
         return solicitudActualizada;
       });
   }
@@ -856,15 +922,22 @@ export class SolicitudesService {
         include: SOLICITUD_INCLUDE,
       })
       .then(async (solicitudActualizada) => {
-        // Crear notificación para el usuario emisor
-        await this.notificacionesService.crearNotificacion({
-          titulo: 'Solicitud observada',
-          mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido observada y requiere correcciones`,
-          tipo: 'SOLICITUD_OBSERVADA',
-          usuarioId: solicitud.usuarioEmisorId,
-          solicitudId: solicitudActualizada.id,
-          urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
-        });
+        try {
+          // Crear notificación para el usuario emisor
+          await this.notificacionesService.crearNotificacion({
+            titulo: 'Solicitud observada',
+            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido observada y requiere correcciones`,
+            tipo: 'SOLICITUD_OBSERVADA',
+            usuarioId: solicitud.usuarioEmisorId,
+            solicitudId: solicitudActualizada.id,
+            urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
+          });
+        } catch (error) {
+          console.error(
+            `[SolicitudesService] Error al crear notificación (observar) para solicitud ${solicitudActualizada.id}:`,
+            error,
+          );
+        }
         return solicitudActualizada;
       });
   }
@@ -900,15 +973,22 @@ export class SolicitudesService {
         include: SOLICITUD_INCLUDE,
       })
       .then(async (solicitudActualizada) => {
-        // Crear notificación para el usuario emisor
-        await this.notificacionesService.crearNotificacion({
-          titulo: 'Solicitud desembolsada',
-          mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada exitosamente`,
-          tipo: 'SOLICITUD_APROBADA',
-          usuarioId: solicitudActualizada.usuarioEmisorId,
-          solicitudId: solicitudActualizada.id,
-          urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
-        });
+        try {
+          // Crear notificación para el usuario emisor
+          await this.notificacionesService.crearNotificacion({
+            titulo: 'Solicitud desembolsada',
+            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada exitosamente`,
+            tipo: 'SOLICITUD_APROBADA',
+            usuarioId: solicitudActualizada.usuarioEmisorId,
+            solicitudId: solicitudActualizada.id,
+            urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
+          });
+        } catch (error) {
+          console.error(
+            `[SolicitudesService] Error al crear notificación (desembolsar) para solicitud ${solicitudActualizada.id}:`,
+            error,
+          );
+        }
         return solicitudActualizada;
       });
   }
