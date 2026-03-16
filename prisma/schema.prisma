@@ -165,6 +165,7 @@ model Solicitud {
   fechaInicio             DateTime?
   fechaFin                DateTime?
   codigoDesembolso        String?
+  urlComprobante          String?
   montoTotalNeto          Decimal         @default(0) @db.Decimal(10, 2)
   montoTotalPresupuestado Decimal         @default(0) @db.Decimal(10, 2)
   estado                  EstadoSolicitud @default(PENDIENTE)

@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsUrl } from 'class-validator';
 
 export class DesembolsarSolicitudDto {
   @ApiProperty({
@@ -9,4 +9,12 @@ export class DesembolsarSolicitudDto {
   @IsString()
   @IsNotEmpty({ message: 'El código de desembolso es obligatorio' })
   codigoDesembolso: string;
+
+  @ApiPropertyOptional({
+    example: 'https://drive.google.com/file/d/abc123/view',
+    description: 'URL del PDF escaneado del comprobante de depósito',
+  })
+  @IsOptional()
+  @IsUrl({}, { message: 'La URL del comprobante no es válida' })
+  urlComprobante?: string;
 }

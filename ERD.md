@@ -136,6 +136,7 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     DateTime fechaInicio "❓"
     DateTime fechaFin "❓"
     String codigoDesembolso "❓"
+    String urlComprobante "❓"
     Decimal montoTotalNeto 
     Decimal montoTotalPresupuestado 
     EstadoSolicitud estado 

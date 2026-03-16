@@ -892,6 +892,7 @@ export class SolicitudesService {
         data: {
           estado: EstadoSolicitud.DESEMBOLSADO,
           codigoDesembolso: desembolsarDto.codigoDesembolso,
+          urlComprobante: desembolsarDto.urlComprobante ?? null,
           aprobadorId: null, // Finalizado
         },
         include: SOLICITUD_INCLUDE,
