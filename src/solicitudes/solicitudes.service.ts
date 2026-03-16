@@ -5,7 +5,12 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateSolicitudDto } from './dto/create-solicitud.dto';
+import {
+  CreateSolicitudDto,
+  CreatePlanificacionDto,
+  CreateNominaDto,
+  CreateHospedajeDto,
+} from './dto/create-solicitud.dto';
 import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
 import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
@@ -27,6 +32,29 @@ import {
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+
+type DetalleSolicitud = {
+  montoTotalPresupuestado: Prisma.Decimal;
+  montoTotalNeto: Prisma.Decimal;
+  viaticosData: {
+    data: Omit<
+      Prisma.ViaticoUncheckedCreateInput,
+      'solicitudId' | 'solicitudPresupuestoId'
+    >;
+    planificacionIndexes: number[];
+    poaId: number;
+  }[];
+  gastosData: {
+    data: Omit<
+      Prisma.GastoUncheckedCreateInput,
+      'solicitudId' | 'solicitudPresupuestoId'
+    >;
+    poaId: number;
+  }[];
+  planificaciones: CreatePlanificacionDto[];
+  nominasTerceros: CreateNominaDto[];
+  hospedajes: CreateHospedajeDto[];
+};
 
 type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
@@ -59,28 +87,7 @@ export class SolicitudesService {
 
   private async prepararInsertAnidado(
     dto: CreateSolicitudDto | UpdateSolicitudDto,
-  ): Promise<{
-    montoTotalPresupuestado: Prisma.Decimal;
-    montoTotalNeto: Prisma.Decimal;
-    viaticosData: {
-      data: Omit<
-        Prisma.ViaticoUncheckedCreateInput,
-        'solicitudId' | 'solicitudPresupuestoId'
-      >;
-      planificacionIndexes: number[];
-      poaId: number;
-    }[];
-    gastosData: {
-      data: Omit<
-        Prisma.GastoUncheckedCreateInput,
-        'solicitudId' | 'solicitudPresupuestoId'
-      >;
-      poaId: number;
-    }[];
-    planificaciones: import('./dto/create-solicitud.dto').CreatePlanificacionDto[];
-    nominasTerceros: import('./dto/create-solicitud.dto').CreateNominaDto[];
-    hospedajes: import('./dto/create-solicitud.dto').CreateHospedajeDto[];
-  }> {
+  ): Promise<DetalleSolicitud> {
     const {
       planificaciones = [],
       viaticos = [],
@@ -271,6 +278,87 @@ export class SolicitudesService {
     };
   }
 
+  private async insertarRelacionesSolicitud(
+    solicitudId: number,
+    detalles: DetalleSolicitud,
+    presupuestosMap: Map<number, number>,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    // C. Crear Planificaciones y mapear IDs
+    const createdPlanificaciones: { id: number }[] = [];
+    for (const p of detalles.planificaciones) {
+      const d1 = new Date(p.fechaInicio);
+      const d2 = new Date(p.fechaFin);
+      const diferenciaMilisegundos = d2.getTime() - d1.getTime();
+      const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
+      const diasFinales =
+        p.dias !== undefined && p.dias !== null
+          ? Number(p.dias)
+          : Number(diasExactos.toFixed(2));
+
+      const cp = await tx.planificacion.create({
+        data: {
+          actividadProgramada: p.actividad,
+          fechaInicio: d1,
+          fechaFin: d2,
+          diasCalculados: diasFinales,
+          cantidadPersonasInstitucional: p.cantInstitucional,
+          cantidadPersonasTerceros: p.cantTerceros,
+          solicitudId,
+        },
+      });
+      createdPlanificaciones.push({ id: cp.id });
+    }
+
+    // D. Crear Viáticos
+    for (const vItem of detalles.viaticosData) {
+      await tx.viatico.create({
+        data: {
+          ...vItem.data,
+          solicitudId,
+          solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
+          planificaciones: {
+            connect: vItem.planificacionIndexes.map((idx) => ({
+              id: createdPlanificaciones[idx].id,
+            })),
+          },
+        },
+      });
+    }
+
+    // E. Crear Hospedajes
+    for (const h of detalles.hospedajes) {
+      await tx.hospedaje.create({
+        data: {
+          ...h,
+          solicitudId,
+        },
+      });
+    }
+
+    // E. Crear Gastos
+    for (const gRecord of detalles.gastosData) {
+      await tx.gasto.create({
+        data: {
+          ...gRecord.data,
+          solicitudId,
+          solicitudPresupuestoId: presupuestosMap.get(gRecord.poaId)!,
+        },
+      });
+    }
+
+    // F. Crear PersonaExterna (viene de nominasTerceros)
+    for (const n of detalles.nominasTerceros) {
+      await tx.personaExterna.create({
+        data: {
+          nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
+          procedenciaInstitucion: n.procedenciaInstitucion.trim().toUpperCase(),
+          solicitudId,
+        },
+      });
+    }
+  }
+
   async create(
     createSolicitudDto: CreateSolicitudDto,
     usuarioId: number,
@@ -404,82 +492,13 @@ export class SolicitudesService {
         presupuestosMap.set(poaId, sp.id);
       }
 
-      // C. Crear Planificaciones y mapear IDs
-      const createdPlanificaciones: { id: number }[] = [];
-      for (const p of detalles.planificaciones) {
-        const d1 = new Date(p.fechaInicio);
-        const d2 = new Date(p.fechaFin);
-        // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
-        const diferenciaMilisegundos = d2.getTime() - d1.getTime();
-        const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
-        const diasFinales =
-          p.dias !== undefined && p.dias !== null
-            ? Number(p.dias)
-            : Number(diasExactos.toFixed(2));
-
-        const cp = await tx.planificacion.create({
-          data: {
-            actividadProgramada: p.actividad,
-            fechaInicio: d1,
-            fechaFin: d2,
-            diasCalculados: diasFinales,
-            cantidadPersonasInstitucional: p.cantInstitucional,
-            cantidadPersonasTerceros: p.cantTerceros,
-            solicitudId: solicitud.id,
-          },
-        });
-        createdPlanificaciones.push({ id: cp.id });
-      }
-
-      // D. Crear Viáticos
-      for (const vItem of detalles.viaticosData) {
-        await tx.viatico.create({
-          data: {
-            ...vItem.data,
-            solicitudId: solicitud.id,
-            solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
-            planificaciones: {
-              connect: vItem.planificacionIndexes.map((idx) => ({
-                id: createdPlanificaciones[idx].id,
-              })),
-            },
-          },
-        });
-      }
-
-      // E. Crear Hospedajes
-      for (const h of detalles.hospedajes) {
-        await tx.hospedaje.create({
-          data: {
-            ...h,
-            solicitudId: solicitud.id,
-          },
-        });
-      }
-
-      // E. Crear Gastos
-      for (const gRecord of detalles.gastosData) {
-        await tx.gasto.create({
-          data: {
-            ...gRecord.data,
-            solicitudId: solicitud.id,
-            solicitudPresupuestoId: presupuestosMap.get(gRecord.poaId)!,
-          },
-        });
-      }
-
-      // F. Crear PersonaExterna (Viene de nominasTerceros)
-      for (const n of detalles.nominasTerceros) {
-        await tx.personaExterna.create({
-          data: {
-            nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
-            procedenciaInstitucion: n.procedenciaInstitucion
-              .trim()
-              .toUpperCase(),
-            solicitudId: solicitud.id,
-          },
-        });
-      }
+      // C–F. Insertar relaciones anidadas (planificaciones, viáticos, hospedajes, gastos, nóminas)
+      await this.insertarRelacionesSolicitud(
+        solicitud.id,
+        detalles,
+        presupuestosMap,
+        tx,
+      );
 
       // SYNC: Recalcular subtotales de los presupuestos involucrados
       await this.presupuestoService.recalcularTotales(solicitud.id, tx);
@@ -720,78 +739,13 @@ export class SolicitudesService {
           presupuestosMap.set(poaId, sp.id);
         }
 
-        // C. Re-inserción masiva (exactamente igual que el create)
-        const createdPlanif: { id: number }[] = [];
-        for (const p of detalles.planificaciones) {
-          const d1 = new Date(p.fechaInicio);
-          const d2 = new Date(p.fechaFin);
-          // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
-          const diferenciaMilisegundos = d2.getTime() - d1.getTime();
-          const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
-          const diasFinales =
-            p.dias !== undefined && p.dias !== null
-              ? Number(p.dias)
-              : Number(diasExactos.toFixed(2));
-
-          const cp = await tx.planificacion.create({
-            data: {
-              actividadProgramada: p.actividad,
-              fechaInicio: d1,
-              fechaFin: d2,
-              diasCalculados: diasFinales,
-              cantidadPersonasInstitucional: p.cantInstitucional,
-              cantidadPersonasTerceros: p.cantTerceros,
-              solicitudId: id,
-            },
-          });
-          createdPlanif.push({ id: cp.id });
-        }
-
-        for (const v of detalles.viaticosData) {
-          await tx.viatico.create({
-            data: {
-              ...v.data,
-              solicitudId: id,
-              solicitudPresupuestoId: presupuestosMap.get(v.poaId)!,
-              planificaciones: {
-                connect: v.planificacionIndexes.map((idx) => ({
-                  id: createdPlanif[idx].id,
-                })),
-              },
-            },
-          });
-        }
-
-        for (const g of detalles.gastosData) {
-          await tx.gasto.create({
-            data: {
-              ...g.data,
-              solicitudId: id,
-              solicitudPresupuestoId: presupuestosMap.get(g.poaId)!,
-            },
-          });
-        }
-
-        for (const h of detalles.hospedajes) {
-          await tx.hospedaje.create({
-            data: {
-              ...h,
-              solicitudId: id,
-            },
-          });
-        }
-
-        for (const n of detalles.nominasTerceros) {
-          await tx.personaExterna.create({
-            data: {
-              nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
-              procedenciaInstitucion: n.procedenciaInstitucion
-                .trim()
-                .toUpperCase(),
-              solicitudId: id,
-            },
-          });
-        }
+        // C–F. Re-inserción de relaciones anidadas
+        await this.insertarRelacionesSolicitud(
+          id,
+          detalles,
+          presupuestosMap,
+          tx,
+        );
       }
 
       // SYNC: Recalcular subtotales de los presupuestos involucrados

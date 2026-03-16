@@ -8,8 +8,12 @@ import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exce
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // CORS Enable
-  app.enableCors();
+  // CORS: permitir solo el origen del frontend (configurable por variable de entorno)
+  app.enableCors({
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+    methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  });
 
   // Global Validation Pipe
   app.useGlobalPipes(
