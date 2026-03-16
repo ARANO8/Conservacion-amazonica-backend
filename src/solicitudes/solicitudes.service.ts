@@ -414,6 +414,31 @@ export class SolicitudesService {
       );
     }
 
+    // VALIDACIÓN: Todos los poaIds referenciados en viáticos, gastos y hospedajes
+    // deben estar incluidos en el array poaIds enviado en la solicitud.
+    const poaIdSet = new Set(poaIds);
+    for (const v of detalles.viaticosData) {
+      if (!poaIdSet.has(v.poaId)) {
+        throw new BadRequestException(
+          `El viático referencia la partida POA ${v.poaId} que no está incluida en poaIds`,
+        );
+      }
+    }
+    for (const g of detalles.gastosData) {
+      if (!poaIdSet.has(g.poaId)) {
+        throw new BadRequestException(
+          `El gasto referencia la partida POA ${g.poaId} que no está incluida en poaIds`,
+        );
+      }
+    }
+    for (const h of detalles.hospedajes) {
+      if (!poaIdSet.has(h.poaId)) {
+        throw new BadRequestException(
+          `El hospedaje referencia la partida POA ${h.poaId} que no está incluida en poaIds`,
+        );
+      }
+    }
+
     // Calcular monto solicitado por POA (viáticos + gastos + hospedajes)
     const montosByPoa = new Map<number, Prisma.Decimal>();
     for (const v of detalles.viaticosData) {
