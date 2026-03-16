@@ -146,7 +146,6 @@ export class SolicitudesController {
   }
 
   @Get(':id/pdf')
-  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Generar y descargar reporte PDF de la solicitud' })
   @ApiProduces('application/pdf')
   @ApiOkResponse({

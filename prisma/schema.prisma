@@ -391,10 +391,10 @@ model Hospedaje {
   destino          String // Ej: "La Paz", "Sucre", "Rurrenabaque"
   personas         Int
   noches           Int
-  cantidadUnitaria Float
-  costoTotal       Float // personas * noches * cantidadUnitaria
-  iva              Float // 13% del costoTotal
-  it               Float // 3% del costoTotal
+  cantidadUnitaria Decimal @db.Decimal(10, 2)
+  costoTotal       Decimal @db.Decimal(10, 2) // personas * noches * cantidadUnitaria
+  iva              Decimal @db.Decimal(10, 2) // 13% del costoTotal
+  it               Decimal @db.Decimal(10, 2) // 3% del costoTotal
 
   solicitudId Int
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)

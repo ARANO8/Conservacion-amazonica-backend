@@ -182,7 +182,7 @@ export class PoaService {
       },
     });
 
-    const costoTotal = cantidad * costoUnitario;
+    const costoTotal = new Prisma.Decimal(cantidad).mul(costoUnitario);
 
     return this.prisma.poa.create({
       data: {
@@ -229,11 +229,14 @@ export class PoaService {
     }
 
     const cantFinal = cantidad ?? existingPoa.cantidad;
-    const unitFinal = costoUnitario ?? Number(existingPoa.costoUnitario);
+    const unitFinal =
+      costoUnitario != null
+        ? new Prisma.Decimal(costoUnitario)
+        : existingPoa.costoUnitario;
 
     updateData.cantidad = cantFinal;
     updateData.costoUnitario = unitFinal;
-    updateData.costoTotal = cantFinal * unitFinal;
+    updateData.costoTotal = new Prisma.Decimal(cantFinal).mul(unitFinal);
 
     return this.prisma.poa.update({
       where: { id },

@@ -10,11 +10,18 @@ import { JwtStrategy } from './jwt.strategy';
   imports: [
     UsuariosModule,
     PassportModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'secretKey',
-      signOptions: {
-        expiresIn: (process.env.JWT_EXPIRES_IN ||
-          '24h') as `${number}${'h' | 'm' | 's' | 'd'}`,
+    JwtModule.registerAsync({
+      useFactory: () => {
+        if (!process.env.JWT_SECRET) {
+          throw new Error('JWT_SECRET is not defined in environment variables');
+        }
+        return {
+          secret: process.env.JWT_SECRET,
+          signOptions: {
+            expiresIn: (process.env.JWT_EXPIRES_IN ||
+              '24h') as `${number}${'h' | 'm' | 's' | 'd'}`,
+          },
+        };
       },
     }),
   ],
