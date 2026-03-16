@@ -22,8 +22,9 @@ import { NotificacionesService } from './notificaciones.service';
 
 interface RequestWithUser extends Request {
   user?: {
-    id: number;
+    userId: number;
     email: string;
+    rol: string;
   };
 }
 
@@ -41,7 +42,7 @@ export class NotificacionesController {
     description: 'Lista de notificaciones del usuario',
   })
   async getMisNotificaciones(@Req() req: RequestWithUser) {
-    return this.notificacionesService.getMisNotificaciones(req.user!.id);
+    return this.notificacionesService.getMisNotificaciones(req.user!.userId);
   }
 
   @Get('unread')
@@ -51,7 +52,9 @@ export class NotificacionesController {
     description: 'Lista de notificaciones no leídas del usuario',
   })
   async getNotificacionesNoLeidas(@Req() req: RequestWithUser) {
-    return this.notificacionesService.getNotificacionesNoLeidas(req.user!.id);
+    return this.notificacionesService.getNotificacionesNoLeidas(
+      req.user!.userId,
+    );
   }
 
   @Get('unread/count')
@@ -63,9 +66,20 @@ export class NotificacionesController {
   async getCountNotificacionesNoLeidas(@Req() req: RequestWithUser) {
     const count =
       await this.notificacionesService.getCountNotificacionesNoLeidas(
-        req.user!.id,
+        req.user!.userId,
       );
     return { count };
+  }
+
+  @Patch('read-all')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Marcar todas las notificaciones como leídas' })
+  @ApiResponse({
+    status: 204,
+    description: 'Todas las notificaciones marcadas como leídas',
+  })
+  async marcarTodasComoLeidas(@Req() req: RequestWithUser) {
+    await this.notificacionesService.marcarTodasComoLeidas(req.user!.userId);
   }
 
   @Patch(':id/read')
@@ -78,18 +92,7 @@ export class NotificacionesController {
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
   ) {
-    return this.notificacionesService.marcarComoLeida(id, req.user!.id);
-  }
-
-  @Patch('read-all')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Marcar todas las notificaciones como leídas' })
-  @ApiResponse({
-    status: 204,
-    description: 'Todas las notificaciones marcadas como leídas',
-  })
-  async marcarTodasComoLeidas(@Req() req: RequestWithUser) {
-    await this.notificacionesService.marcarTodasComoLeidas(req.user!.id);
+    return this.notificacionesService.marcarComoLeida(id, req.user!.userId);
   }
 
   @Delete(':id')
@@ -103,6 +106,6 @@ export class NotificacionesController {
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
   ) {
-    await this.notificacionesService.eliminarNotificacion(id, req.user!.id);
+    await this.notificacionesService.eliminarNotificacion(id, req.user!.userId);
   }
 }
