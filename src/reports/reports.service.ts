@@ -312,9 +312,9 @@ export class ReportsService {
                 alignment: 'right',
               },
             ]),
-            // Gastos
+            // Comprobantes
             ...(solicitud.gastos || []).map((g) => [
-              `Gasto: ${g.tipoGasto?.nombre || 'N/A'}`,
+              `Comprobante: ${g.tipoGasto?.nombre || 'N/A'}`,
               g.detalle || g.tipoDocumento,
               g.cantidad,
               formatCurrency(g.costoUnitario),
