@@ -493,6 +493,8 @@ export class SolicitudesService {
                 estructura: {
                   include: {
                     proyecto: { include: { cuentaBancaria: true } },
+                    grupo: true,
+                    partida: true,
                   },
                 },
                 codigoPresupuestario: true,
