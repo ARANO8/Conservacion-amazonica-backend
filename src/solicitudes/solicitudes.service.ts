@@ -10,7 +10,13 @@ import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
 import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
-import { Rol, EstadoSolicitud, Solicitud, Prisma } from '@prisma/client';
+import {
+  Rol,
+  EstadoSolicitud,
+  Solicitud,
+  Prisma,
+  AccionHistorial,
+} from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
 import {
@@ -279,6 +285,16 @@ export class SolicitudesService {
       );
     }
 
+    // VALIDACIÓN: El aprobador no debe ser un usuario eliminado (soft-delete guard)
+    const aprobador = await this.prisma.usuario.findFirst({
+      where: { id: aprobadorId, deletedAt: null },
+    });
+    if (!aprobador) {
+      throw new NotFoundException(
+        `El aprobador con ID ${aprobadorId} no existe o ha sido eliminado del sistema`,
+      );
+    }
+
     const detalles = await this.prepararInsertAnidado(createSolicitudDto);
 
     // --- CÁLCULO DE FECHAS (Strict Separation) ---
@@ -520,17 +536,11 @@ export class SolicitudesService {
   }
 
   async findOne(id: number) {
+    // Una sola consulta con todos los includes necesarios y filtro deletedAt: null
+    // Evita la doble consulta anterior y garantiza que las solicitudes borradas
+    // (soft-delete) nunca sean expuestas.
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
-      include: SOLICITUD_INCLUDE,
-    });
-
-    if (!solicitud) {
-      throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
-    }
-
-    const solicitudCompleta = await this.prisma.solicitud.findUnique({
-      where: { id },
       include: {
         usuarioEmisor: true,
         aprobador: true,
@@ -571,11 +581,11 @@ export class SolicitudesService {
       },
     });
 
-    if (!solicitudCompleta) {
-      throw new NotFoundException(`Error al recuperar solicitud ${id}`);
+    if (!solicitud) {
+      throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
-    return solicitudCompleta;
+    return solicitud;
   }
 
   private async enriquecerConSaldos(
@@ -636,6 +646,16 @@ export class SolicitudesService {
     if (aprobadorId === usuarioId) {
       throw new BadRequestException(
         'No puedes asignarte a ti mismo como aprobador',
+      );
+    }
+
+    // VALIDACIÓN: El aprobador no debe ser un usuario eliminado (soft-delete guard)
+    const aprobadorUpdate = await this.prisma.usuario.findFirst({
+      where: { id: aprobadorId, deletedAt: null },
+    });
+    if (!aprobadorUpdate) {
+      throw new NotFoundException(
+        `El aprobador con ID ${aprobadorId} no existe o ha sido eliminado del sistema`,
       );
     }
 
@@ -854,22 +874,35 @@ export class SolicitudesService {
 
     const { nuevoAprobadorId } = aprobarDto;
 
-    // Verificar que el nuevo aprobador existe
-    const nuevoAprobador = await this.prisma.usuario.findUnique({
-      where: { id: nuevoAprobadorId },
+    // Verificar que el nuevo aprobador existe y no está eliminado (soft-delete guard)
+    const nuevoAprobador = await this.prisma.usuario.findFirst({
+      where: { id: nuevoAprobadorId, deletedAt: null },
     });
 
     if (!nuevoAprobador) {
       throw new NotFoundException(
-        `El nuevo aprobador con ID ${nuevoAprobadorId} no existe`,
+        `El nuevo aprobador con ID ${nuevoAprobadorId} no existe o ha sido eliminado del sistema`,
       );
     }
 
-    return this.prisma.solicitud
-      .update({
-        where: { id },
-        data: { aprobadorId: nuevoAprobadorId },
-        include: SOLICITUD_INCLUDE,
+    return this.prisma
+      .$transaction(async (tx) => {
+        const solicitudActualizada = await tx.solicitud.update({
+          where: { id },
+          data: { aprobadorId: nuevoAprobadorId },
+          include: SOLICITUD_INCLUDE,
+        });
+
+        // Registrar en historial (dentro de la misma transacción)
+        await tx.historialAprobacion.create({
+          data: {
+            accion: AccionHistorial.DERIVADO,
+            solicitudId: id,
+            usuarioActorId: usuarioId,
+          },
+        });
+
+        return solicitudActualizada;
       })
       .then(async (solicitudActualizada) => {
         try {
@@ -911,15 +944,29 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma.solicitud
-      .update({
-        where: { id },
-        data: {
-          estado: EstadoSolicitud.OBSERVADO,
-          observacion: observarDto.observacion,
-          aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
-        },
-        include: SOLICITUD_INCLUDE,
+    return this.prisma
+      .$transaction(async (tx) => {
+        const solicitudActualizada = await tx.solicitud.update({
+          where: { id },
+          data: {
+            estado: EstadoSolicitud.OBSERVADO,
+            observacion: observarDto.observacion,
+            aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
+          },
+          include: SOLICITUD_INCLUDE,
+        });
+
+        // Registrar en historial (dentro de la misma transacción)
+        await tx.historialAprobacion.create({
+          data: {
+            accion: AccionHistorial.RECHAZADO,
+            comentario: observarDto.observacion,
+            solicitudId: id,
+            usuarioActorId: usuarioId,
+          },
+        });
+
+        return solicitudActualizada;
       })
       .then(async (solicitudActualizada) => {
         try {
@@ -961,16 +1008,30 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma.solicitud
-      .update({
-        where: { id },
-        data: {
-          estado: EstadoSolicitud.DESEMBOLSADO,
-          codigoDesembolso: desembolsarDto.codigoDesembolso,
-          urlComprobante: desembolsarDto.urlComprobante ?? null,
-          aprobadorId: null, // Finalizado
-        },
-        include: SOLICITUD_INCLUDE,
+    return this.prisma
+      .$transaction(async (tx) => {
+        const solicitudActualizada = await tx.solicitud.update({
+          where: { id },
+          data: {
+            estado: EstadoSolicitud.DESEMBOLSADO,
+            codigoDesembolso: desembolsarDto.codigoDesembolso,
+            urlComprobante: desembolsarDto.urlComprobante ?? null,
+            aprobadorId: null, // Finalizado
+          },
+          include: SOLICITUD_INCLUDE,
+        });
+
+        // Registrar en historial (dentro de la misma transacción)
+        await tx.historialAprobacion.create({
+          data: {
+            accion: AccionHistorial.APROBADO,
+            comentario: desembolsarDto.codigoDesembolso,
+            solicitudId: id,
+            usuarioActorId: usuario.id,
+          },
+        });
+
+        return solicitudActualizada;
       })
       .then(async (solicitudActualizada) => {
         try {
