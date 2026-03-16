@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exception.filter';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -24,9 +25,14 @@ async function bootstrap() {
     }),
   );
 
-  // Global Prisma Exception Filter
+  // Global Exception Filters (orden: el ÚLTIMO registrado se ejecuta PRIMERO)
+  // 1. AllExceptionsFilter: fallback para TODO tipo de error
+  // 2. PrismaClientExceptionFilter: maneja P2002/P2025 específicamente
   const httpAdapterHost = app.get(HttpAdapterHost);
-  app.useGlobalFilters(new PrismaClientExceptionFilter(httpAdapterHost));
+  app.useGlobalFilters(
+    new AllExceptionsFilter(),
+    new PrismaClientExceptionFilter(httpAdapterHost),
+  );
 
   // Swagger Configuration
   const config = new DocumentBuilder()

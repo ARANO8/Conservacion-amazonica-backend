@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -62,6 +63,8 @@ type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
 
 @Injectable()
 export class SolicitudesService {
+  private readonly logger = new Logger(SolicitudesService.name);
+
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => SolicitudPresupuestoService))
@@ -296,6 +299,9 @@ export class SolicitudesService {
           ? Number(p.dias)
           : Number(diasExactos.toFixed(2));
 
+      this.logger.log(
+        `[insertarRelaciones] Creando Planificacion: actividad="${p.actividad}", fechaInicio=${p.fechaInicio}, fechaFin=${p.fechaFin}, diasFinales=${diasFinales}`,
+      );
       const cp = await tx.planificacion.create({
         data: {
           actividadProgramada: p.actividad,
@@ -308,36 +314,55 @@ export class SolicitudesService {
         },
       });
       createdPlanificaciones.push({ id: cp.id });
+      this.logger.log(
+        `[insertarRelaciones] Planificacion creada OK (id=${cp.id})`,
+      );
     }
 
     // D. Crear Viáticos
-    for (const vItem of detalles.viaticosData) {
+    for (let idx = 0; idx < detalles.viaticosData.length; idx++) {
+      const vItem = detalles.viaticosData[idx];
+      const spId = presupuestosMap.get(vItem.poaId);
+      this.logger.log(
+        `[insertarRelaciones] Creando Viatico ${idx}: poaId=${vItem.poaId}, spId=${spId}, planificacionIndexes=${JSON.stringify(vItem.planificacionIndexes)}, data=${JSON.stringify(vItem.data)}`,
+      );
       await tx.viatico.create({
         data: {
           ...vItem.data,
           solicitudId,
           solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
           planificaciones: {
-            connect: vItem.planificacionIndexes.map((idx) => ({
-              id: createdPlanificaciones[idx].id,
+            connect: vItem.planificacionIndexes.map((i) => ({
+              id: createdPlanificaciones[i].id,
             })),
           },
         },
       });
+      this.logger.log(`[insertarRelaciones] Viatico ${idx} creado OK`);
     }
 
     // E. Crear Hospedajes
-    for (const h of detalles.hospedajes) {
+    for (let idx = 0; idx < detalles.hospedajes.length; idx++) {
+      const h = detalles.hospedajes[idx];
+      this.logger.log(
+        `[insertarRelaciones] Creando Hospedaje ${idx}: ${JSON.stringify(h)}`,
+      );
       await tx.hospedaje.create({
         data: {
           ...h,
           solicitudId,
         },
       });
+      this.logger.log(`[insertarRelaciones] Hospedaje ${idx} creado OK`);
     }
 
     // E. Crear Gastos
-    for (const gRecord of detalles.gastosData) {
+    for (let idx = 0; idx < detalles.gastosData.length; idx++) {
+      const gRecord = detalles.gastosData[idx];
+      const spId = presupuestosMap.get(gRecord.poaId);
+      this.logger.log(
+        `[insertarRelaciones] Creando Gasto ${idx}: poaId=${gRecord.poaId}, spId=${spId}, data=${JSON.stringify(gRecord.data)}`,
+      );
       await tx.gasto.create({
         data: {
           ...gRecord.data,
@@ -345,10 +370,14 @@ export class SolicitudesService {
           solicitudPresupuestoId: presupuestosMap.get(gRecord.poaId)!,
         },
       });
+      this.logger.log(`[insertarRelaciones] Gasto ${idx} creado OK`);
     }
 
     // F. Crear PersonaExterna (viene de nominasTerceros)
     for (const n of detalles.nominasTerceros) {
+      this.logger.log(
+        `[insertarRelaciones] Creando PersonaExterna: ${n.nombreCompleto}`,
+      );
       await tx.personaExterna.create({
         data: {
           nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
@@ -365,6 +394,10 @@ export class SolicitudesService {
   ): Promise<Solicitud> {
     const { poaIds, descripcion, aprobadorId, lugarViaje, motivoViaje } =
       createSolicitudDto;
+
+    this.logger.log(
+      `[create] INICIO — usuarioId=${usuarioId}, aprobadorId=${aprobadorId}, poaIds=${JSON.stringify(poaIds)}`,
+    );
 
     // VALIDACIÓN: Evitar Auto-Aprobación
     if (aprobadorId === usuarioId) {
@@ -383,7 +416,16 @@ export class SolicitudesService {
       );
     }
 
+    this.logger.log(`[create] Aprobador validado OK (id=${aprobadorId})`);
+
     const detalles = await this.prepararInsertAnidado(createSolicitudDto);
+
+    this.logger.log(
+      `[create] prepararInsertAnidado OK — viaticosData=${detalles.viaticosData.length}, gastosData=${detalles.gastosData.length}, hospedajes=${detalles.hospedajes.length}, planificaciones=${detalles.planificaciones.length}`,
+    );
+    this.logger.log(
+      `[create] montoTotalPresupuestado=${detalles.montoTotalPresupuestado.toString()}, montoTotalNeto=${detalles.montoTotalNeto.toString()}`,
+    );
 
     // --- CÁLCULO DE FECHAS (Strict Separation) ---
     let minDate: Date | null = null;
@@ -466,6 +508,7 @@ export class SolicitudesService {
     const result = await this.prisma.$transaction(async (tx) => {
       // 0. Generar código atómicamente dentro de la transacción (evita race condition P2002)
       const codigoSolicitud = await this.generarCodigo(tx);
+      this.logger.log(`[create TX] Código generado: ${codigoSolicitud}`);
 
       // 0'. Validar saldo disponible por POA antes de comprometer fondos
       for (const [poaId, montoSolicitado] of montosByPoa) {
@@ -483,6 +526,9 @@ export class SolicitudesService {
         const comprometido =
           comprometidoRaw._sum.subtotalPresupuestado ?? new Prisma.Decimal(0);
         const saldoDisponible = poa.costoTotal.sub(comprometido);
+        this.logger.log(
+          `[create TX] POA ${poaId}: costoTotal=${poa.costoTotal.toString()}, comprometido=${comprometido.toString()}, saldo=${saldoDisponible.toString()}, solicitado=${montoSolicitado.toString()}`,
+        );
         if (montoSolicitado.gt(saldoDisponible)) {
           throw new BadRequestException(
             'Saldo insuficiente en el POA especificado',
@@ -491,6 +537,7 @@ export class SolicitudesService {
       }
 
       // A. Crear Solicitud
+      this.logger.log(`[create TX] Creando solicitud...`);
       const solicitud = await tx.solicitud.create({
         data: {
           codigoSolicitud,
@@ -507,26 +554,37 @@ export class SolicitudesService {
           usuarioBeneficiado: { connect: { id: usuarioId } },
         },
       });
+      this.logger.log(`[create TX] Solicitud creada OK (id=${solicitud.id})`);
 
       // B. Crear SolicitudPresupuesto (transaccional, save-at-end)
       const presupuestosMap = new Map<number, number>(); // poaId → SolicitudPresupuesto.id
       for (const poaId of poaIds) {
+        this.logger.log(
+          `[create TX] Creando SolicitudPresupuesto para poaId=${poaId}...`,
+        );
         const sp = await tx.solicitudPresupuesto.create({
           data: { poaId, solicitudId: solicitud.id },
         });
         presupuestosMap.set(poaId, sp.id);
+        this.logger.log(
+          `[create TX] SolicitudPresupuesto creado OK (id=${sp.id}, poaId=${poaId})`,
+        );
       }
 
       // C–F. Insertar relaciones anidadas (planificaciones, viáticos, hospedajes, gastos, nóminas)
+      this.logger.log(`[create TX] Insertando relaciones anidadas...`);
       await this.insertarRelacionesSolicitud(
         solicitud.id,
         detalles,
         presupuestosMap,
         tx,
       );
+      this.logger.log(`[create TX] Relaciones anidadas OK`);
 
       // SYNC: Recalcular subtotales de los presupuestos involucrados
+      this.logger.log(`[create TX] Recalculando totales...`);
       await this.presupuestoService.recalcularTotales(solicitud.id, tx);
+      this.logger.log(`[create TX] Recálculo OK`);
 
       return tx.solicitud.findUnique({
         where: { id: solicitud.id },

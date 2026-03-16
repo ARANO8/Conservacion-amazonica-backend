@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Res,
   StreamableFile,
+  Logger,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -46,6 +47,8 @@ interface RequestWithUser extends Request {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('solicitudes')
 export class SolicitudesController {
+  private readonly logger = new Logger(SolicitudesController.name);
+
   constructor(
     private readonly solicitudesService: SolicitudesService,
     private readonly reportsService: ReportsService,
@@ -57,6 +60,12 @@ export class SolicitudesController {
     @Body() createSolicitudDto: CreateSolicitudDto,
     @Req() req: RequestWithUser,
   ) {
+    this.logger.log(
+      `[CREATE] usuarioId=${req.user.userId} | poaIds=${JSON.stringify(createSolicitudDto.poaIds)} | viaticos=${createSolicitudDto.viaticos?.length ?? 0} | gastos=${createSolicitudDto.gastos?.length ?? 0} | hospedajes=${createSolicitudDto.hospedajes?.length ?? 0} | planificaciones=${createSolicitudDto.planificaciones?.length ?? 0}`,
+    );
+    this.logger.debug(
+      `[CREATE] Body completo: ${JSON.stringify(createSolicitudDto)}`,
+    );
     return this.solicitudesService.create(createSolicitudDto, req.user.userId);
   }
 
