@@ -604,7 +604,7 @@ export class SolicitudesService {
         tipo: 'SOLICITUD_ASIGNADA',
         usuarioId: aprobadorId,
         solicitudId: result.id,
-        urlDestino: `/dashboard/inbox/${result.id}`,
+        urlDestino: `/app/aprobaciones/${result.id}`,
       });
     } catch (error) {
       console.error(
@@ -950,7 +950,7 @@ export class SolicitudesService {
             tipo: 'SOLICITUD_DERIVADA',
             usuarioId: nuevoAprobadorId,
             solicitudId: solicitudActualizada.id,
-            urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
+            urlDestino: `/app/aprobaciones/${solicitudActualizada.id}`,
           });
         } catch (error) {
           console.error(
