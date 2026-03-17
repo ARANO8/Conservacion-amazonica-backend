@@ -1010,11 +1010,11 @@ export class SolicitudesService {
           // Crear notificación para el usuario emisor
           await this.notificacionesService.crearNotificacion({
             titulo: 'Solicitud observada',
-            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido observada y requiere correcciones`,
+            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} requiere correcciones. Observación: ${observarDto.observacion}`,
             tipo: 'SOLICITUD_OBSERVADA',
             usuarioId: solicitud.usuarioEmisorId,
             solicitudId: solicitudActualizada.id,
-            urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
+            urlDestino: `/app/solicitudes/${id}/editar`,
           });
         } catch (error) {
           console.error(
@@ -1075,11 +1075,11 @@ export class SolicitudesService {
           // Crear notificación para el usuario emisor
           await this.notificacionesService.crearNotificacion({
             titulo: 'Solicitud desembolsada',
-            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada exitosamente`,
+            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada. Código: ${desembolsarDto.codigoDesembolso}. Procede a registrar tu rendición.`,
             tipo: 'SOLICITUD_APROBADA',
             usuarioId: solicitudActualizada.usuarioEmisorId,
             solicitudId: solicitudActualizada.id,
-            urlDestino: `/dashboard/inbox/${solicitudActualizada.id}`,
+            urlDestino: `/app/rendiciones/nueva?solicitudId=${id}`,
           });
         } catch (error) {
           console.error(
