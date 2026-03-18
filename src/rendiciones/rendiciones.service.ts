@@ -83,6 +83,43 @@ export class RendicionesService {
         );
       }
 
+      const montosPorPartida = this.agruparMontosPorPartida(dto);
+      const partidaIds = Array.from(montosPorPartida.keys());
+
+      const partidas =
+        partidaIds.length > 0
+          ? await tx.solicitudPresupuesto.findMany({
+              where: {
+                id: { in: partidaIds },
+                solicitudId: dto.solicitudId,
+              },
+              select: {
+                id: true,
+                poaId: true,
+                subtotalPresupuestado: true,
+              },
+            })
+          : [];
+
+      if (partidas.length !== partidaIds.length) {
+        throw new BadRequestException(
+          'Se detectaron partidas que no pertenecen a la solicitud rendida',
+        );
+      }
+
+      for (const partida of partidas) {
+        const montoEjecutarPartida =
+          montosPorPartida.get(partida.id) ?? new Prisma.Decimal(0);
+
+        if (montoEjecutarPartida.gt(partida.subtotalPresupuestado)) {
+          throw new BadRequestException(
+            `El monto ejecutado en la partida ${partida.id} excede el presupuesto comprometido`,
+          );
+        }
+      }
+
+      const montosPorPoa = this.agruparMontosPorPoa(partidas, montosPorPartida);
+
       const totalRespaldado = this.calcularTotalRespaldado(dto);
       const saldoLiquido = new Prisma.Decimal(solicitud.montoTotalNeto).minus(
         totalRespaldado,
@@ -150,25 +187,12 @@ export class RendicionesService {
         },
       });
 
-      for (const gasto of dto.gastos ?? []) {
-        const partida = await tx.solicitudPresupuesto.findUnique({
-          where: { id: gasto.partidaId },
-          select: { id: true, solicitudId: true, poaId: true },
-        });
-
-        if (!partida || partida.solicitudId !== dto.solicitudId) {
-          throw new BadRequestException(
-            `La partida ${gasto.partidaId} no pertenece a la solicitud rendida`,
-          );
-        }
-
-        const montoBruto = new Prisma.Decimal(gasto.montoBruto);
-
+      for (const [poaId, montoEjecutar] of montosPorPoa) {
         await tx.poa.update({
-          where: { id: partida.poaId },
+          where: { id: poaId },
           data: {
             montoEjecutado: {
-              increment: montoBruto,
+              increment: montoEjecutar,
             },
           },
         });
@@ -205,5 +229,41 @@ export class RendicionesService {
     );
 
     return totalGastos.plus(totalSinRespaldo);
+  }
+
+  private agruparMontosPorPartida(
+    dto: CreateRendicionDto,
+  ): Map<number, Prisma.Decimal> {
+    const montosPorPartida = new Map<number, Prisma.Decimal>();
+
+    for (const gasto of dto.gastos ?? []) {
+      const montoBruto = new Prisma.Decimal(gasto.montoBruto);
+      const acumulado =
+        montosPorPartida.get(gasto.partidaId) ?? new Prisma.Decimal(0);
+      montosPorPartida.set(gasto.partidaId, acumulado.plus(montoBruto));
+    }
+
+    return montosPorPartida;
+  }
+
+  private agruparMontosPorPoa(
+    partidas: {
+      id: number;
+      poaId: number;
+      subtotalPresupuestado: Prisma.Decimal;
+    }[],
+    montosPorPartida: Map<number, Prisma.Decimal>,
+  ): Map<number, Prisma.Decimal> {
+    const montosPorPoa = new Map<number, Prisma.Decimal>();
+
+    for (const partida of partidas) {
+      const montoPartida =
+        montosPorPartida.get(partida.id) ?? new Prisma.Decimal(0);
+      const acumuladoPoa =
+        montosPorPoa.get(partida.poaId) ?? new Prisma.Decimal(0);
+      montosPorPoa.set(partida.poaId, acumuladoPoa.plus(montoPartida));
+    }
+
+    return montosPorPoa;
   }
 }

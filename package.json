@@ -7,6 +7,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "maintenance:recalibrar-poa-ejecutado": "ts-node -r tsconfig-paths/register src/scripts/recalibrar-monto-ejecutado.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"types/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

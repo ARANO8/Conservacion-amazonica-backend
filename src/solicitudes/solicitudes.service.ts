@@ -61,6 +61,13 @@ type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
 }>;
 
+const ESTADOS_COMPROMISO_ACTIVO: EstadoSolicitud[] = [
+  // En este dominio no existe EstadoSolicitud.APROBADO explícito.
+  // PENDIENTE representa solicitudes activas previas al desembolso.
+  EstadoSolicitud.PENDIENTE,
+  EstadoSolicitud.DESEMBOLSADO,
+];
+
 @Injectable()
 export class SolicitudesService {
   private readonly logger = new Logger(SolicitudesService.name);
@@ -514,18 +521,26 @@ export class SolicitudesService {
       for (const [poaId, montoSolicitado] of montosByPoa) {
         const poa = await tx.poa.findUnique({
           where: { id: poaId },
-          select: { costoTotal: true },
+          select: { costoTotal: true, montoEjecutado: true },
         });
         if (!poa) {
           throw new NotFoundException(`POA con ID ${poaId} no encontrado`);
         }
         const comprometidoRaw = await tx.solicitudPresupuesto.aggregate({
-          where: { poaId, solicitud: { deletedAt: null } },
+          where: {
+            poaId,
+            solicitud: {
+              deletedAt: null,
+              estado: { in: ESTADOS_COMPROMISO_ACTIVO },
+            },
+          },
           _sum: { subtotalPresupuestado: true },
         });
         const comprometido =
           comprometidoRaw._sum.subtotalPresupuestado ?? new Prisma.Decimal(0);
-        const saldoDisponible = poa.costoTotal.sub(comprometido);
+        const saldoDisponible = poa.costoTotal
+          .sub(poa.montoEjecutado)
+          .sub(comprometido);
         this.logger.log(
           `[create TX] POA ${poaId}: costoTotal=${poa.costoTotal.toString()}, comprometido=${comprometido.toString()}, saldo=${saldoDisponible.toString()}, solicitado=${montoSolicitado.toString()}`,
         );

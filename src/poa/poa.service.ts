@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { EstadoPoa, Prisma } from '@prisma/client';
+import { EstadoPoa, EstadoSolicitud, Prisma } from '@prisma/client';
 import { CreatePoaDto } from './dto/create-poa.dto';
 import { UpdatePoaDto } from './dto/update-poa.dto';
 import { PoaPaginationDto } from './dto/poa-pagination.dto';
@@ -30,18 +30,30 @@ type PoaWithSaldo<T> = T & {
   tieneCompromisos: boolean;
 };
 
+const ESTADOS_COMPROMISO_ACTIVO: EstadoSolicitud[] = [
+  // En este dominio no existe EstadoSolicitud.APROBADO explícito.
+  // PENDIENTE representa solicitudes aprobables/en curso antes del desembolso.
+  EstadoSolicitud.PENDIENTE,
+  EstadoSolicitud.DESEMBOLSADO,
+];
+
 @Injectable()
 export class PoaService {
   constructor(private prisma: PrismaService) {}
 
   async addSaldoDisponible<
-    T extends { id: number; costoTotal: Prisma.Decimal },
+    T extends {
+      id: number;
+      costoTotal: Prisma.Decimal;
+      montoEjecutado: Prisma.Decimal;
+    },
   >(poa: T): Promise<PoaWithSaldo<T>> {
     const comprometidoRaw = await this.prisma.solicitudPresupuesto.aggregate({
       where: {
         poaId: poa.id,
         solicitud: {
           deletedAt: null,
+          estado: { in: ESTADOS_COMPROMISO_ACTIVO },
         },
       },
       _sum: {
@@ -52,7 +64,10 @@ export class PoaService {
     const montoComprometido =
       comprometidoRaw._sum.subtotalPresupuestado || new Prisma.Decimal(0);
 
-    const saldoDisponible = poa.costoTotal.sub(montoComprometido).toNumber();
+    const saldoDisponible = poa.costoTotal
+      .sub(poa.montoEjecutado)
+      .sub(montoComprometido)
+      .toNumber();
 
     return {
       ...poa,
@@ -68,7 +83,11 @@ export class PoaService {
    * N consultas individuales, eliminando el problema N+1.
    */
   private async batchEnrichWithSaldos<
-    T extends { id: number; costoTotal: Prisma.Decimal },
+    T extends {
+      id: number;
+      costoTotal: Prisma.Decimal;
+      montoEjecutado: Prisma.Decimal;
+    },
   >(poas: T[]): Promise<PoaWithSaldo<T>[]> {
     if (poas.length === 0) return [];
 
@@ -78,7 +97,10 @@ export class PoaService {
       by: ['poaId'],
       where: {
         poaId: { in: poaIds },
-        solicitud: { deletedAt: null },
+        solicitud: {
+          deletedAt: null,
+          estado: { in: ESTADOS_COMPROMISO_ACTIVO },
+        },
       },
       _sum: { subtotalPresupuestado: true },
     });
@@ -92,7 +114,10 @@ export class PoaService {
 
     return poas.map((poa) => {
       const montoComprometido = sumMap.get(poa.id) ?? new Prisma.Decimal(0);
-      const saldoDisponible = poa.costoTotal.sub(montoComprometido).toNumber();
+      const saldoDisponible = poa.costoTotal
+        .sub(poa.montoEjecutado)
+        .sub(montoComprometido)
+        .toNumber();
       return {
         ...poa,
         montoComprometido: montoComprometido.toNumber(),
@@ -454,6 +479,7 @@ export class PoaService {
         cantidad: true,
         costoUnitario: true,
         costoTotal: true,
+        montoEjecutado: true,
         actividad: {
           select: {
             id: true,
