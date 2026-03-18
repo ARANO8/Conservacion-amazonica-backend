@@ -21,7 +21,23 @@ export class RendicionesService {
       where: { solicitudId },
       include: {
         solicitud: true,
-        gastosRendicion: true,
+        gastosRendicion: {
+          include: {
+            partida: {
+              include: {
+                poa: {
+                  include: {
+                    estructura: {
+                      include: {
+                        partida: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
         declaracionesJuradas: true,
         informeGastos: {
           include: {
@@ -88,8 +104,15 @@ export class RendicionesService {
               tipoDocumento: this.toTipoDocumento(gasto.tipoDocumento),
               nroDocumento: gasto.numeroDocumento ?? 'S/N',
               fecha: gasto.fechaDocumento ?? dto.fechaRendicion,
+              concepto: gasto.concepto,
               detalle: gasto.detalle ?? gasto.concepto,
-              monto: new Prisma.Decimal(gasto.montoTotal),
+              proveedor: gasto.proveedor,
+              partidaId: gasto.partidaId,
+              urlComprobante: gasto.urlComprobante,
+              monto: new Prisma.Decimal(gasto.montoBruto),
+              montoBruto: new Prisma.Decimal(gasto.montoBruto),
+              montoImpuestos: new Prisma.Decimal(gasto.montoImpuestos),
+              montoNeto: new Prisma.Decimal(gasto.montoNeto),
             })),
           },
           declaracionesJuradas: {
@@ -147,7 +170,8 @@ export class RendicionesService {
 
   private calcularTotalRespaldado(dto: CreateRendicionDto): Prisma.Decimal {
     const totalGastos = (dto.gastos ?? []).reduce(
-      (acc, gasto) => acc.plus(new Prisma.Decimal(gasto.montoTotal)),
+      (acc, gasto) =>
+        acc.plus(new Prisma.Decimal(gasto.montoBruto ?? gasto.montoTotal ?? 0)),
       new Prisma.Decimal(0),
     );
 

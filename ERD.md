@@ -200,8 +200,14 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     TipoDocumento tipoDocumento 
     String nroDocumento 
     DateTime fecha 
+    String concepto 
     String detalle 
+    String proveedor "❓"
+    String urlComprobante 
     Decimal monto 
+    Decimal montoBruto 
+    Decimal montoImpuestos 
+    Decimal montoNeto 
     }
   
 
@@ -332,6 +338,7 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     "ActividadInforme" }o--|| "InformeGastos" : "informe"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoRendicion" }o--|| "Rendicion" : "rendicion"
+    "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"
     "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"

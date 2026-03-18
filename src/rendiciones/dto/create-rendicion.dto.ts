@@ -83,7 +83,27 @@ export class CreateGastoRendicionDto {
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
-  montoTotal: number;
+  montoBruto: number;
+
+  @ApiProperty({
+    example: 185.68,
+    description: 'Monto de impuestos/retenciones aplicados al comprobante',
+  })
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  montoImpuestos: number;
+
+  @ApiPropertyOptional({
+    example: 1160.5,
+    description:
+      'Alias de compatibilidad para frontend: monto total bruto del comprobante',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0.01)
+  montoTotal?: number;
 
   @ApiProperty({
     example: 974.82,

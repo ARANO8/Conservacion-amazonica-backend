@@ -273,11 +273,20 @@ model GastoRendicion {
   tipoDocumento TipoDocumento
   nroDocumento  String
   fecha         DateTime
+  concepto      String        @default("")
   detalle       String
-  monto         Decimal       @db.Decimal(10, 2)
+  proveedor     String?
+  urlComprobante String       @default("")
+  monto         Decimal       @default(0) @db.Decimal(10, 2)
+  montoBruto    Decimal       @default(0) @db.Decimal(10, 2)
+  montoImpuestos Decimal      @default(0) @db.Decimal(10, 2)
+  montoNeto     Decimal       @default(0) @db.Decimal(10, 2)
 
   rendicionId Int
   rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
+
+  partidaId Int?
+  partida   SolicitudPresupuesto? @relation(fields: [partidaId], references: [id], onDelete: SetNull)
 }
 
 model DeclaracionJurada {
@@ -303,6 +312,7 @@ model SolicitudPresupuesto {
 
   viaticos Viatico[]
   gastos   Gasto[]
+  gastosRendicion GastoRendicion[]
 
   @@unique([solicitudId, poaId])
 }
