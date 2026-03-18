@@ -275,17 +275,17 @@ export class CreateRendicionDto {
   @IsUrl()
   urlCuadroComparativo?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: [String],
     example: [
       'https://drive.google.com/file/d/cotizacion-1/view',
       'https://drive.google.com/file/d/cotizacion-2/view',
     ],
   })
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @IsString({ each: true })
-  urlCotizaciones: string[];
+  urlCotizaciones?: string[];
 
   @ApiProperty({ type: [CreateGastoRendicionDto] })
   @IsArray()
