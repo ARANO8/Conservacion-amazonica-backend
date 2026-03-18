@@ -18,6 +18,7 @@ import { ReportsModule } from './reports/reports.module';
 import { SolicitudPresupuestoModule } from './solicitudes-presupuestos/solicitudes-presupuestos.module';
 import { CuentasBancariasModule } from './catalogos/cuentas-bancarias/cuentas-bancarias.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
+import { RendicionesModule } from './rendiciones/rendiciones.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
     SolicitudPresupuestoModule,
     CuentasBancariasModule,
     NotificacionesModule,
+    RendicionesModule,
   ],
   providers: [
     {
