@@ -167,6 +167,15 @@ export class CreateHospedajeDto {
   @IsNotEmpty()
   destino: string;
 
+  @ApiProperty({
+    enum: TipoDocumento,
+    example: TipoDocumento.RECIBO,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(TipoDocumento)
+  tipoDocumento?: TipoDocumento;
+
   @ApiProperty({ example: 1, minimum: 1 })
   @IsInt()
   @Min(1)

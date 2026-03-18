@@ -426,6 +426,7 @@ model Hospedaje {
   id               Int    @id @default(autoincrement())
   region           String // "Eje troncal", "Ciudades Intermedias", "Bolivia Norte", "Pueblos"
   destino          String // Ej: "La Paz", "Sucre", "Rurrenabaque"
+  tipoDocumento    TipoDocumento @default(RECIBO)
   personas         Int
   noches           Int
   cantidadUnitaria Decimal @db.Decimal(10, 2)

@@ -27,6 +27,7 @@ import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicit
 import { Inject, forwardRef } from '@nestjs/common';
 import {
   calcularMontosGastos,
+  calcularMontosHospedaje,
   calcularMontosViaticos,
   validarLimitesViatico,
 } from './solicitudes.helper';
@@ -217,9 +218,24 @@ export class SolicitudesService {
     }
 
     // --- Procesar Hospedajes ---
+    const hospedajesData: CreateHospedajeDto[] = [];
     for (const hDto of hospedajes) {
-      montoTotalPresupuestado = montoTotalPresupuestado.add(hDto.costoTotal);
-      montoTotalNeto = montoTotalNeto.add(hDto.costoTotal);
+      const tipoDocumento = hDto.tipoDocumento ?? 'RECIBO';
+      const costoTotal = new Prisma.Decimal(hDto.costoTotal);
+      const { iva, it, montoPresupuestado } = calcularMontosHospedaje(
+        costoTotal,
+        tipoDocumento,
+      );
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
+      montoTotalNeto = montoTotalNeto.add(costoTotal);
+
+      hospedajesData.push({
+        ...hDto,
+        tipoDocumento,
+        iva: Number(iva.toString()),
+        it: Number(it.toString()),
+      });
     }
 
     // --- Procesar Gastos ---
@@ -284,7 +300,7 @@ export class SolicitudesService {
       gastosData,
       planificaciones,
       nominasTerceros,
-      hospedajes,
+      hospedajes: hospedajesData,
     };
   }
 
@@ -749,6 +765,7 @@ export class SolicitudesService {
       planificaciones,
       viaticos,
       gastos,
+      hospedajes,
       nominasTerceros,
     } = updateSolicitudDto;
 
@@ -781,6 +798,7 @@ export class SolicitudesService {
       (planificaciones && planificaciones.length > 0) ||
       (viaticos && viaticos.length > 0) ||
       (gastos && gastos.length > 0) ||
+      (hospedajes && hospedajes.length > 0) ||
       (nominasTerceros && nominasTerceros.length > 0);
 
     return this.prisma.$transaction(async (tx) => {

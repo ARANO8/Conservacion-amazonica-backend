@@ -126,3 +126,26 @@ export function calcularMontosGastos(
     montoPresupuestado,
   };
 }
+
+export function calcularMontosHospedaje(
+  costoTotal: Prisma.Decimal,
+  tipoDocumento: 'FACTURA' | 'RECIBO',
+) {
+  if (tipoDocumento === 'FACTURA') {
+    return {
+      iva: new Prisma.Decimal(0),
+      it: new Prisma.Decimal(0),
+      montoPresupuestado: redondear(costoTotal),
+    };
+  }
+
+  const montoBruto = redondear(costoTotal.div(0.84));
+  const iva = redondear(montoBruto.mul(0.13));
+  const it = redondear(montoBruto.mul(0.03));
+
+  return {
+    iva,
+    it,
+    montoPresupuestado: redondear(costoTotal.add(iva).add(it)),
+  };
+}
