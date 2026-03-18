@@ -62,6 +62,46 @@ export class PoaService {
     };
   }
 
+  /**
+   * Versión batch de addSaldoDisponible.
+   * Lanza UNA sola consulta groupBy para todos los poaIds recibidos en lugar de
+   * N consultas individuales, eliminando el problema N+1.
+   */
+  private async batchEnrichWithSaldos<
+    T extends { id: number; costoTotal: Prisma.Decimal },
+  >(poas: T[]): Promise<PoaWithSaldo<T>[]> {
+    if (poas.length === 0) return [];
+
+    const poaIds = poas.map((p) => p.id);
+
+    const sums = await this.prisma.solicitudPresupuesto.groupBy({
+      by: ['poaId'],
+      where: {
+        poaId: { in: poaIds },
+        solicitud: { deletedAt: null },
+      },
+      _sum: { subtotalPresupuestado: true },
+    });
+
+    const sumMap = new Map<number, Prisma.Decimal>(
+      sums.map((s) => [
+        s.poaId,
+        s._sum.subtotalPresupuestado ?? new Prisma.Decimal(0),
+      ]),
+    );
+
+    return poas.map((poa) => {
+      const montoComprometido = sumMap.get(poa.id) ?? new Prisma.Decimal(0);
+      const saldoDisponible = poa.costoTotal.sub(montoComprometido).toNumber();
+      return {
+        ...poa,
+        montoComprometido: montoComprometido.toNumber(),
+        saldoDisponible,
+        tieneCompromisos: montoComprometido.gt(0),
+      };
+    });
+  }
+
   async findAll(paginationDto: PoaPaginationDto) {
     const { page = 1, limit = 10, search } = paginationDto;
     const skip = (page - 1) * limit;
@@ -113,9 +153,8 @@ export class PoaService {
 
     const lastPage = Math.ceil(total / limit);
 
-    const enrichedData = await Promise.all(
-      data.map((poa) => this.addSaldoDisponible(poa)),
-    );
+    // Una sola consulta groupBy para todos los POAs (elimina N+1)
+    const enrichedData = await this.batchEnrichWithSaldos(data);
 
     return {
       data: enrichedData,
@@ -182,7 +221,7 @@ export class PoaService {
       },
     });
 
-    const costoTotal = cantidad * costoUnitario;
+    const costoTotal = new Prisma.Decimal(cantidad).mul(costoUnitario);
 
     return this.prisma.poa.create({
       data: {
@@ -229,11 +268,14 @@ export class PoaService {
     }
 
     const cantFinal = cantidad ?? existingPoa.cantidad;
-    const unitFinal = costoUnitario ?? Number(existingPoa.costoUnitario);
+    const unitFinal =
+      costoUnitario != null
+        ? new Prisma.Decimal(costoUnitario)
+        : existingPoa.costoUnitario;
 
     updateData.cantidad = cantFinal;
     updateData.costoUnitario = unitFinal;
-    updateData.costoTotal = cantFinal * unitFinal;
+    updateData.costoTotal = new Prisma.Decimal(cantFinal).mul(unitFinal);
 
     return this.prisma.poa.update({
       where: { id },
@@ -303,24 +345,27 @@ export class PoaService {
       },
     });
 
-    return Promise.all(
-      estructuras.map(async (e) => {
-        const poasEnriquecidos = await Promise.all(
-          e.poas.map((poa) => this.addSaldoDisponible(poa)),
-        );
+    // Recopilar todos los IDs de POA en una sola pasada
+    const todosLosPoas = estructuras.flatMap((e) => e.poas);
 
-        const saldoTotalPartida = poasEnriquecidos.reduce(
-          (acc, poa) => acc + poa.saldoDisponible,
-          0,
-        );
+    // Una sola consulta groupBy para todos los POAs (elimina N+1)
+    const poasEnriquecidos = await this.batchEnrichWithSaldos(todosLosPoas);
 
-        return {
-          id: e.partida.id,
-          nombre: e.partida.nombre,
-          saldoDisponible: saldoTotalPartida,
-        };
-      }),
-    );
+    // Indexar por id para O(1) al rearmar por estructura
+    const enrichedMap = new Map(poasEnriquecidos.map((p) => [p.id, p]));
+
+    return estructuras.map((e) => {
+      const saldoTotalPartida = e.poas.reduce((acc, poa) => {
+        const enriquecido = enrichedMap.get(poa.id);
+        return acc + (enriquecido?.saldoDisponible ?? 0);
+      }, 0);
+
+      return {
+        id: e.partida.id,
+        nombre: e.partida.nombre,
+        saldoDisponible: saldoTotalPartida,
+      };
+    });
   }
 
   async getItemsPorPartida(

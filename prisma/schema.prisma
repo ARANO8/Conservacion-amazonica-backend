@@ -43,30 +43,44 @@ enum TipoDocumento {
   RECIBO
 }
 
+enum EstadoRendicion {
+   PENDIENTE
+   APROBADA
+   OBSERVADA
+   RECHAZADA
+}
+
+enum TipoNotificacion {
+   SOLICITUD_ASIGNADA
+   SOLICITUD_DERIVADA
+   SOLICITUD_APROBADA
+   SOLICITUD_OBSERVADA
+   RENDICION_PENDIENTE
+}
 
 // --- MODELOS ---
 
-model Usuario { 
-  id             Int      @id @default(autoincrement())
-  email          String   @unique
+model Usuario {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
   password       String
   nombreCompleto String
-  rol            Rol      @default(USUARIO)
+  rol            Rol       @default(USUARIO)
   cargo          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  solicitudesEmitidas     Solicitud[] @relation("Emisor")
-  solicitudesPorAprobar   Solicitud[] @relation("AprobadorSolicitud")
-  solicitudesBeneficiadas Solicitud[] @relation("Beneficiario")
+  solicitudesEmitidas     Solicitud[]           @relation("Emisor")
+  solicitudesPorAprobar   Solicitud[]           @relation("AprobadorSolicitud")
+  solicitudesBeneficiadas Solicitud[]           @relation("Beneficiario")
   historialAprobaciones   HistorialAprobacion[]
   notificaciones          Notificacion[]
 }
 
 model Proyecto {
-  id     Int    @id @default(autoincrement())
-  nombre String
+  id        Int       @id @default(autoincrement())
+  nombre    String
   deletedAt DateTime?
 
   cuentaBancariaId Int?
@@ -76,16 +90,16 @@ model Proyecto {
 }
 
 model Grupo {
-  id     Int    @id @default(autoincrement())
-  nombre String
+  id        Int       @id @default(autoincrement())
+  nombre    String
   deletedAt DateTime?
 
   estructuras EstructuraProgramatica[]
 }
 
 model Partida {
-  id     Int    @id @default(autoincrement())
-  nombre String
+  id        Int       @id @default(autoincrement())
+  nombre    String
   deletedAt DateTime?
 
   estructuras EstructuraProgramatica[]
@@ -120,13 +134,14 @@ model EstructuraProgramatica {
 }
 
 model Poa {
-  id                   Int       @id @default(autoincrement())
-  codigoPoa            String
-  cantidad             Int
-  costoUnitario        Decimal   @db.Decimal(10, 2)
-  costoTotal           Decimal   @db.Decimal(10, 2)
-  estado               EstadoPoa @default(ACTIVO)
-  deletedAt            DateTime?
+  id            Int       @id @default(autoincrement())
+  codigoPoa     String
+  cantidad      Int
+  costoUnitario Decimal   @db.Decimal(10, 2)
+  costoTotal    Decimal   @db.Decimal(10, 2)
+  montoEjecutado Decimal  @default(0) @db.Decimal(10, 2)
+  estado        EstadoPoa @default(ACTIVO)
+  deletedAt     DateTime?
 
   estructuraId Int
   estructura   EstructuraProgramatica @relation(fields: [estructuraId], references: [id])
@@ -142,20 +157,21 @@ model Poa {
 }
 
 model Solicitud {
-  id                Int             @id @default(autoincrement())
-  codigoSolicitud   String          @unique
-  descripcion       String?
-  fechaSolicitud    DateTime        @default(now())
-  motivoViaje       String?
-  lugarViaje        String?
-  fechaInicio       DateTime?
-  fechaFin          DateTime?
-  codigoDesembolso  String?
-  montoTotalNeto           Decimal         @default(0) @db.Decimal(10, 2)
-  montoTotalPresupuestado  Decimal         @default(0) @db.Decimal(10, 2)
-  estado                   EstadoSolicitud @default(PENDIENTE)
-  observacion              String?
-  deletedAt         DateTime?
+  id                      Int             @id @default(autoincrement())
+  codigoSolicitud         String          @unique
+  descripcion             String?
+  fechaSolicitud          DateTime        @default(now())
+  motivoViaje             String?
+  lugarViaje              String?
+  fechaInicio             DateTime?
+  fechaFin                DateTime?
+  codigoDesembolso        String?
+  urlComprobante          String?
+  montoTotalNeto          Decimal         @default(0) @db.Decimal(10, 2)
+  montoTotalPresupuestado Decimal         @default(0) @db.Decimal(10, 2)
+  estado                  EstadoSolicitud @default(PENDIENTE)
+  observacion             String?
+  deletedAt               DateTime?
 
   usuarioEmisorId Int
   usuarioEmisor   Usuario @relation("Emisor", fields: [usuarioEmisorId], references: [id])
@@ -168,8 +184,8 @@ model Solicitud {
 
   presupuestos SolicitudPresupuesto[]
 
-  planificaciones     Planificacion[]
-  nominasTerceros     NominaTerceros[]
+  planificaciones Planificacion[]
+  nominasTerceros NominaTerceros[]
 
   historialAprobaciones HistorialAprobacion[]
   notificaciones        Notificacion[]
@@ -194,33 +210,100 @@ model HistorialAprobacion {
 }
 
 model Notificacion {
-  id            Int      @id @default(autoincrement())
-  mensaje       String
-  leido         Boolean  @default(false)
-  fechaCreacion DateTime @default(now())
+   id            Int                 @id @default(autoincrement())
+   titulo        String
+   mensaje       String
+   tipo          TipoNotificacion    @default(SOLICITUD_ASIGNADA)
+   leida         Boolean             @default(false)
+   urlDestino    String?
+   createdAt     DateTime            @default(now())
+   updatedAt     DateTime            @updatedAt
 
-  usuarioId Int
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+   usuarioId Int
+   usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
-  solicitudId Int?
-  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
+   solicitudId Int?
+   solicitud   Solicitud? @relation(fields: [solicitudId], references: [id], onDelete: SetNull)
 }
 
 model Rendicion {
-  id              Int      @id @default(autoincrement())
-  fechaRendicion  DateTime @default(now())
-  montoRespaldado Decimal  @db.Decimal(10, 2)
-  saldoADevolver  Decimal  @db.Decimal(10, 2)
+  id              Int             @id @default(autoincrement())
+  fechaRendicion  DateTime        @default(now())
+  /// Suma de todos los GastoRendicion + DeclaracionJurada
+  montoRespaldado Decimal         @default(0) @db.Decimal(10, 2)
+  /// montoDesembolsado - montoRespaldado (positivo = devolver, negativo = falta respaldo)
+  saldoLiquido    Decimal         @default(0) @db.Decimal(10, 2)
+  estado          EstadoRendicion @default(PENDIENTE)
+  urlCuadroComparativo String?
+  urlCotizaciones      String[]
   observaciones   String?
 
   solicitudId Int       @unique
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  informeGastos        InformeGastos?
+  gastosRendicion      GastoRendicion[]
+  declaracionesJuradas DeclaracionJurada[]
+}
+
+model InformeGastos {
+  id          Int       @id @default(autoincrement())
+  rendicionId Int       @unique
+  rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
+  fechaInicio DateTime
+  fechaFin    DateTime
+
+  actividades ActividadInforme[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ActividadInforme {
+  id                   Int           @id @default(autoincrement())
+  informeId            Int
+  informe              InformeGastos @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  fecha                DateTime
+  lugar                String
+  personaInstitucion   String
+  actividadesRealizadas String
+}
+
+model GastoRendicion {
+  id            Int           @id @default(autoincrement())
+  tipoDocumento TipoDocumento
+  nroDocumento  String
+  fecha         DateTime
+  concepto      String        @default("")
+  detalle       String
+  proveedor     String?
+  urlComprobante String       @default("")
+  monto         Decimal       @default(0) @db.Decimal(10, 2)
+  montoBruto    Decimal       @default(0) @db.Decimal(10, 2)
+  montoImpuestos Decimal      @default(0) @db.Decimal(10, 2)
+  montoNeto     Decimal       @default(0) @db.Decimal(10, 2)
+
+  rendicionId Int
+  rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
+
+  partidaId Int?
+  partida   SolicitudPresupuesto? @relation(fields: [partidaId], references: [id], onDelete: SetNull)
+}
+
+model DeclaracionJurada {
+  id      Int      @id @default(autoincrement())
+  fecha   DateTime
+  detalle String
+  monto   Decimal  @db.Decimal(10, 2)
+
+  rendicionId Int
+  rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
 }
 
 model SolicitudPresupuesto {
-  id                    Int           @id @default(autoincrement())
-  subtotalNeto          Decimal       @default(0) @db.Decimal(10, 2)
-  subtotalPresupuestado Decimal       @default(0) @db.Decimal(10, 2)
+  id                    Int     @id @default(autoincrement())
+  subtotalNeto          Decimal @default(0) @db.Decimal(10, 2)
+  subtotalPresupuestado Decimal @default(0) @db.Decimal(10, 2)
 
   solicitudId Int
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
@@ -230,6 +313,7 @@ model SolicitudPresupuesto {
 
   viaticos Viatico[]
   gastos   Gasto[]
+  gastosRendicion GastoRendicion[]
 
   @@unique([solicitudId, poaId])
 }
@@ -241,10 +325,10 @@ model Planificacion {
   cantidadPersonasTerceros      Int      @default(0)
   fechaInicio                   DateTime
   fechaFin                      DateTime
-  diasCalculados                Decimal   @db.Decimal(5, 2)
+  diasCalculados                Decimal  @db.Decimal(5, 2)
 
-  solicitudId                   Int
-  solicitud                     Solicitud @relation(fields: [solicitudId], references: [id])
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
   viaticos    Viatico[]
 }
 
@@ -257,10 +341,10 @@ model Concepto {
 }
 
 model Viatico {
-  id               Int         @id @default(autoincrement())
-  tipoDestino      TipoDestino
-  dias             Decimal     @db.Decimal(5, 2)
-  cantidadPersonas Int         @default(1)
+  id                 Int         @id @default(autoincrement())
+  tipoDestino        TipoDestino
+  dias               Decimal     @db.Decimal(5, 2)
+  cantidadPersonas   Int         @default(1)
   costoUnitario      Decimal     @db.Decimal(10, 2)
   montoPresupuestado Decimal     @db.Decimal(10, 2)
   iva13              Decimal     @db.Decimal(10, 2)
@@ -287,16 +371,16 @@ model TipoGasto {
 }
 
 model Gasto {
-  id             Int           @id @default(autoincrement())
-  tipoDocumento  TipoDocumento
-  cantidad       Int
+  id                 Int           @id @default(autoincrement())
+  tipoDocumento      TipoDocumento
+  cantidad           Int
   costoUnitario      Decimal       @db.Decimal(10, 2)
   montoPresupuestado Decimal       @db.Decimal(10, 2)
   iva13              Decimal       @db.Decimal(10, 2)
   it3                Decimal       @db.Decimal(10, 2)
   iue5               Decimal       @db.Decimal(10, 2)
   montoNeto          Decimal       @db.Decimal(10, 2)
-  detalle        String?
+  detalle            String?
 
   solicitudId Int
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
@@ -325,32 +409,33 @@ model NominaTerceros {
 }
 
 model CuentaBancaria {
-  id           Int        @id @default(autoincrement())
-  numeroCuenta String     @unique
-  banco        String     @default("BISA S.A.")
-  moneda       String     @default("M/N")
+  id           Int    @id @default(autoincrement())
+  numeroCuenta String @unique
+  banco        String @default("BISA S.A.")
+  moneda       String @default("M/N")
 
-  proyectos    Proyecto[]
+  proyectos Proyecto[]
 }
 
 generator erd {
   provider = "prisma-erd-generator"
   output   = "../ERD.md"
 }
+
 model Hospedaje {
-  id               Int       @id @default(autoincrement())
-  region           String    // "Eje troncal", "Ciudades Intermedias", "Bolivia Norte", "Pueblos"
-  destino          String    // Ej: "La Paz", "Sucre", "Rurrenabaque"
+  id               Int    @id @default(autoincrement())
+  region           String // "Eje troncal", "Ciudades Intermedias", "Bolivia Norte", "Pueblos"
+  destino          String // Ej: "La Paz", "Sucre", "Rurrenabaque"
   personas         Int
   noches           Int
-  cantidadUnitaria Float
-  costoTotal       Float     // personas * noches * cantidadUnitaria
-  iva              Float     // 13% del costoTotal
-  it               Float     // 3% del costoTotal
+  cantidadUnitaria Decimal @db.Decimal(10, 2)
+  costoTotal       Decimal @db.Decimal(10, 2) // personas * noches * cantidadUnitaria
+  iva              Decimal @db.Decimal(10, 2) // 13% del costoTotal
+  it               Decimal @db.Decimal(10, 2) // 3% del costoTotal
 
-  solicitudId      Int
-  solicitud        Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
 
-  poaId            Int
-  poa              Poa       @relation(fields: [poaId], references: [id])
+  poaId Int
+  poa   Poa @relation(fields: [poaId], references: [id])
 }

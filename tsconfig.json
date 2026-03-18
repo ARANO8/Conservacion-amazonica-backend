@@ -26,6 +26,7 @@
     "src/**/*",
     "prisma/**/*",
     "test/**/*",
+    "types/**/*",
     "check-poa.js"
   ]
 }

@@ -21,6 +21,11 @@ export interface SolicitudReportData {
   usuarioBeneficiado?: {
     nombreCompleto?: string | null;
   } | null;
+  cuentaBancaria?: {
+    numeroCuenta?: string | null;
+    banco?: string | null;
+    moneda?: string | null;
+  } | null;
   presupuestos?: Array<{
     poa?: {
       codigoPoa?: string | null;
@@ -30,6 +35,11 @@ export interface SolicitudReportData {
       estructura?: {
         proyecto?: {
           nombre?: string | null;
+          cuentaBancaria?: {
+            numeroCuenta?: string | null;
+            banco?: string | null;
+            moneda?: string | null;
+          } | null;
         } | null;
       } | null;
       codigoPresupuestario?: {
@@ -76,74 +86,98 @@ export class ReportsService {
   constructor() {}
 
   async generateSolicitudPdf(solicitud: SolicitudReportData): Promise<Buffer> {
-    // 1. Cargar el módulo
-    /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-    const PdfPrinterLib = require('pdfmake/js/printer');
-    const PdfPrinter = PdfPrinterLib.default || PdfPrinterLib;
+    try {
+      console.log(
+        '[Reports] Iniciando generación de PDF para:',
+        solicitud.codigoSolicitud,
+      );
 
-    const fonts = {
-      Roboto: {
-        normal: 'Helvetica',
-        bold: 'Helvetica-Bold',
-        italics: 'Helvetica-Oblique',
-        bolditalics: 'Helvetica-BoldOblique',
-      },
-    };
+      // 1. Cargar el módulo (nota: case-sensitive en Linux, debe ser 'Printer' con mayúscula)
+      /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+      const PdfPrinterLib = require('pdfmake/js/Printer');
+      const PdfPrinter = PdfPrinterLib.default || PdfPrinterLib;
 
-    const printer = new PdfPrinter(fonts);
-
-    const docDefinition: TDocumentDefinitions = {
-      content: [
-        this.buildHeader(solicitud),
-        this.buildDatosGenerales(solicitud),
-        // Se ha elminado la seccion ITINERARIO
-        this.buildDetalleEconomico(solicitud),
-        this.buildDatosBancarios(),
-        this.buildFirmas(solicitud),
-      ],
-      styles: {
-        orgTitle: { fontSize: 10, italics: true, color: 'gray' },
-        header: { fontSize: 16, bold: true },
-        code: { fontSize: 14, bold: true, color: 'red' },
-        sectionHeader: {
-          fontSize: 12,
-          bold: true,
-          background: '#eeeeee',
-          margin: [0, 10, 0, 10],
+      const fonts = {
+        Roboto: {
+          normal: 'Helvetica',
+          bold: 'Helvetica-Bold',
+          italics: 'Helvetica-Oblique',
+          bolditalics: 'Helvetica-BoldOblique',
         },
-        tableHeader: {
+      };
+
+      const printer = new PdfPrinter(fonts);
+
+      console.log('[Reports] Construyendo docDefinition...');
+      const docDefinition: TDocumentDefinitions = {
+        content: [
+          this.buildHeader(solicitud),
+          this.buildDatosGenerales(solicitud),
+          // Se ha elminado la seccion ITINERARIO
+          this.buildDetalleEconomico(solicitud),
+          this.buildDatosBancarios(solicitud),
+          this.buildFirmas(solicitud),
+        ],
+        styles: {
+          orgTitle: { fontSize: 10, italics: true, color: 'gray' },
+          header: { fontSize: 16, bold: true },
+          code: { fontSize: 14, bold: true, color: 'red' },
+          sectionHeader: {
+            fontSize: 12,
+            bold: true,
+            background: '#eeeeee',
+            margin: [0, 10, 0, 10],
+          },
+          tableHeader: {
+            fontSize: 10,
+            bold: true,
+            fillColor: '#4bae32',
+            color: '#ffffff',
+          },
+        },
+        defaultStyle: {
+          font: 'Roboto',
           fontSize: 10,
-          bold: true,
-          fillColor: '#4bae32',
-          color: '#ffffff',
         },
-      },
-      defaultStyle: {
-        font: 'Roboto',
-        fontSize: 10,
-      },
-    };
+      };
 
-    let doc = printer.createPdfKitDocument(docDefinition);
+      console.log('[Reports] Creando documento PDF...');
+      let doc = printer.createPdfKitDocument(docDefinition);
 
-    if (doc instanceof Promise) {
-      doc = await doc;
-    }
-
-    return new Promise((resolve, reject) => {
-      try {
-        const chunks: Buffer[] = [];
-        doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-        doc.on('end', () => resolve(Buffer.concat(chunks)));
-        doc.on('error', (err: unknown) =>
-          reject(err instanceof Error ? err : new Error(String(err))),
-        );
-        doc.end();
-      } catch (error) {
-        reject(error instanceof Error ? error : new Error(String(error)));
+      if (doc instanceof Promise) {
+        doc = await doc;
       }
-    });
-    /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+
+      console.log('[Reports] Capturando datos del documento...');
+      return new Promise((resolve, reject) => {
+        try {
+          const chunks: Buffer[] = [];
+          doc.on('data', (chunk: Buffer) => {
+            chunks.push(chunk);
+            console.log(`[Reports] Datos recibidos: ${chunk.length} bytes`);
+          });
+          doc.on('end', () => {
+            const buffer = Buffer.concat(chunks);
+            console.log(
+              `[Reports] PDF completado, tamaño total: ${buffer.length} bytes`,
+            );
+            resolve(buffer);
+          });
+          doc.on('error', (err: unknown) => {
+            console.error('[Reports] Error en documento:', err);
+            reject(err instanceof Error ? err : new Error(String(err)));
+          });
+          doc.end();
+        } catch (error) {
+          console.error('[Reports] Error en Promise:', error);
+          reject(error instanceof Error ? error : new Error(String(error)));
+        }
+      });
+      /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
+    } catch (error) {
+      console.error('[Reports] Error generando PDF:', error);
+      throw error;
+    }
   }
 
   private formatUTCDate(date: Date | string | null | undefined): string {
@@ -278,9 +312,9 @@ export class ReportsService {
                 alignment: 'right',
               },
             ]),
-            // Gastos
+            // Comprobantes
             ...(solicitud.gastos || []).map((g) => [
-              `Gasto: ${g.tipoGasto?.nombre || 'N/A'}`,
+              `Comprobante: ${g.tipoGasto?.nombre || 'N/A'}`,
               g.detalle || g.tipoDocumento,
               g.cantidad,
               formatCurrency(g.costoUnitario),
@@ -330,28 +364,52 @@ export class ReportsService {
     ];
   }
 
-  private buildDatosBancarios(): any {
+  private buildDatosBancarios(solicitud: SolicitudReportData): any {
     return [
       {
         table: {
-          widths: ['*'],
+          widths: ['50%', '50%'],
           body: [
             [
               {
-                text: 'DATOS BANCARIOS (Llenar solo si aplica)',
+                text: 'DATOS BANCARIOS',
                 fillColor: '#eeeeee',
                 bold: true,
+                colSpan: 2,
+              },
+              {},
+            ],
+            [
+              {
+                text: 'Banco:',
+                bold: true,
+                margin: [5, 10, 5, 5],
+              },
+              {
+                text: solicitud.cuentaBancaria?.banco || '',
+                margin: [5, 10, 5, 5],
               },
             ],
             [
               {
-                text: [
-                  'Cuenta Bancaria:\n\n',
-                  'Nombre: ______________________   N° Cuenta: ______________________   Banco: ______________________\n\n',
-                  'N° Transferencia: ______________________\n\n',
-                  'Fecha de emisión: ______________________',
-                ],
-                margin: [0, 10, 0, 10],
+                text: 'Número de Cuenta:',
+                bold: true,
+                margin: [5, 10, 5, 5],
+              },
+              {
+                text: solicitud.cuentaBancaria?.numeroCuenta || '',
+                margin: [5, 10, 5, 5],
+              },
+            ],
+            [
+              {
+                text: 'Moneda:',
+                bold: true,
+                margin: [5, 10, 5, 5],
+              },
+              {
+                text: solicitud.cuentaBancaria?.moneda || '',
+                margin: [5, 10, 5, 5],
               },
             ],
           ],

@@ -45,6 +45,25 @@ TERCEROS TERCEROS
 RECIBO RECIBO
         }
     
+
+
+        EstadoRendicion {
+            PENDIENTE PENDIENTE
+APROBADA APROBADA
+OBSERVADA OBSERVADA
+RECHAZADA RECHAZADA
+        }
+    
+
+
+        TipoNotificacion {
+            SOLICITUD_ASIGNADA SOLICITUD_ASIGNADA
+SOLICITUD_DERIVADA SOLICITUD_DERIVADA
+SOLICITUD_APROBADA SOLICITUD_APROBADA
+SOLICITUD_OBSERVADA SOLICITUD_OBSERVADA
+RENDICION_PENDIENTE RENDICION_PENDIENTE
+        }
+    
   "Usuario" {
     Int id "🗝️"
     String email 
@@ -102,6 +121,7 @@ RECIBO RECIBO
     Int cantidad 
     Decimal costoUnitario 
     Decimal costoTotal 
+    Decimal montoEjecutado 
     EstadoPoa estado 
     DateTime deletedAt "❓"
     }
@@ -117,6 +137,7 @@ RECIBO RECIBO
     DateTime fechaInicio "❓"
     DateTime fechaFin "❓"
     String codigoDesembolso "❓"
+    String urlComprobante "❓"
     Decimal montoTotalNeto 
     Decimal montoTotalPresupuestado 
     EstadoSolicitud estado 
@@ -135,9 +156,13 @@ RECIBO RECIBO
 
   "Notificacion" {
     Int id "🗝️"
+    String titulo 
     String mensaje 
-    Boolean leido 
-    DateTime fechaCreacion 
+    TipoNotificacion tipo 
+    Boolean leida 
+    String urlDestino "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
     }
   
 
@@ -145,8 +170,53 @@ RECIBO RECIBO
     Int id "🗝️"
     DateTime fechaRendicion 
     Decimal montoRespaldado 
-    Decimal saldoADevolver 
+    Decimal saldoLiquido 
+    EstadoRendicion estado 
+    String urlCuadroComparativo "❓"
+    String urlCotizaciones 
     String observaciones "❓"
+    }
+  
+
+  "InformeGastos" {
+    Int id "🗝️"
+    DateTime fechaInicio 
+    DateTime fechaFin 
+    DateTime createdAt 
+    DateTime updatedAt 
+    }
+  
+
+  "ActividadInforme" {
+    Int id "🗝️"
+    DateTime fecha 
+    String lugar 
+    String personaInstitucion 
+    String actividadesRealizadas 
+    }
+  
+
+  "GastoRendicion" {
+    Int id "🗝️"
+    TipoDocumento tipoDocumento 
+    String nroDocumento 
+    DateTime fecha 
+    String concepto 
+    String detalle 
+    String proveedor "❓"
+    String urlComprobante 
+    Decimal monto 
+    Decimal montoBruto 
+    Decimal montoImpuestos 
+    Decimal montoNeto 
+    }
+  
+
+  "DeclaracionJurada" {
+    Int id "🗝️"
+    DateTime fecha 
+    String detalle 
+    Decimal monto 
     }
   
 
@@ -238,10 +308,10 @@ RECIBO RECIBO
     String destino 
     Int personas 
     Int noches 
-    Float cantidadUnitaria 
-    Float costoTotal 
-    Float iva 
-    Float it 
+    Decimal cantidadUnitaria 
+    Decimal costoTotal 
+    Decimal iva 
+    Decimal it 
     }
   
     "Usuario" |o--|| "Rol" : "enum:rol"
@@ -260,9 +330,17 @@ RECIBO RECIBO
     "HistorialAprobacion" |o--|| "AccionHistorial" : "enum:accion"
     "HistorialAprobacion" }o--|| "Solicitud" : "solicitud"
     "HistorialAprobacion" }o--|| "Usuario" : "usuarioActor"
+    "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
+    "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
+    "InformeGastos" |o--|| "Rendicion" : "rendicion"
+    "ActividadInforme" }o--|| "InformeGastos" : "informe"
+    "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
+    "GastoRendicion" }o--|| "Rendicion" : "rendicion"
+    "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"
+    "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
     "Planificacion" }o--|| "Solicitud" : "solicitud"

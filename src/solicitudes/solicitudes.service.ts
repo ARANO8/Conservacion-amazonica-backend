@@ -3,14 +3,26 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateSolicitudDto } from './dto/create-solicitud.dto';
+import {
+  CreateSolicitudDto,
+  CreatePlanificacionDto,
+  CreateNominaDto,
+  CreateHospedajeDto,
+} from './dto/create-solicitud.dto';
 import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
 import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
-import { Rol, EstadoSolicitud, Solicitud, Prisma } from '@prisma/client';
+import {
+  Rol,
+  EstadoSolicitud,
+  Solicitud,
+  Prisma,
+  AccionHistorial,
+} from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
 import {
@@ -20,6 +32,30 @@ import {
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
 import { PoaService } from '../poa/poa.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
+
+type DetalleSolicitud = {
+  montoTotalPresupuestado: Prisma.Decimal;
+  montoTotalNeto: Prisma.Decimal;
+  viaticosData: {
+    data: Omit<
+      Prisma.ViaticoUncheckedCreateInput,
+      'solicitudId' | 'solicitudPresupuestoId'
+    >;
+    planificacionIndexes: number[];
+    poaId: number;
+  }[];
+  gastosData: {
+    data: Omit<
+      Prisma.GastoUncheckedCreateInput,
+      'solicitudId' | 'solicitudPresupuestoId'
+    >;
+    poaId: number;
+  }[];
+  planificaciones: CreatePlanificacionDto[];
+  nominasTerceros: CreateNominaDto[];
+  hospedajes: CreateHospedajeDto[];
+};
 
 type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
@@ -27,16 +63,19 @@ type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
 
 @Injectable()
 export class SolicitudesService {
+  private readonly logger = new Logger(SolicitudesService.name);
+
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => SolicitudPresupuestoService))
     private presupuestoService: SolicitudPresupuestoService,
     private poaService: PoaService,
+    private notificacionesService: NotificacionesService,
   ) {}
 
-  private async generarCodigo(): Promise<string> {
+  private async generarCodigo(tx: Prisma.TransactionClient): Promise<string> {
     const anioActual = new Date().getFullYear();
-    const count = await this.prisma.solicitud.count({
+    const count = await tx.solicitud.count({
       where: {
         fechaSolicitud: {
           gte: new Date(`${anioActual}-01-01`),
@@ -51,28 +90,7 @@ export class SolicitudesService {
 
   private async prepararInsertAnidado(
     dto: CreateSolicitudDto | UpdateSolicitudDto,
-  ): Promise<{
-    montoTotalPresupuestado: Prisma.Decimal;
-    montoTotalNeto: Prisma.Decimal;
-    viaticosData: {
-      data: Omit<
-        Prisma.ViaticoUncheckedCreateInput,
-        'solicitudId' | 'solicitudPresupuestoId'
-      >;
-      planificacionIndexes: number[];
-      poaId: number;
-    }[];
-    gastosData: {
-      data: Omit<
-        Prisma.GastoUncheckedCreateInput,
-        'solicitudId' | 'solicitudPresupuestoId'
-      >;
-      poaId: number;
-    }[];
-    planificaciones: import('./dto/create-solicitud.dto').CreatePlanificacionDto[];
-    nominasTerceros: import('./dto/create-solicitud.dto').CreateNominaDto[];
-    hospedajes: import('./dto/create-solicitud.dto').CreateHospedajeDto[];
-  }> {
+  ): Promise<DetalleSolicitud> {
     const {
       planificaciones = [],
       viaticos = [],
@@ -128,20 +146,25 @@ export class SolicitudesService {
         }
       }
 
-      // Validamos contra la primera planificación del array (por simplicidad en el helper)
-      validarLimitesViatico(
-        vDto,
-        planificaciones[vDto.planificacionIndexes[0]],
-      );
+      // Validamos la capacidad contra cada planificación referenciada por el viático
+      for (const idx of vDto.planificacionIndexes) {
+        validarLimitesViatico(vDto, planificaciones[idx]);
+      }
 
       const precioCatalogo =
         vDto.tipoDestino === 'INSTITUCIONAL'
           ? concepto.precioInstitucional
           : concepto.precioTerceros;
 
-      const montoNetoUnitario = vDto.montoNeto
-        ? new Prisma.Decimal(vDto.montoNeto)
-        : precioCatalogo;
+      // montoNeto (si se provee) es el VALOR TOTAL (días * personas * unitario).
+      // Derivamos el precio unitario para los cálculos de impuestos y almacenamiento.
+      const divisorUnidad = vDto.dias * vDto.cantidadPersonas;
+      const costoUnitario: Prisma.Decimal =
+        vDto.montoNeto != null
+          ? divisorUnidad > 0
+            ? new Prisma.Decimal(vDto.montoNeto).div(divisorUnidad)
+            : new Prisma.Decimal(vDto.montoNeto)
+          : precioCatalogo;
 
       const {
         subtotalNeto,
@@ -149,18 +172,17 @@ export class SolicitudesService {
         it,
         montoPresupuestado: calcMontoPresupuestado,
       } = calcularMontosViaticos(
-        montoNetoUnitario,
+        costoUnitario,
         vDto.dias,
         vDto.cantidadPersonas,
         vDto.tipoDestino,
       );
 
-      // Trust DTO if provided (assuming DTO sends the TOTAL for viáticos if it specifies it)
-      // Actually, looking at vDto.montoNeto, it says 'Monto neto a recibir'.
-      // If vDto.montoPresupuestado is present, we trust it as the TOTAL for that viatico entry.
-      const finalMontoNeto = vDto.montoNeto
-        ? new Prisma.Decimal(vDto.montoNeto)
-        : subtotalNeto;
+      // montoNeto provisto es el TOTAL; si no se provee, usamos el subtotal calculado
+      const finalMontoNeto =
+        vDto.montoNeto != null
+          ? new Prisma.Decimal(vDto.montoNeto)
+          : subtotalNeto;
       const finalMontoPresupuestado = vDto.montoPresupuestado
         ? new Prisma.Decimal(vDto.montoPresupuestado)
         : calcMontoPresupuestado;
@@ -178,7 +200,7 @@ export class SolicitudesService {
           tipoDestino: vDto.tipoDestino,
           dias: vDto.dias,
           cantidadPersonas: vDto.cantidadPersonas,
-          costoUnitario: montoNetoUnitario,
+          costoUnitario: costoUnitario,
           montoPresupuestado: finalMontoPresupuestado,
           iva13: iva,
           it3: it,
@@ -259,12 +281,123 @@ export class SolicitudesService {
     };
   }
 
+  private async insertarRelacionesSolicitud(
+    solicitudId: number,
+    detalles: DetalleSolicitud,
+    presupuestosMap: Map<number, number>,
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
+    // C. Crear Planificaciones y mapear IDs
+    const createdPlanificaciones: { id: number }[] = [];
+    for (const p of detalles.planificaciones) {
+      const d1 = new Date(p.fechaInicio);
+      const d2 = new Date(p.fechaFin);
+      const diferenciaMilisegundos = d2.getTime() - d1.getTime();
+      const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
+      const diasFinales =
+        p.dias !== undefined && p.dias !== null
+          ? Number(p.dias)
+          : Number(diasExactos.toFixed(2));
+
+      this.logger.log(
+        `[insertarRelaciones] Creando Planificacion: actividad="${p.actividad}", fechaInicio=${p.fechaInicio}, fechaFin=${p.fechaFin}, diasFinales=${diasFinales}`,
+      );
+      const cp = await tx.planificacion.create({
+        data: {
+          actividadProgramada: p.actividad,
+          fechaInicio: d1,
+          fechaFin: d2,
+          diasCalculados: diasFinales,
+          cantidadPersonasInstitucional: p.cantInstitucional,
+          cantidadPersonasTerceros: p.cantTerceros,
+          solicitudId,
+        },
+      });
+      createdPlanificaciones.push({ id: cp.id });
+      this.logger.log(
+        `[insertarRelaciones] Planificacion creada OK (id=${cp.id})`,
+      );
+    }
+
+    // D. Crear Viáticos
+    for (let idx = 0; idx < detalles.viaticosData.length; idx++) {
+      const vItem = detalles.viaticosData[idx];
+      const spId = presupuestosMap.get(vItem.poaId);
+      this.logger.log(
+        `[insertarRelaciones] Creando Viatico ${idx}: poaId=${vItem.poaId}, spId=${spId}, planificacionIndexes=${JSON.stringify(vItem.planificacionIndexes)}, data=${JSON.stringify(vItem.data)}`,
+      );
+      await tx.viatico.create({
+        data: {
+          ...vItem.data,
+          solicitudId,
+          solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
+          planificaciones: {
+            connect: vItem.planificacionIndexes.map((i) => ({
+              id: createdPlanificaciones[i].id,
+            })),
+          },
+        },
+      });
+      this.logger.log(`[insertarRelaciones] Viatico ${idx} creado OK`);
+    }
+
+    // E. Crear Hospedajes
+    for (let idx = 0; idx < detalles.hospedajes.length; idx++) {
+      const h = detalles.hospedajes[idx];
+      this.logger.log(
+        `[insertarRelaciones] Creando Hospedaje ${idx}: ${JSON.stringify(h)}`,
+      );
+      await tx.hospedaje.create({
+        data: {
+          ...h,
+          solicitudId,
+        },
+      });
+      this.logger.log(`[insertarRelaciones] Hospedaje ${idx} creado OK`);
+    }
+
+    // E. Crear Gastos
+    for (let idx = 0; idx < detalles.gastosData.length; idx++) {
+      const gRecord = detalles.gastosData[idx];
+      const spId = presupuestosMap.get(gRecord.poaId);
+      this.logger.log(
+        `[insertarRelaciones] Creando Gasto ${idx}: poaId=${gRecord.poaId}, spId=${spId}, data=${JSON.stringify(gRecord.data)}`,
+      );
+      await tx.gasto.create({
+        data: {
+          ...gRecord.data,
+          solicitudId,
+          solicitudPresupuestoId: presupuestosMap.get(gRecord.poaId)!,
+        },
+      });
+      this.logger.log(`[insertarRelaciones] Gasto ${idx} creado OK`);
+    }
+
+    // F. Crear PersonaExterna (viene de nominasTerceros)
+    for (const n of detalles.nominasTerceros) {
+      this.logger.log(
+        `[insertarRelaciones] Creando PersonaExterna: ${n.nombreCompleto}`,
+      );
+      await tx.personaExterna.create({
+        data: {
+          nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
+          procedenciaInstitucion: n.procedenciaInstitucion.trim().toUpperCase(),
+          solicitudId,
+        },
+      });
+    }
+  }
+
   async create(
     createSolicitudDto: CreateSolicitudDto,
     usuarioId: number,
   ): Promise<Solicitud> {
     const { poaIds, descripcion, aprobadorId, lugarViaje, motivoViaje } =
       createSolicitudDto;
+
+    this.logger.log(
+      `[create] INICIO — usuarioId=${usuarioId}, aprobadorId=${aprobadorId}, poaIds=${JSON.stringify(poaIds)}`,
+    );
 
     // VALIDACIÓN: Evitar Auto-Aprobación
     if (aprobadorId === usuarioId) {
@@ -273,7 +406,26 @@ export class SolicitudesService {
       );
     }
 
+    // VALIDACIÓN: El aprobador no debe ser un usuario eliminado (soft-delete guard)
+    const aprobador = await this.prisma.usuario.findFirst({
+      where: { id: aprobadorId, deletedAt: null },
+    });
+    if (!aprobador) {
+      throw new NotFoundException(
+        `El aprobador con ID ${aprobadorId} no existe o ha sido eliminado del sistema`,
+      );
+    }
+
+    this.logger.log(`[create] Aprobador validado OK (id=${aprobadorId})`);
+
     const detalles = await this.prepararInsertAnidado(createSolicitudDto);
+
+    this.logger.log(
+      `[create] prepararInsertAnidado OK — viaticosData=${detalles.viaticosData.length}, gastosData=${detalles.gastosData.length}, hospedajes=${detalles.hospedajes.length}, planificaciones=${detalles.planificaciones.length}`,
+    );
+    this.logger.log(
+      `[create] montoTotalPresupuestado=${detalles.montoTotalPresupuestado.toString()}, montoTotalNeto=${detalles.montoTotalNeto.toString()}`,
+    );
 
     // --- CÁLCULO DE FECHAS (Strict Separation) ---
     let minDate: Date | null = null;
@@ -304,10 +456,88 @@ export class SolicitudesService {
       );
     }
 
-    const codigoSolicitud = await this.generarCodigo();
+    // VALIDACIÓN: Todos los poaIds referenciados en viáticos, gastos y hospedajes
+    // deben estar incluidos en el array poaIds enviado en la solicitud.
+    const poaIdSet = new Set(poaIds);
+    for (const v of detalles.viaticosData) {
+      if (!poaIdSet.has(v.poaId)) {
+        throw new BadRequestException(
+          `El viático referencia la partida POA ${v.poaId} que no está incluida en poaIds`,
+        );
+      }
+    }
+    for (const g of detalles.gastosData) {
+      if (!poaIdSet.has(g.poaId)) {
+        throw new BadRequestException(
+          `El gasto referencia la partida POA ${g.poaId} que no está incluida en poaIds`,
+        );
+      }
+    }
+    for (const h of detalles.hospedajes) {
+      if (!poaIdSet.has(h.poaId)) {
+        throw new BadRequestException(
+          `El hospedaje referencia la partida POA ${h.poaId} que no está incluida en poaIds`,
+        );
+      }
+    }
+
+    // Calcular monto solicitado por POA (viáticos + gastos + hospedajes)
+    const montosByPoa = new Map<number, Prisma.Decimal>();
+    for (const v of detalles.viaticosData) {
+      const prev = montosByPoa.get(v.poaId) ?? new Prisma.Decimal(0);
+      montosByPoa.set(
+        v.poaId,
+        prev.add(v.data.montoPresupuestado as Prisma.Decimal),
+      );
+    }
+    for (const g of detalles.gastosData) {
+      const prev = montosByPoa.get(g.poaId) ?? new Prisma.Decimal(0);
+      montosByPoa.set(
+        g.poaId,
+        prev.add(g.data.montoPresupuestado as Prisma.Decimal),
+      );
+    }
+    for (const h of detalles.hospedajes) {
+      const prev = montosByPoa.get(h.poaId) ?? new Prisma.Decimal(0);
+      const hospPresupuestado = new Prisma.Decimal(h.costoTotal)
+        .add(new Prisma.Decimal(h.iva))
+        .add(new Prisma.Decimal(h.it));
+      montosByPoa.set(h.poaId, prev.add(hospPresupuestado));
+    }
 
     const result = await this.prisma.$transaction(async (tx) => {
+      // 0. Generar código atómicamente dentro de la transacción (evita race condition P2002)
+      const codigoSolicitud = await this.generarCodigo(tx);
+      this.logger.log(`[create TX] Código generado: ${codigoSolicitud}`);
+
+      // 0'. Validar saldo disponible por POA antes de comprometer fondos
+      for (const [poaId, montoSolicitado] of montosByPoa) {
+        const poa = await tx.poa.findUnique({
+          where: { id: poaId },
+          select: { costoTotal: true },
+        });
+        if (!poa) {
+          throw new NotFoundException(`POA con ID ${poaId} no encontrado`);
+        }
+        const comprometidoRaw = await tx.solicitudPresupuesto.aggregate({
+          where: { poaId, solicitud: { deletedAt: null } },
+          _sum: { subtotalPresupuestado: true },
+        });
+        const comprometido =
+          comprometidoRaw._sum.subtotalPresupuestado ?? new Prisma.Decimal(0);
+        const saldoDisponible = poa.costoTotal.sub(comprometido);
+        this.logger.log(
+          `[create TX] POA ${poaId}: costoTotal=${poa.costoTotal.toString()}, comprometido=${comprometido.toString()}, saldo=${saldoDisponible.toString()}, solicitado=${montoSolicitado.toString()}`,
+        );
+        if (montoSolicitado.gt(saldoDisponible)) {
+          throw new BadRequestException(
+            'Saldo insuficiente en el POA especificado',
+          );
+        }
+      }
+
       // A. Crear Solicitud
+      this.logger.log(`[create TX] Creando solicitud...`);
       const solicitud = await tx.solicitud.create({
         data: {
           codigoSolicitud,
@@ -324,95 +554,37 @@ export class SolicitudesService {
           usuarioBeneficiado: { connect: { id: usuarioId } },
         },
       });
+      this.logger.log(`[create TX] Solicitud creada OK (id=${solicitud.id})`);
 
       // B. Crear SolicitudPresupuesto (transaccional, save-at-end)
       const presupuestosMap = new Map<number, number>(); // poaId → SolicitudPresupuesto.id
       for (const poaId of poaIds) {
+        this.logger.log(
+          `[create TX] Creando SolicitudPresupuesto para poaId=${poaId}...`,
+        );
         const sp = await tx.solicitudPresupuesto.create({
           data: { poaId, solicitudId: solicitud.id },
         });
         presupuestosMap.set(poaId, sp.id);
+        this.logger.log(
+          `[create TX] SolicitudPresupuesto creado OK (id=${sp.id}, poaId=${poaId})`,
+        );
       }
 
-      // C. Crear Planificaciones y mapear IDs
-      const createdPlanificaciones: { id: number }[] = [];
-      for (const p of detalles.planificaciones) {
-        const d1 = new Date(p.fechaInicio);
-        const d2 = new Date(p.fechaFin);
-        // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
-        const diferenciaMilisegundos = d2.getTime() - d1.getTime();
-        const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
-        const diasFinales =
-          p.dias !== undefined && p.dias !== null
-            ? Number(p.dias)
-            : Number(diasExactos.toFixed(2));
-
-        const cp = await tx.planificacion.create({
-          data: {
-            actividadProgramada: p.actividad,
-            fechaInicio: d1,
-            fechaFin: d2,
-            diasCalculados: diasFinales,
-            cantidadPersonasInstitucional: p.cantInstitucional,
-            cantidadPersonasTerceros: p.cantTerceros,
-            solicitudId: solicitud.id,
-          },
-        });
-        createdPlanificaciones.push({ id: cp.id });
-      }
-
-      // D. Crear Viáticos
-      for (const vItem of detalles.viaticosData) {
-        await tx.viatico.create({
-          data: {
-            ...vItem.data,
-            solicitudId: solicitud.id,
-            solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
-            planificaciones: {
-              connect: vItem.planificacionIndexes.map((idx) => ({
-                id: createdPlanificaciones[idx].id,
-              })),
-            },
-          },
-        });
-      }
-
-      // E. Crear Hospedajes
-      for (const h of detalles.hospedajes) {
-        await tx.hospedaje.create({
-          data: {
-            ...h,
-            solicitudId: solicitud.id,
-          },
-        });
-      }
-
-      // E. Crear Gastos
-      for (const gRecord of detalles.gastosData) {
-        await tx.gasto.create({
-          data: {
-            ...gRecord.data,
-            solicitudId: solicitud.id,
-            solicitudPresupuestoId: presupuestosMap.get(gRecord.poaId)!,
-          },
-        });
-      }
-
-      // F. Crear PersonaExterna (Viene de nominasTerceros)
-      for (const n of detalles.nominasTerceros) {
-        await tx.personaExterna.create({
-          data: {
-            nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
-            procedenciaInstitucion: n.procedenciaInstitucion
-              .trim()
-              .toUpperCase(),
-            solicitudId: solicitud.id,
-          },
-        });
-      }
+      // C–F. Insertar relaciones anidadas (planificaciones, viáticos, hospedajes, gastos, nóminas)
+      this.logger.log(`[create TX] Insertando relaciones anidadas...`);
+      await this.insertarRelacionesSolicitud(
+        solicitud.id,
+        detalles,
+        presupuestosMap,
+        tx,
+      );
+      this.logger.log(`[create TX] Relaciones anidadas OK`);
 
       // SYNC: Recalcular subtotales de los presupuestos involucrados
+      this.logger.log(`[create TX] Recalculando totales...`);
       await this.presupuestoService.recalcularTotales(solicitud.id, tx);
+      this.logger.log(`[create TX] Recálculo OK`);
 
       return tx.solicitud.findUnique({
         where: { id: solicitud.id },
@@ -422,6 +594,23 @@ export class SolicitudesService {
 
     if (!result) {
       throw new BadRequestException('Fallo al crear la solicitud');
+    }
+
+    // Crear notificación para el aprobador asignado (fire-and-forget seguro)
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Nueva solicitud asignada',
+        mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
+        tipo: 'SOLICITUD_ASIGNADA',
+        usuarioId: aprobadorId,
+        solicitudId: result.id,
+        urlDestino: `/app/aprobaciones/${result.id}`,
+      });
+    } catch (error) {
+      console.error(
+        `[SolicitudesService] Error al crear notificación para solicitud ${result.id}:`,
+        error,
+      );
     }
 
     return result;
@@ -449,17 +638,11 @@ export class SolicitudesService {
   }
 
   async findOne(id: number) {
+    // Una sola consulta con todos los includes necesarios y filtro deletedAt: null
+    // Evita la doble consulta anterior y garantiza que las solicitudes borradas
+    // (soft-delete) nunca sean expuestas.
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
-      include: SOLICITUD_INCLUDE,
-    });
-
-    if (!solicitud) {
-      throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
-    }
-
-    const solicitudCompleta = await this.prisma.solicitud.findUnique({
-      where: { id },
       include: {
         usuarioEmisor: true,
         aprobador: true,
@@ -475,6 +658,8 @@ export class SolicitudesService {
                 estructura: {
                   include: {
                     proyecto: { include: { cuentaBancaria: true } },
+                    grupo: true,
+                    partida: true,
                   },
                 },
                 codigoPresupuestario: true,
@@ -498,11 +683,11 @@ export class SolicitudesService {
       },
     });
 
-    if (!solicitudCompleta) {
-      throw new NotFoundException(`Error al recuperar solicitud ${id}`);
+    if (!solicitud) {
+      throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
-    return solicitudCompleta;
+    return solicitud;
   }
 
   private async enriquecerConSaldos(
@@ -563,6 +748,16 @@ export class SolicitudesService {
     if (aprobadorId === usuarioId) {
       throw new BadRequestException(
         'No puedes asignarte a ti mismo como aprobador',
+      );
+    }
+
+    // VALIDACIÓN: El aprobador no debe ser un usuario eliminado (soft-delete guard)
+    const aprobadorUpdate = await this.prisma.usuario.findFirst({
+      where: { id: aprobadorId, deletedAt: null },
+    });
+    if (!aprobadorUpdate) {
+      throw new NotFoundException(
+        `El aprobador con ID ${aprobadorId} no existe o ha sido eliminado del sistema`,
       );
     }
 
@@ -627,78 +822,13 @@ export class SolicitudesService {
           presupuestosMap.set(poaId, sp.id);
         }
 
-        // C. Re-inserción masiva (exactamente igual que el create)
-        const createdPlanif: { id: number }[] = [];
-        for (const p of detalles.planificaciones) {
-          const d1 = new Date(p.fechaInicio);
-          const d2 = new Date(p.fechaFin);
-          // Prioridad al usuario: usar días explícitos si vienen, o calcular como fallback
-          const diferenciaMilisegundos = d2.getTime() - d1.getTime();
-          const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
-          const diasFinales =
-            p.dias !== undefined && p.dias !== null
-              ? Number(p.dias)
-              : Number(diasExactos.toFixed(2));
-
-          const cp = await tx.planificacion.create({
-            data: {
-              actividadProgramada: p.actividad,
-              fechaInicio: d1,
-              fechaFin: d2,
-              diasCalculados: diasFinales,
-              cantidadPersonasInstitucional: p.cantInstitucional,
-              cantidadPersonasTerceros: p.cantTerceros,
-              solicitudId: id,
-            },
-          });
-          createdPlanif.push({ id: cp.id });
-        }
-
-        for (const v of detalles.viaticosData) {
-          await tx.viatico.create({
-            data: {
-              ...v.data,
-              solicitudId: id,
-              solicitudPresupuestoId: presupuestosMap.get(v.poaId)!,
-              planificaciones: {
-                connect: v.planificacionIndexes.map((idx) => ({
-                  id: createdPlanif[idx].id,
-                })),
-              },
-            },
-          });
-        }
-
-        for (const g of detalles.gastosData) {
-          await tx.gasto.create({
-            data: {
-              ...g.data,
-              solicitudId: id,
-              solicitudPresupuestoId: presupuestosMap.get(g.poaId)!,
-            },
-          });
-        }
-
-        for (const h of detalles.hospedajes) {
-          await tx.hospedaje.create({
-            data: {
-              ...h,
-              solicitudId: id,
-            },
-          });
-        }
-
-        for (const n of detalles.nominasTerceros) {
-          await tx.personaExterna.create({
-            data: {
-              nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
-              procedenciaInstitucion: n.procedenciaInstitucion
-                .trim()
-                .toUpperCase(),
-              solicitudId: id,
-            },
-          });
-        }
+        // C–F. Re-inserción de relaciones anidadas
+        await this.insertarRelacionesSolicitud(
+          id,
+          detalles,
+          presupuestosMap,
+          tx,
+        );
       }
 
       // SYNC: Recalcular subtotales de los presupuestos involucrados
@@ -730,6 +860,12 @@ export class SolicitudesService {
     if (solicitud.usuarioEmisorId !== usuarioId) {
       throw new ForbiddenException(
         'Solo el creador puede eliminar esta solicitud',
+      );
+    }
+
+    if (solicitud.estado === EstadoSolicitud.DESEMBOLSADO) {
+      throw new BadRequestException(
+        'No se puede eliminar una solicitud que ya ha sido desembolsada',
       );
     }
 
@@ -775,22 +911,55 @@ export class SolicitudesService {
 
     const { nuevoAprobadorId } = aprobarDto;
 
-    // Verificar que el nuevo aprobador existe
-    const nuevoAprobador = await this.prisma.usuario.findUnique({
-      where: { id: nuevoAprobadorId },
+    // Verificar que el nuevo aprobador existe y no está eliminado (soft-delete guard)
+    const nuevoAprobador = await this.prisma.usuario.findFirst({
+      where: { id: nuevoAprobadorId, deletedAt: null },
     });
 
     if (!nuevoAprobador) {
       throw new NotFoundException(
-        `El nuevo aprobador con ID ${nuevoAprobadorId} no existe`,
+        `El nuevo aprobador con ID ${nuevoAprobadorId} no existe o ha sido eliminado del sistema`,
       );
     }
 
-    return this.prisma.solicitud.update({
-      where: { id },
-      data: { aprobadorId: nuevoAprobadorId },
-      include: SOLICITUD_INCLUDE,
-    });
+    return this.prisma
+      .$transaction(async (tx) => {
+        const solicitudActualizada = await tx.solicitud.update({
+          where: { id },
+          data: { aprobadorId: nuevoAprobadorId },
+          include: SOLICITUD_INCLUDE,
+        });
+
+        // Registrar en historial (dentro de la misma transacción)
+        await tx.historialAprobacion.create({
+          data: {
+            accion: AccionHistorial.DERIVADO,
+            solicitudId: id,
+            usuarioActorId: usuarioId,
+          },
+        });
+
+        return solicitudActualizada;
+      })
+      .then(async (solicitudActualizada) => {
+        try {
+          // Crear notificación para el nuevo aprobador
+          await this.notificacionesService.crearNotificacion({
+            titulo: 'Solicitud derivada',
+            mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
+            tipo: 'SOLICITUD_DERIVADA',
+            usuarioId: nuevoAprobadorId,
+            solicitudId: solicitudActualizada.id,
+            urlDestino: `/app/aprobaciones/${solicitudActualizada.id}`,
+          });
+        } catch (error) {
+          console.error(
+            `[SolicitudesService] Error al crear notificación (derivar) para solicitud ${solicitudActualizada.id}:`,
+            error,
+          );
+        }
+        return solicitudActualizada;
+      });
   }
 
   async observar(
@@ -812,15 +981,49 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma.solicitud.update({
-      where: { id },
-      data: {
-        estado: EstadoSolicitud.OBSERVADO,
-        observacion: observarDto.observacion,
-        aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
-      },
-      include: SOLICITUD_INCLUDE,
-    });
+    return this.prisma
+      .$transaction(async (tx) => {
+        const solicitudActualizada = await tx.solicitud.update({
+          where: { id },
+          data: {
+            estado: EstadoSolicitud.OBSERVADO,
+            observacion: observarDto.observacion,
+            aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
+          },
+          include: SOLICITUD_INCLUDE,
+        });
+
+        // Registrar en historial (dentro de la misma transacción)
+        await tx.historialAprobacion.create({
+          data: {
+            accion: AccionHistorial.RECHAZADO,
+            comentario: observarDto.observacion,
+            solicitudId: id,
+            usuarioActorId: usuarioId,
+          },
+        });
+
+        return solicitudActualizada;
+      })
+      .then(async (solicitudActualizada) => {
+        try {
+          // Crear notificación para el usuario emisor
+          await this.notificacionesService.crearNotificacion({
+            titulo: 'Solicitud observada',
+            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} requiere correcciones. Observación: ${observarDto.observacion}`,
+            tipo: 'SOLICITUD_OBSERVADA',
+            usuarioId: solicitud.usuarioEmisorId,
+            solicitudId: solicitudActualizada.id,
+            urlDestino: `/app/solicitudes/${id}/editar`,
+          });
+        } catch (error) {
+          console.error(
+            `[SolicitudesService] Error al crear notificación (observar) para solicitud ${solicitudActualizada.id}:`,
+            error,
+          );
+        }
+        return solicitudActualizada;
+      });
   }
 
   async desembolsar(
@@ -842,14 +1045,49 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma.solicitud.update({
-      where: { id },
-      data: {
-        estado: EstadoSolicitud.DESEMBOLSADO,
-        codigoDesembolso: desembolsarDto.codigoDesembolso,
-        aprobadorId: null, // Finalizado
-      },
-      include: SOLICITUD_INCLUDE,
-    });
+    return this.prisma
+      .$transaction(async (tx) => {
+        const solicitudActualizada = await tx.solicitud.update({
+          where: { id },
+          data: {
+            estado: EstadoSolicitud.DESEMBOLSADO,
+            codigoDesembolso: desembolsarDto.codigoDesembolso,
+            urlComprobante: desembolsarDto.urlComprobante ?? null,
+            aprobadorId: null, // Finalizado
+          },
+          include: SOLICITUD_INCLUDE,
+        });
+
+        // Registrar en historial (dentro de la misma transacción)
+        await tx.historialAprobacion.create({
+          data: {
+            accion: AccionHistorial.APROBADO,
+            comentario: desembolsarDto.codigoDesembolso,
+            solicitudId: id,
+            usuarioActorId: usuario.id,
+          },
+        });
+
+        return solicitudActualizada;
+      })
+      .then(async (solicitudActualizada) => {
+        try {
+          // Crear notificación para el usuario emisor
+          await this.notificacionesService.crearNotificacion({
+            titulo: 'Solicitud desembolsada',
+            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada. Código: ${desembolsarDto.codigoDesembolso}. Procede a registrar tu rendición.`,
+            tipo: 'SOLICITUD_APROBADA',
+            usuarioId: solicitudActualizada.usuarioEmisorId,
+            solicitudId: solicitudActualizada.id,
+            urlDestino: `/app/rendiciones/nueva?solicitudId=${id}`,
+          });
+        } catch (error) {
+          console.error(
+            `[SolicitudesService] Error al crear notificación (desembolsar) para solicitud ${solicitudActualizada.id}:`,
+            error,
+          );
+        }
+        return solicitudActualizada;
+      });
   }
 }
