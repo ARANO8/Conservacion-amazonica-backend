@@ -96,7 +96,6 @@ export class RendicionesService {
               select: {
                 id: true,
                 poaId: true,
-                subtotalPresupuestado: true,
               },
             })
           : [];
@@ -105,17 +104,6 @@ export class RendicionesService {
         throw new BadRequestException(
           'Se detectaron partidas que no pertenecen a la solicitud rendida',
         );
-      }
-
-      for (const partida of partidas) {
-        const montoEjecutarPartida =
-          montosPorPartida.get(partida.id) ?? new Prisma.Decimal(0);
-
-        if (montoEjecutarPartida.gt(partida.subtotalPresupuestado)) {
-          throw new BadRequestException(
-            `El monto ejecutado en la partida ${partida.id} excede el presupuesto comprometido`,
-          );
-        }
       }
 
       const montosPorPoa = this.agruparMontosPorPoa(partidas, montosPorPartida);
@@ -250,7 +238,6 @@ export class RendicionesService {
     partidas: {
       id: number;
       poaId: number;
-      subtotalPresupuestado: Prisma.Decimal;
     }[],
     montosPorPartida: Map<number, Prisma.Decimal>,
   ): Map<number, Prisma.Decimal> {
