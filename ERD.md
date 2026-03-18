@@ -171,7 +171,27 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     Decimal montoRespaldado 
     Decimal saldoLiquido 
     EstadoRendicion estado 
+    String urlCuadroComparativo "❓"
+    String urlCotizaciones 
     String observaciones "❓"
+    }
+  
+
+  "InformeGastos" {
+    Int id "🗝️"
+    DateTime fechaInicio 
+    DateTime fechaFin 
+    DateTime createdAt 
+    DateTime updatedAt 
+    }
+  
+
+  "ActividadInforme" {
+    Int id "🗝️"
+    DateTime fecha 
+    String lugar 
+    String personaInstitucion 
+    String actividadesRealizadas 
     }
   
 
@@ -308,6 +328,8 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
+    "InformeGastos" |o--|| "Rendicion" : "rendicion"
+    "ActividadInforme" }o--|| "InformeGastos" : "informe"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoRendicion" }o--|| "Rendicion" : "rendicion"
     "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
