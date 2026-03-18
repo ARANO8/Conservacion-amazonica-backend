@@ -139,6 +139,7 @@ model Poa {
   cantidad      Int
   costoUnitario Decimal   @db.Decimal(10, 2)
   costoTotal    Decimal   @db.Decimal(10, 2)
+  montoEjecutado Decimal  @default(0) @db.Decimal(10, 2)
   estado        EstadoPoa @default(ACTIVO)
   deletedAt     DateTime?
 

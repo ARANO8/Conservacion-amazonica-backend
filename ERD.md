@@ -121,6 +121,7 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     Int cantidad 
     Decimal costoUnitario 
     Decimal costoTotal 
+    Decimal montoEjecutado 
     EstadoPoa estado 
     DateTime deletedAt "❓"
     }

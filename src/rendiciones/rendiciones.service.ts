@@ -92,7 +92,7 @@ export class RendicionesService {
         data: {
           solicitudId: dto.solicitudId,
           fechaRendicion: dto.fechaRendicion,
-          estado: EstadoRendicion.PENDIENTE,
+          estado: EstadoRendicion.APROBADA,
           urlCuadroComparativo: dto.urlCuadroComparativo,
           urlCotizaciones: dto.urlCotizaciones ?? [],
           observaciones:
@@ -149,6 +149,30 @@ export class RendicionesService {
           },
         },
       });
+
+      for (const gasto of dto.gastos ?? []) {
+        const partida = await tx.solicitudPresupuesto.findUnique({
+          where: { id: gasto.partidaId },
+          select: { id: true, solicitudId: true, poaId: true },
+        });
+
+        if (!partida || partida.solicitudId !== dto.solicitudId) {
+          throw new BadRequestException(
+            `La partida ${gasto.partidaId} no pertenece a la solicitud rendida`,
+          );
+        }
+
+        const montoBruto = new Prisma.Decimal(gasto.montoBruto);
+
+        await tx.poa.update({
+          where: { id: partida.poaId },
+          data: {
+            montoEjecutado: {
+              increment: montoBruto,
+            },
+          },
+        });
+      }
 
       await tx.solicitud.update({
         where: { id: dto.solicitudId },
