@@ -36,10 +36,8 @@ async function bootstrap() {
 
   // Swagger Configuration
   const config = new DocumentBuilder()
-    .setTitle('SIFIN API - Conservación Amazónica')
-    .setDescription(
-      'API para el Sistema Financiero Integrado (POA, Solicitudes, Rendiciones)',
-    )
+    .setTitle('AMZdesk API - Conservación Amazónica')
+    .setDescription('API para AMZdesk (POA, Solicitudes, Rendiciones)')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
