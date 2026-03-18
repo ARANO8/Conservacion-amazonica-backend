@@ -1,4 +1,13 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -24,6 +33,20 @@ interface RequestWithUser extends Request {
 @Controller('rendiciones')
 export class RendicionesController {
   constructor(private readonly rendicionesService: RendicionesService) {}
+
+  @Get('solicitud/:solicitudId')
+  @ApiOperation({ summary: 'Obtener la rendición por ID de solicitud' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rendición encontrada',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No se encontró rendición para la solicitud indicada',
+  })
+  findBySolicitudId(@Param('solicitudId', ParseIntPipe) solicitudId: number) {
+    return this.rendicionesService.findBySolicitudId(solicitudId);
+  }
 
   @Post()
   @ApiOperation({ summary: 'Crear una rendición con detalle completo' })

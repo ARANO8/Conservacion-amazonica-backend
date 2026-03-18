@@ -16,6 +16,30 @@ import { CreateRendicionDto } from './dto/create-rendicion.dto';
 export class RendicionesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findBySolicitudId(solicitudId: number) {
+    const rendicion = await this.prisma.rendicion.findUnique({
+      where: { solicitudId },
+      include: {
+        solicitud: true,
+        gastosRendicion: true,
+        declaracionesJuradas: true,
+        informeGastos: {
+          include: {
+            actividades: true,
+          },
+        },
+      },
+    });
+
+    if (!rendicion) {
+      throw new NotFoundException(
+        'No se encontró una rendición para la solicitud indicada',
+      );
+    }
+
+    return rendicion;
+  }
+
   async create(dto: CreateRendicionDto, usuarioId: number) {
     void usuarioId;
 
