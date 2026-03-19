@@ -647,14 +647,29 @@ export class SolicitudesService {
     return result;
   }
 
-  async findAll(usuario: {
-    id: number;
-    rol: Rol;
-  }): Promise<SolicitudConRelaciones[]> {
+  async findAll(
+    usuario: {
+      id: number;
+      rol: Rol;
+    },
+    partidaId?: number,
+  ): Promise<SolicitudConRelaciones[]> {
     const where: Prisma.SolicitudWhereInput = { deletedAt: null };
 
     if (usuario.rol === Rol.USUARIO) {
       where.OR = [{ usuarioEmisorId: usuario.id }, { aprobadorId: usuario.id }];
+    }
+
+    if (partidaId !== undefined) {
+      where.presupuestos = {
+        some: {
+          poa: {
+            estructura: {
+              partidaId,
+            },
+          },
+        },
+      };
     }
 
     const solicitudes = await this.prisma.solicitud.findMany({

@@ -12,6 +12,8 @@ import {
   Res,
   StreamableFile,
   Logger,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,6 +21,7 @@ import {
   ApiBearerAuth,
   ApiProduces,
   ApiOkResponse,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { SolicitudesService } from './solicitudes.service';
 import { CreateSolicitudDto } from './dto/create-solicitud.dto';
@@ -71,11 +74,27 @@ export class SolicitudesController {
 
   @Get()
   @ApiOperation({ summary: 'Listar solicitudes (Filtrado por rol)' })
-  findAll(@Req() req: RequestWithUser) {
-    return this.solicitudesService.findAll({
-      id: req.user.userId,
-      rol: req.user.rol,
-    });
+  @ApiQuery({
+    name: 'partidaId',
+    required: false,
+    type: Number,
+    description: 'Filtrar solicitudes por partida presupuestaria',
+  })
+  findAll(@Req() req: RequestWithUser, @Query('partidaId') partidaId?: string) {
+    const partidaIdNumber =
+      partidaId && partidaId.trim() !== '' ? Number(partidaId) : undefined;
+
+    if (partidaId !== undefined && Number.isNaN(partidaIdNumber)) {
+      throw new BadRequestException('El parámetro partidaId debe ser numérico');
+    }
+
+    return this.solicitudesService.findAll(
+      {
+        id: req.user.userId,
+        rol: req.user.rol,
+      },
+      partidaIdNumber,
+    );
   }
 
   @Get(':id')
