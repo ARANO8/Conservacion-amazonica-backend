@@ -266,6 +266,27 @@ export class CreateSolicitudDto {
   @IsOptional()
   descripcion?: string;
 
+  @ApiProperty({
+    example: 'https://drive.google.com/file/d/cuadro/view',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  urlCuadroComparativo?: string;
+
+  @ApiProperty({
+    type: [String],
+    example: [
+      'https://drive.google.com/file/d/cotizacion-1/view',
+      'https://drive.google.com/file/d/cotizacion-2/view',
+    ],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  urlCotizaciones?: string[];
+
   @ApiProperty({ type: [CreatePlanificacionDto], required: false })
   @IsArray()
   @IsOptional()

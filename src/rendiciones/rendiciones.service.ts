@@ -118,8 +118,6 @@ export class RendicionesService {
           solicitudId: dto.solicitudId,
           fechaRendicion: dto.fechaRendicion,
           estado: EstadoRendicion.APROBADA,
-          urlCuadroComparativo: dto.urlCuadroComparativo,
-          urlCotizaciones: dto.urlCotizaciones ?? [],
           observaciones:
             dto.observaciones ?? dto.declaracionJurada?.observaciones,
           montoRespaldado: totalRespaldado,

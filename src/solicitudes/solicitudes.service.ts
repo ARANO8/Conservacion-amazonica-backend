@@ -415,8 +415,15 @@ export class SolicitudesService {
     createSolicitudDto: CreateSolicitudDto,
     usuarioId: number,
   ): Promise<Solicitud> {
-    const { poaIds, descripcion, aprobadorId, lugarViaje, motivoViaje } =
-      createSolicitudDto;
+    const {
+      poaIds,
+      descripcion,
+      aprobadorId,
+      lugarViaje,
+      motivoViaje,
+      urlCuadroComparativo,
+      urlCotizaciones,
+    } = createSolicitudDto;
 
     this.logger.log(
       `[create] INICIO — usuarioId=${usuarioId}, aprobadorId=${aprobadorId}, poaIds=${JSON.stringify(poaIds)}`,
@@ -577,6 +584,8 @@ export class SolicitudesService {
           montoTotalNeto: detalles.montoTotalNeto,
           lugarViaje,
           motivoViaje,
+          urlCuadroComparativo,
+          urlCotizaciones: urlCotizaciones ?? [],
           fechaInicio: minDate,
           fechaFin: maxDate,
           estado: EstadoSolicitud.PENDIENTE,

@@ -138,6 +138,8 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     DateTime fechaFin "❓"
     String codigoDesembolso "❓"
     String urlComprobante "❓"
+    String urlCuadroComparativo "❓"
+    String urlCotizaciones 
     Decimal montoTotalNeto 
     Decimal montoTotalPresupuestado 
     EstadoSolicitud estado 
@@ -172,8 +174,6 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     Decimal montoRespaldado 
     Decimal saldoLiquido 
     EstadoRendicion estado 
-    String urlCuadroComparativo "❓"
-    String urlCotizaciones 
     String observaciones "❓"
     }
   

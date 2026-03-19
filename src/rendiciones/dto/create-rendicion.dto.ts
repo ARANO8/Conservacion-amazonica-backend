@@ -268,25 +268,6 @@ export class CreateRendicionDto {
   @IsDate()
   fechaRendicion: Date;
 
-  @ApiPropertyOptional({
-    example: 'https://drive.google.com/file/d/cuadro/view',
-  })
-  @IsOptional()
-  @IsUrl()
-  urlCuadroComparativo?: string;
-
-  @ApiPropertyOptional({
-    type: [String],
-    example: [
-      'https://drive.google.com/file/d/cotizacion-1/view',
-      'https://drive.google.com/file/d/cotizacion-2/view',
-    ],
-  })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  urlCotizaciones?: string[];
-
   @ApiProperty({ type: [CreateGastoRendicionDto] })
   @IsArray()
   @ValidateNested({ each: true })
