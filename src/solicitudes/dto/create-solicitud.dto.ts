@@ -167,6 +167,15 @@ export class CreateHospedajeDto {
   @IsNotEmpty()
   destino: string;
 
+  @ApiProperty({
+    enum: TipoDocumento,
+    example: TipoDocumento.RECIBO,
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(TipoDocumento)
+  tipoDocumento?: TipoDocumento;
+
   @ApiProperty({ example: 1, minimum: 1 })
   @IsInt()
   @Min(1)
@@ -256,6 +265,27 @@ export class CreateSolicitudDto {
   @IsString()
   @IsOptional()
   descripcion?: string;
+
+  @ApiProperty({
+    example: 'https://drive.google.com/file/d/cuadro/view',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  urlCuadroComparativo?: string;
+
+  @ApiProperty({
+    type: [String],
+    example: [
+      'https://drive.google.com/file/d/cotizacion-1/view',
+      'https://drive.google.com/file/d/cotizacion-2/view',
+    ],
+    required: false,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  urlCotizaciones?: string[];
 
   @ApiProperty({ type: [CreatePlanificacionDto], required: false })
   @IsArray()

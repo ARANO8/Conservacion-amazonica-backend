@@ -167,6 +167,8 @@ model Solicitud {
   fechaFin                DateTime?
   codigoDesembolso        String?
   urlComprobante          String?
+  urlCuadroComparativo    String?
+  urlCotizaciones         String[]        @default([])
   montoTotalNeto          Decimal         @default(0) @db.Decimal(10, 2)
   montoTotalPresupuestado Decimal         @default(0) @db.Decimal(10, 2)
   estado                  EstadoSolicitud @default(PENDIENTE)
@@ -234,8 +236,6 @@ model Rendicion {
   /// montoDesembolsado - montoRespaldado (positivo = devolver, negativo = falta respaldo)
   saldoLiquido    Decimal         @default(0) @db.Decimal(10, 2)
   estado          EstadoRendicion @default(PENDIENTE)
-  urlCuadroComparativo String?
-  urlCotizaciones      String[]
   observaciones   String?
 
   solicitudId Int       @unique
@@ -426,6 +426,7 @@ model Hospedaje {
   id               Int    @id @default(autoincrement())
   region           String // "Eje troncal", "Ciudades Intermedias", "Bolivia Norte", "Pueblos"
   destino          String // Ej: "La Paz", "Sucre", "Rurrenabaque"
+  tipoDocumento    TipoDocumento @default(RECIBO)
   personas         Int
   noches           Int
   cantidadUnitaria Decimal @db.Decimal(10, 2)

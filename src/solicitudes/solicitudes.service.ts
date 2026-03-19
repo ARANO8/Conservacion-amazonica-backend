@@ -27,6 +27,7 @@ import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicit
 import { Inject, forwardRef } from '@nestjs/common';
 import {
   calcularMontosGastos,
+  calcularMontosHospedaje,
   calcularMontosViaticos,
   validarLimitesViatico,
 } from './solicitudes.helper';
@@ -60,6 +61,13 @@ type DetalleSolicitud = {
 type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
 }>;
+
+const ESTADOS_COMPROMISO_ACTIVO: EstadoSolicitud[] = [
+  // En este dominio no existe EstadoSolicitud.APROBADO explícito.
+  // PENDIENTE representa solicitudes activas previas al desembolso.
+  EstadoSolicitud.PENDIENTE,
+  EstadoSolicitud.DESEMBOLSADO,
+];
 
 @Injectable()
 export class SolicitudesService {
@@ -210,9 +218,24 @@ export class SolicitudesService {
     }
 
     // --- Procesar Hospedajes ---
+    const hospedajesData: CreateHospedajeDto[] = [];
     for (const hDto of hospedajes) {
-      montoTotalPresupuestado = montoTotalPresupuestado.add(hDto.costoTotal);
-      montoTotalNeto = montoTotalNeto.add(hDto.costoTotal);
+      const tipoDocumento = hDto.tipoDocumento ?? 'RECIBO';
+      const costoTotal = new Prisma.Decimal(hDto.costoTotal);
+      const { iva, it, montoPresupuestado } = calcularMontosHospedaje(
+        costoTotal,
+        tipoDocumento,
+      );
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
+      montoTotalNeto = montoTotalNeto.add(costoTotal);
+
+      hospedajesData.push({
+        ...hDto,
+        tipoDocumento,
+        iva: Number(iva.toString()),
+        it: Number(it.toString()),
+      });
     }
 
     // --- Procesar Gastos ---
@@ -277,7 +300,7 @@ export class SolicitudesService {
       gastosData,
       planificaciones,
       nominasTerceros,
-      hospedajes,
+      hospedajes: hospedajesData,
     };
   }
 
@@ -392,8 +415,15 @@ export class SolicitudesService {
     createSolicitudDto: CreateSolicitudDto,
     usuarioId: number,
   ): Promise<Solicitud> {
-    const { poaIds, descripcion, aprobadorId, lugarViaje, motivoViaje } =
-      createSolicitudDto;
+    const {
+      poaIds,
+      descripcion,
+      aprobadorId,
+      lugarViaje,
+      motivoViaje,
+      urlCuadroComparativo,
+      urlCotizaciones,
+    } = createSolicitudDto;
 
     this.logger.log(
       `[create] INICIO — usuarioId=${usuarioId}, aprobadorId=${aprobadorId}, poaIds=${JSON.stringify(poaIds)}`,
@@ -514,18 +544,26 @@ export class SolicitudesService {
       for (const [poaId, montoSolicitado] of montosByPoa) {
         const poa = await tx.poa.findUnique({
           where: { id: poaId },
-          select: { costoTotal: true },
+          select: { costoTotal: true, montoEjecutado: true },
         });
         if (!poa) {
           throw new NotFoundException(`POA con ID ${poaId} no encontrado`);
         }
         const comprometidoRaw = await tx.solicitudPresupuesto.aggregate({
-          where: { poaId, solicitud: { deletedAt: null } },
+          where: {
+            poaId,
+            solicitud: {
+              deletedAt: null,
+              estado: { in: ESTADOS_COMPROMISO_ACTIVO },
+            },
+          },
           _sum: { subtotalPresupuestado: true },
         });
         const comprometido =
           comprometidoRaw._sum.subtotalPresupuestado ?? new Prisma.Decimal(0);
-        const saldoDisponible = poa.costoTotal.sub(comprometido);
+        const saldoDisponible = poa.costoTotal
+          .sub(poa.montoEjecutado)
+          .sub(comprometido);
         this.logger.log(
           `[create TX] POA ${poaId}: costoTotal=${poa.costoTotal.toString()}, comprometido=${comprometido.toString()}, saldo=${saldoDisponible.toString()}, solicitado=${montoSolicitado.toString()}`,
         );
@@ -546,6 +584,8 @@ export class SolicitudesService {
           montoTotalNeto: detalles.montoTotalNeto,
           lugarViaje,
           motivoViaje,
+          urlCuadroComparativo,
+          urlCotizaciones: urlCotizaciones ?? [],
           fechaInicio: minDate,
           fechaFin: maxDate,
           estado: EstadoSolicitud.PENDIENTE,
@@ -616,14 +656,29 @@ export class SolicitudesService {
     return result;
   }
 
-  async findAll(usuario: {
-    id: number;
-    rol: Rol;
-  }): Promise<SolicitudConRelaciones[]> {
+  async findAll(
+    usuario: {
+      id: number;
+      rol: Rol;
+    },
+    partidaId?: number,
+  ): Promise<SolicitudConRelaciones[]> {
     const where: Prisma.SolicitudWhereInput = { deletedAt: null };
 
     if (usuario.rol === Rol.USUARIO) {
       where.OR = [{ usuarioEmisorId: usuario.id }, { aprobadorId: usuario.id }];
+    }
+
+    if (partidaId !== undefined) {
+      where.presupuestos = {
+        some: {
+          poa: {
+            estructura: {
+              partidaId,
+            },
+          },
+        },
+      };
     }
 
     const solicitudes = await this.prisma.solicitud.findMany({
@@ -734,6 +789,7 @@ export class SolicitudesService {
       planificaciones,
       viaticos,
       gastos,
+      hospedajes,
       nominasTerceros,
     } = updateSolicitudDto;
 
@@ -766,6 +822,7 @@ export class SolicitudesService {
       (planificaciones && planificaciones.length > 0) ||
       (viaticos && viaticos.length > 0) ||
       (gastos && gastos.length > 0) ||
+      (hospedajes && hospedajes.length > 0) ||
       (nominasTerceros && nominasTerceros.length > 0);
 
     return this.prisma.$transaction(async (tx) => {

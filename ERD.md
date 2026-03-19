@@ -138,6 +138,8 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     DateTime fechaFin "❓"
     String codigoDesembolso "❓"
     String urlComprobante "❓"
+    String urlCuadroComparativo "❓"
+    String urlCotizaciones 
     Decimal montoTotalNeto 
     Decimal montoTotalPresupuestado 
     EstadoSolicitud estado 
@@ -172,8 +174,6 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     Decimal montoRespaldado 
     Decimal saldoLiquido 
     EstadoRendicion estado 
-    String urlCuadroComparativo "❓"
-    String urlCotizaciones 
     String observaciones "❓"
     }
   
@@ -306,6 +306,7 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     Int id "🗝️"
     String region 
     String destino 
+    TipoDocumento tipoDocumento 
     Int personas 
     Int noches 
     Decimal cantidadUnitaria 
@@ -355,6 +356,7 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     "Gasto" }o--|| "TipoGasto" : "tipoGasto"
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
     "NominaTerceros" }o--|| "Solicitud" : "solicitud"
+    "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" }o--|| "Poa" : "poa"
 ```
