@@ -6,7 +6,7 @@ async function recalibrarMontoEjecutado(prisma: PrismaClient): Promise<void> {
       where: {
         partidaId: { not: null },
         rendicion: {
-          estado: EstadoRendicion.APROBADA,
+          estado: EstadoRendicion.APROBADO,
           solicitud: {
             deletedAt: null,
           },

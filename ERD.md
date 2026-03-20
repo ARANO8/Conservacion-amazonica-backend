@@ -25,10 +25,12 @@ BLOQUEADO BLOQUEADO
     
 
 
-        AccionHistorial {
-            APROBADO APROBADO
-RECHAZADO RECHAZADO
+        TipoAccionHistorial {
+            CREADO CREADO
+APROBADO APROBADO
+OBSERVADO OBSERVADO
 DERIVADO DERIVADO
+RECHAZADO RECHAZADO
         }
     
 
@@ -49,6 +51,9 @@ RECIBO RECIBO
 
         EstadoRendicion {
             PENDIENTE PENDIENTE
+APROBADO APROBADO
+OBSERVADO OBSERVADO
+RECHAZADO RECHAZADO
 APROBADA APROBADA
 OBSERVADA OBSERVADA
 RECHAZADA RECHAZADA
@@ -150,9 +155,9 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
 
   "HistorialAprobacion" {
     Int id "🗝️"
-    AccionHistorial accion 
+    TipoAccionHistorial accion 
     String comentario "❓"
-    DateTime fechaAccion 
+    DateTime fecha 
     }
   
 
@@ -328,14 +333,17 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
     "Solicitud" }o--|| "Usuario" : "usuarioEmisor"
     "Solicitud" }o--|o "Usuario" : "aprobador"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
-    "HistorialAprobacion" |o--|| "AccionHistorial" : "enum:accion"
-    "HistorialAprobacion" }o--|| "Solicitud" : "solicitud"
-    "HistorialAprobacion" }o--|| "Usuario" : "usuarioActor"
+    "HistorialAprobacion" |o--|| "TipoAccionHistorial" : "enum:accion"
+    "HistorialAprobacion" }o--|| "Usuario" : "usuario"
+    "HistorialAprobacion" }o--|o "Usuario" : "derivadoA"
+    "HistorialAprobacion" }o--|o "Solicitud" : "solicitud"
+    "HistorialAprobacion" }o--|o "Rendicion" : "rendicion"
     "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
+    "Rendicion" }o--|o "Usuario" : "aprobadorActual"
     "InformeGastos" |o--|| "Rendicion" : "rendicion"
     "ActividadInforme" }o--|| "InformeGastos" : "informe"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"

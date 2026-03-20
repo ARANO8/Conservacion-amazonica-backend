@@ -21,7 +21,7 @@ import {
   EstadoSolicitud,
   Solicitud,
   Prisma,
-  AccionHistorial,
+  TipoAccionHistorial,
 } from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
@@ -703,8 +703,8 @@ export class SolicitudesService {
         aprobador: true,
         usuarioBeneficiado: true,
         historialAprobaciones: {
-          include: { usuarioActor: true },
-          orderBy: { fechaAccion: 'desc' },
+          include: { usuario: true, derivadoA: true },
+          orderBy: { fecha: 'desc' },
         },
         presupuestos: {
           include: {
@@ -990,9 +990,10 @@ export class SolicitudesService {
         // Registrar en historial (dentro de la misma transacción)
         await tx.historialAprobacion.create({
           data: {
-            accion: AccionHistorial.DERIVADO,
+            accion: TipoAccionHistorial.DERIVADO,
             solicitudId: id,
-            usuarioActorId: usuarioId,
+            usuarioId,
+            derivadoAId: nuevoAprobadorId,
           },
         });
 
@@ -1053,10 +1054,11 @@ export class SolicitudesService {
         // Registrar en historial (dentro de la misma transacción)
         await tx.historialAprobacion.create({
           data: {
-            accion: AccionHistorial.RECHAZADO,
+            accion: TipoAccionHistorial.OBSERVADO,
             comentario: observarDto.observacion,
             solicitudId: id,
-            usuarioActorId: usuarioId,
+            usuarioId,
+            derivadoAId: solicitud.usuarioEmisorId,
           },
         });
 
@@ -1118,10 +1120,10 @@ export class SolicitudesService {
         // Registrar en historial (dentro de la misma transacción)
         await tx.historialAprobacion.create({
           data: {
-            accion: AccionHistorial.APROBADO,
+            accion: TipoAccionHistorial.APROBADO,
             comentario: desembolsarDto.codigoDesembolso,
             solicitudId: id,
-            usuarioActorId: usuario.id,
+            usuarioId: usuario.id,
           },
         });
 

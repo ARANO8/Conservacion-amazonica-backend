@@ -27,10 +27,12 @@ enum EstadoPoa {
   BLOQUEADO
 }
 
-enum AccionHistorial {
+enum TipoAccionHistorial {
+  CREADO
   APROBADO
-  RECHAZADO
+  OBSERVADO
   DERIVADO
+  RECHAZADO
 }
 
 enum TipoDestino {
@@ -45,6 +47,9 @@ enum TipoDocumento {
 
 enum EstadoRendicion {
    PENDIENTE
+   APROBADO
+   OBSERVADO
+   RECHAZADO
    APROBADA
    OBSERVADA
    RECHAZADA
@@ -74,7 +79,9 @@ model Usuario {
   solicitudesEmitidas     Solicitud[]           @relation("Emisor")
   solicitudesPorAprobar   Solicitud[]           @relation("AprobadorSolicitud")
   solicitudesBeneficiadas Solicitud[]           @relation("Beneficiario")
-  historialAprobaciones   HistorialAprobacion[]
+  historialesCreados      HistorialAprobacion[] @relation("ActorHistorial")
+  historialesRecibidos    HistorialAprobacion[] @relation("DestinatarioHistorial")
+  rendicionesPorAprobar   Rendicion[]           @relation("RendicionAprobador")
   notificaciones          Notificacion[]
 }
 
@@ -189,7 +196,7 @@ model Solicitud {
   planificaciones Planificacion[]
   nominasTerceros NominaTerceros[]
 
-  historialAprobaciones HistorialAprobacion[]
+  historialAprobaciones HistorialAprobacion[] @relation("SolicitudHistorial")
   notificaciones        Notificacion[]
   rendicion             Rendicion?
   viaticos              Viatico[]
@@ -199,16 +206,22 @@ model Solicitud {
 }
 
 model HistorialAprobacion {
-  id          Int             @id @default(autoincrement())
-  accion      AccionHistorial
-  comentario  String?
-  fechaAccion DateTime        @default(now())
+  id         Int                  @id @default(autoincrement())
+  accion     TipoAccionHistorial
+  comentario String?
+  fecha      DateTime             @default(now())
 
-  solicitudId Int
-  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+  usuarioId Int
+  usuario   Usuario @relation("ActorHistorial", fields: [usuarioId], references: [id])
 
-  usuarioActorId Int
-  usuarioActor   Usuario @relation(fields: [usuarioActorId], references: [id])
+  derivadoAId Int?
+  derivadoA   Usuario? @relation("DestinatarioHistorial", fields: [derivadoAId], references: [id])
+
+  solicitudId Int?
+  solicitud   Solicitud? @relation("SolicitudHistorial", fields: [solicitudId], references: [id])
+
+  rendicionId Int?
+  rendicion   Rendicion? @relation("RendicionHistorial", fields: [rendicionId], references: [id])
 }
 
 model Notificacion {
@@ -236,14 +249,18 @@ model Rendicion {
   /// montoDesembolsado - montoRespaldado (positivo = devolver, negativo = falta respaldo)
   saldoLiquido    Decimal         @default(0) @db.Decimal(10, 2)
   estado          EstadoRendicion @default(PENDIENTE)
+  aprobadorActualId Int?
   observaciones   String?
 
   solicitudId Int       @unique
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
 
+  aprobadorActual Usuario? @relation("RendicionAprobador", fields: [aprobadorActualId], references: [id])
+
   informeGastos        InformeGastos?
   gastosRendicion      GastoRendicion[]
   declaracionesJuradas DeclaracionJurada[]
+  historialAprobaciones HistorialAprobacion[] @relation("RendicionHistorial")
 }
 
 model InformeGastos {

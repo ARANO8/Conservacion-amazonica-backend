@@ -117,7 +117,7 @@ export class RendicionesService {
         data: {
           solicitudId: dto.solicitudId,
           fechaRendicion: dto.fechaRendicion,
-          estado: EstadoRendicion.APROBADA,
+          estado: EstadoRendicion.APROBADO,
           observaciones:
             dto.observaciones ?? dto.declaracionJurada?.observaciones,
           montoRespaldado: totalRespaldado,
