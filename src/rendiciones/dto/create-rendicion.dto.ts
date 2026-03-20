@@ -268,6 +268,15 @@ export class CreateRendicionDto {
   @IsDate()
   fechaRendicion: Date;
 
+  @ApiProperty({
+    example: 2,
+    description: 'Usuario responsable de la revisión inicial de la rendición',
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  aprobadorActualId: number;
+
   @ApiProperty({ type: [CreateGastoRendicionDto] })
   @IsArray()
   @ValidateNested({ each: true })

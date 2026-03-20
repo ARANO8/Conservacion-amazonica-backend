@@ -188,7 +188,7 @@ export class DashboardService {
         where: {
           partidaId: { not: null },
           rendicion: {
-            estado: EstadoRendicion.APROBADA,
+            estado: EstadoRendicion.APROBADO,
             solicitud: {
               deletedAt: null,
               estado: { in: ESTADOS_ANALITICA_SOLICITUD },

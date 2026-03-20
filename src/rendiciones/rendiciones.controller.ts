@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -15,15 +17,18 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { Rol } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateRendicionDto } from './dto/create-rendicion.dto';
+import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
+import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 import { RendicionesService } from './rendiciones.service';
 
 interface RequestWithUser extends Request {
   user?: {
     userId: number;
     email: string;
-    rol: string;
+    rol: Rol;
   };
 }
 
@@ -33,6 +38,36 @@ interface RequestWithUser extends Request {
 @Controller('rendiciones')
 export class RendicionesController {
   constructor(private readonly rendicionesService: RendicionesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar rendiciones (filtrado por rol de usuario)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Listado de rendiciones obtenido correctamente',
+  })
+  findAll(
+    @Req() req: RequestWithUser,
+    @Query('solicitudId') solicitudId?: string,
+  ) {
+    const solicitudIdNumber =
+      solicitudId && solicitudId.trim() !== ''
+        ? Number(solicitudId)
+        : undefined;
+
+    if (solicitudId !== undefined && Number.isNaN(solicitudIdNumber)) {
+      throw new BadRequestException(
+        'El parámetro solicitudId debe ser numérico',
+      );
+    }
+
+    return this.rendicionesService.findAll(
+      {
+        id: req.user!.userId,
+        rol: req.user!.rol,
+      },
+      solicitudIdNumber,
+    );
+  }
 
   @Get('solicitud/:solicitudId')
   @ApiOperation({ summary: 'Obtener la rendición por ID de solicitud' })
@@ -48,6 +83,20 @@ export class RendicionesController {
     return this.rendicionesService.findBySolicitudId(solicitudId);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener una rendición por ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rendición encontrada',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No se encontró la rendición indicada',
+  })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.rendicionesService.findOne(id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Crear una rendición con detalle completo' })
   @ApiResponse({
@@ -59,5 +108,43 @@ export class RendicionesController {
     @Req() req: RequestWithUser,
   ) {
     return this.rendicionesService.create(createRendicionDto, req.user!.userId);
+  }
+
+  @Post(':id/aprobar')
+  @ApiOperation({ summary: 'Aprobar o derivar una rendición' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rendición aprobada o derivada correctamente',
+  })
+  aprobar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() aprobarRendicionDto: AprobarRendicionDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.rendicionesService.aprobar(
+      id,
+      aprobarRendicionDto,
+      req.user!.userId,
+      req.user!.rol,
+    );
+  }
+
+  @Post(':id/observar')
+  @ApiOperation({ summary: 'Observar una rendición y devolver al creador' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rendición observada correctamente',
+  })
+  observar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() observarRendicionDto: ObservarRendicionDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.rendicionesService.observar(
+      id,
+      observarRendicionDto,
+      req.user!.userId,
+      req.user!.rol,
+    );
   }
 }
