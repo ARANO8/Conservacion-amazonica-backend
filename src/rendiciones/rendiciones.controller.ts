@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
   Param,
   ParseIntPipe,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -36,6 +38,36 @@ interface RequestWithUser extends Request {
 @Controller('rendiciones')
 export class RendicionesController {
   constructor(private readonly rendicionesService: RendicionesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Listar rendiciones (filtrado por rol de usuario)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Listado de rendiciones obtenido correctamente',
+  })
+  findAll(
+    @Req() req: RequestWithUser,
+    @Query('solicitudId') solicitudId?: string,
+  ) {
+    const solicitudIdNumber =
+      solicitudId && solicitudId.trim() !== ''
+        ? Number(solicitudId)
+        : undefined;
+
+    if (solicitudId !== undefined && Number.isNaN(solicitudIdNumber)) {
+      throw new BadRequestException(
+        'El parámetro solicitudId debe ser numérico',
+      );
+    }
+
+    return this.rendicionesService.findAll(
+      {
+        id: req.user!.userId,
+        rol: req.user!.rol,
+      },
+      solicitudIdNumber,
+    );
+  }
 
   @Get('solicitud/:solicitudId')
   @ApiOperation({ summary: 'Obtener la rendición por ID de solicitud' })

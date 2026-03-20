@@ -79,6 +79,31 @@ const RENDICION_INCLUDE = {
 export class RendicionesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findAll(usuario: { id: number; rol: Rol }, solicitudId?: number) {
+    const where: Prisma.RendicionWhereInput = {};
+
+    if (usuario.rol === Rol.USUARIO) {
+      where.solicitud = {
+        usuarioEmisorId: usuario.id,
+        deletedAt: null,
+      };
+    } else {
+      where.solicitud = {
+        deletedAt: null,
+      };
+    }
+
+    if (solicitudId !== undefined) {
+      where.solicitudId = solicitudId;
+    }
+
+    return this.prisma.rendicion.findMany({
+      where,
+      include: RENDICION_INCLUDE,
+      orderBy: { fechaRendicion: 'desc' },
+    });
+  }
+
   async findOne(id: number) {
     const rendicion = await this.prisma.rendicion.findUnique({
       where: { id },
