@@ -17,39 +17,85 @@ import { CreateRendicionDto } from './dto/create-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 
-@Injectable()
-export class RendicionesService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  async findBySolicitudId(solicitudId: number) {
-    const rendicion = await this.prisma.rendicion.findUnique({
-      where: { solicitudId },
-      include: {
-        solicitud: true,
-        gastosRendicion: {
-          include: {
-            partida: {
-              include: {
-                poa: {
-                  include: {
-                    estructura: {
-                      include: {
-                        partida: true,
-                      },
-                    },
-                  },
+const RENDICION_INCLUDE = {
+  solicitud: true,
+  aprobadorActual: {
+    select: {
+      id: true,
+      nombreCompleto: true,
+      rol: true,
+      cargo: true,
+    },
+  },
+  gastosRendicion: {
+    include: {
+      partida: {
+        include: {
+          poa: {
+            include: {
+              estructura: {
+                include: {
+                  partida: true,
                 },
               },
             },
           },
         },
-        declaracionesJuradas: true,
-        informeGastos: {
-          include: {
-            actividades: true,
-          },
+      },
+    },
+  },
+  declaracionesJuradas: true,
+  informeGastos: {
+    include: {
+      actividades: true,
+    },
+  },
+  historialAprobaciones: {
+    include: {
+      usuario: {
+        select: {
+          id: true,
+          nombreCompleto: true,
+          rol: true,
+          cargo: true,
         },
       },
+      derivadoA: {
+        select: {
+          id: true,
+          nombreCompleto: true,
+          rol: true,
+          cargo: true,
+        },
+      },
+    },
+    orderBy: {
+      fecha: 'asc',
+    },
+  },
+} satisfies Prisma.RendicionInclude;
+
+@Injectable()
+export class RendicionesService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findOne(id: number) {
+    const rendicion = await this.prisma.rendicion.findUnique({
+      where: { id },
+      include: RENDICION_INCLUDE,
+    });
+
+    if (!rendicion) {
+      throw new NotFoundException('Rendición no encontrada');
+    }
+
+    return rendicion;
+  }
+
+  async findBySolicitudId(solicitudId: number) {
+    const rendicion = await this.prisma.rendicion.findUnique({
+      where: { solicitudId },
+      include: RENDICION_INCLUDE,
     });
 
     if (!rendicion) {

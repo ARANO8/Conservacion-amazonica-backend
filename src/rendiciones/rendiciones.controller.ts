@@ -51,6 +51,20 @@ export class RendicionesController {
     return this.rendicionesService.findBySolicitudId(solicitudId);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Obtener una rendición por ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'Rendición encontrada',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No se encontró la rendición indicada',
+  })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.rendicionesService.findOne(id);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Crear una rendición con detalle completo' })
   @ApiResponse({
