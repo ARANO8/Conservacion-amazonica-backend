@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -7,10 +8,14 @@ import {
   EstadoRendicion,
   EstadoSolicitud,
   Prisma,
+  Rol,
   TipoDocumento,
+  TipoAccionHistorial,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRendicionDto } from './dto/create-rendicion.dto';
+import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
+import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 
 @Injectable()
 export class RendicionesService {
@@ -57,8 +62,6 @@ export class RendicionesService {
   }
 
   async create(dto: CreateRendicionDto, usuarioId: number) {
-    void usuarioId;
-
     return this.prisma.$transaction(async (tx) => {
       const solicitud = await tx.solicitud.findUnique({
         where: { id: dto.solicitudId },
@@ -106,18 +109,36 @@ export class RendicionesService {
         );
       }
 
-      const montosPorPoa = this.agruparMontosPorPoa(partidas, montosPorPartida);
-
       const totalRespaldado = this.calcularTotalRespaldado(dto);
       const saldoLiquido = new Prisma.Decimal(solicitud.montoTotalNeto).minus(
         totalRespaldado,
       );
 
+      if (dto.aprobadorActualId === usuarioId) {
+        throw new BadRequestException(
+          'No puedes asignarte a ti mismo como aprobador actual de la rendición',
+        );
+      }
+
+      const aprobadorActual = await tx.usuario.findFirst({
+        where: {
+          id: dto.aprobadorActualId,
+          deletedAt: null,
+        },
+      });
+
+      if (!aprobadorActual) {
+        throw new NotFoundException(
+          `El usuario aprobador con ID ${dto.aprobadorActualId} no existe o está inactivo`,
+        );
+      }
+
       const rendicion = await tx.rendicion.create({
         data: {
           solicitudId: dto.solicitudId,
           fechaRendicion: dto.fechaRendicion,
-          estado: EstadoRendicion.APROBADO,
+          estado: EstadoRendicion.PENDIENTE,
+          aprobadorActualId: dto.aprobadorActualId,
           observaciones:
             dto.observaciones ?? dto.declaracionJurada?.observaciones,
           montoRespaldado: totalRespaldado,
@@ -173,27 +194,242 @@ export class RendicionesService {
         },
       });
 
-      for (const [poaId, montoEjecutar] of montosPorPoa) {
-        await tx.poa.update({
-          where: { id: poaId },
-          data: {
-            montoEjecutado: {
-              increment: montoEjecutar,
-            },
-          },
-        });
-      }
-
-      await tx.solicitud.update({
-        where: { id: dto.solicitudId },
+      await tx.historialAprobacion.create({
         data: {
-          estado: EstadoSolicitud.EJECUTADO,
-          observacion:
-            dto.declaracionJurada?.observaciones ?? solicitud.observacion,
+          accion: TipoAccionHistorial.CREADO,
+          comentario: 'Rendición creada y enviada a revisión',
+          usuarioId,
+          derivadoAId: dto.aprobadorActualId,
+          solicitudId: dto.solicitudId,
+          rendicionId: rendicion.id,
         },
       });
 
       return rendicion;
+    });
+  }
+
+  async aprobar(
+    id: number,
+    dto: AprobarRendicionDto,
+    usuarioId: number,
+    rolUsuario: Rol,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const rendicion = await tx.rendicion.findUnique({
+        where: { id },
+        include: {
+          solicitud: {
+            include: {
+              rendicion: true,
+            },
+          },
+          gastosRendicion: {
+            select: {
+              partidaId: true,
+              montoBruto: true,
+            },
+          },
+        },
+      });
+
+      if (!rendicion) {
+        throw new NotFoundException('Rendición no encontrada');
+      }
+
+      const puedeActuar =
+        rolUsuario === Rol.ADMIN ||
+        rolUsuario === Rol.TESORERO ||
+        rendicion.aprobadorActualId === usuarioId;
+
+      if (!puedeActuar) {
+        throw new ForbiddenException(
+          'No tienes permiso para aprobar esta rendición',
+        );
+      }
+
+      if (rendicion.estado === EstadoRendicion.APROBADO) {
+        throw new BadRequestException('La rendición ya fue aprobada');
+      }
+
+      if (rolUsuario === Rol.TESORERO) {
+        const montoPorPartida = this.agruparMontosPorPartidaDesdeRendicion(
+          rendicion.gastosRendicion,
+        );
+        const partidaIds = Array.from(montoPorPartida.keys());
+
+        const partidas =
+          partidaIds.length > 0
+            ? await tx.solicitudPresupuesto.findMany({
+                where: {
+                  id: { in: partidaIds },
+                  solicitudId: rendicion.solicitudId,
+                },
+                select: {
+                  id: true,
+                  poaId: true,
+                },
+              })
+            : [];
+
+        if (partidas.length !== partidaIds.length) {
+          throw new BadRequestException(
+            'Se detectaron partidas inválidas para ejecutar POA en esta rendición',
+          );
+        }
+
+        const montosPorPoa = this.agruparMontosPorPoa(
+          partidas,
+          montoPorPartida,
+        );
+
+        for (const [poaId, montoEjecutar] of montosPorPoa) {
+          await tx.poa.update({
+            where: { id: poaId },
+            data: {
+              montoEjecutado: {
+                increment: montoEjecutar,
+              },
+            },
+          });
+        }
+
+        const rendicionAprobada = await tx.rendicion.update({
+          where: { id },
+          data: {
+            estado: EstadoRendicion.APROBADO,
+            aprobadorActualId: null,
+            observaciones: dto.comentario ?? rendicion.observaciones,
+          },
+        });
+
+        await tx.solicitud.update({
+          where: { id: rendicion.solicitudId },
+          data: {
+            estado: EstadoSolicitud.EJECUTADO,
+            observacion: dto.comentario ?? rendicion.solicitud.observacion,
+          },
+        });
+
+        await tx.historialAprobacion.create({
+          data: {
+            accion: TipoAccionHistorial.APROBADO,
+            comentario: dto.comentario,
+            usuarioId,
+            solicitudId: rendicion.solicitudId,
+            rendicionId: rendicion.id,
+          },
+        });
+
+        return rendicionAprobada;
+      }
+
+      if (!dto.derivadoAId) {
+        throw new BadRequestException(
+          'Debes especificar derivadoAId para derivar la rendición',
+        );
+      }
+
+      if (dto.derivadoAId === usuarioId) {
+        throw new BadRequestException(
+          'No puedes derivar la rendición al mismo usuario actor',
+        );
+      }
+
+      const destinatario = await tx.usuario.findFirst({
+        where: {
+          id: dto.derivadoAId,
+          deletedAt: null,
+        },
+      });
+
+      if (!destinatario) {
+        throw new NotFoundException(
+          `El usuario derivado con ID ${dto.derivadoAId} no existe o está inactivo`,
+        );
+      }
+
+      const rendicionDerivada = await tx.rendicion.update({
+        where: { id },
+        data: {
+          estado: EstadoRendicion.PENDIENTE,
+          aprobadorActualId: dto.derivadoAId,
+          observaciones: dto.comentario ?? rendicion.observaciones,
+        },
+      });
+
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.DERIVADO,
+          comentario: dto.comentario,
+          usuarioId,
+          derivadoAId: dto.derivadoAId,
+          solicitudId: rendicion.solicitudId,
+          rendicionId: rendicion.id,
+        },
+      });
+
+      return rendicionDerivada;
+    });
+  }
+
+  async observar(
+    id: number,
+    dto: ObservarRendicionDto,
+    usuarioId: number,
+    rolUsuario: Rol,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const rendicion = await tx.rendicion.findUnique({
+        where: { id },
+        include: {
+          solicitud: {
+            select: {
+              id: true,
+              usuarioEmisorId: true,
+            },
+          },
+        },
+      });
+
+      if (!rendicion) {
+        throw new NotFoundException('Rendición no encontrada');
+      }
+
+      const puedeActuar =
+        rolUsuario === Rol.ADMIN ||
+        rolUsuario === Rol.TESORERO ||
+        rendicion.aprobadorActualId === usuarioId;
+
+      if (!puedeActuar) {
+        throw new ForbiddenException(
+          'No tienes permiso para observar esta rendición',
+        );
+      }
+
+      const creadorId = rendicion.solicitud.usuarioEmisorId;
+
+      const rendicionObservada = await tx.rendicion.update({
+        where: { id },
+        data: {
+          estado: EstadoRendicion.OBSERVADO,
+          aprobadorActualId: creadorId,
+          observaciones: dto.comentario,
+        },
+      });
+
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.OBSERVADO,
+          comentario: dto.comentario,
+          usuarioId,
+          derivadoAId: creadorId,
+          solicitudId: rendicion.solicitudId,
+          rendicionId: rendicion.id,
+        },
+      });
+
+      return rendicionObservada;
     });
   }
 
@@ -227,6 +463,25 @@ export class RendicionesService {
       const acumulado =
         montosPorPartida.get(gasto.partidaId) ?? new Prisma.Decimal(0);
       montosPorPartida.set(gasto.partidaId, acumulado.plus(montoBruto));
+    }
+
+    return montosPorPartida;
+  }
+
+  private agruparMontosPorPartidaDesdeRendicion(
+    gastos: {
+      partidaId: number | null;
+      montoBruto: Prisma.Decimal;
+    }[],
+  ): Map<number, Prisma.Decimal> {
+    const montosPorPartida = new Map<number, Prisma.Decimal>();
+
+    for (const gasto of gastos) {
+      if (!gasto.partidaId) continue;
+
+      const acumulado =
+        montosPorPartida.get(gasto.partidaId) ?? new Prisma.Decimal(0);
+      montosPorPartida.set(gasto.partidaId, acumulado.plus(gasto.montoBruto));
     }
 
     return montosPorPartida;
