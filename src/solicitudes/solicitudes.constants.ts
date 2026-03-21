@@ -12,6 +12,15 @@ export const SOLICITUD_INCLUDE = {
   usuarioEmisor: { select: USER_SAFE_SELECT },
   aprobador: { select: USER_SAFE_SELECT },
   usuarioBeneficiado: { select: USER_SAFE_SELECT },
+  historialAprobaciones: {
+    include: {
+      usuario: { select: USER_SAFE_SELECT },
+      derivadoA: { select: USER_SAFE_SELECT },
+    },
+    orderBy: {
+      fecha: 'asc',
+    },
+  },
   viaticos: {
     include: {
       concepto: true,

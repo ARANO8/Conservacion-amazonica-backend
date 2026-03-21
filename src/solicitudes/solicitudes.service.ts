@@ -703,7 +703,26 @@ export class SolicitudesService {
         aprobador: true,
         usuarioBeneficiado: true,
         historialAprobaciones: {
-          include: { usuario: true, derivadoA: true },
+          include: {
+            usuario: {
+              select: {
+                id: true,
+                nombreCompleto: true,
+                email: true,
+                cargo: true,
+                rol: true,
+              },
+            },
+            derivadoA: {
+              select: {
+                id: true,
+                nombreCompleto: true,
+                email: true,
+                cargo: true,
+                rol: true,
+              },
+            },
+          },
           orderBy: { fecha: 'desc' },
         },
         presupuestos: {
