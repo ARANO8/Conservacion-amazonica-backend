@@ -20,6 +20,7 @@ import { Rol } from '@prisma/client';
 @ApiTags('Usuarios')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Rol.ADMIN)
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}

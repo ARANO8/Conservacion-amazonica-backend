@@ -19,6 +19,14 @@ import type { Request, Response } from 'express';
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('AllExceptionsFilter');
+  private readonly sensitiveFields = new Set([
+    'password',
+    'contrasena',
+    'contraseña',
+    'token',
+    'accesstoken',
+    'refreshtoken',
+  ]);
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
@@ -49,8 +57,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
         `[${request.method}] ${request.url} → ${exception.constructor.name}: ${exception.message}`,
         exception.stack,
       );
+      const requestBody = request.body as unknown;
+      const sanitizedBody =
+        requestBody && typeof requestBody === 'object'
+          ? this.sanitizeRequestBody(requestBody as Record<string, unknown>)
+          : requestBody;
       this.logger.error(
-        `Payload recibido: ${JSON.stringify(request.body).slice(0, 2000)}`,
+        `Payload recibido: ${JSON.stringify(sanitizedBody).slice(0, 2000)}`,
       );
     } else {
       this.logger.error(
@@ -65,5 +78,34 @@ export class AllExceptionsFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
     });
+  }
+
+  private sanitizeRequestBody(
+    body: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const sanitizedBody = { ...body };
+
+    for (const [key, value] of Object.entries(sanitizedBody)) {
+      if (this.sensitiveFields.has(key.toLowerCase())) {
+        sanitizedBody[key] = '***';
+        continue;
+      }
+
+      sanitizedBody[key] = this.sanitizeUnknown(value);
+    }
+
+    return sanitizedBody;
+  }
+
+  private sanitizeUnknown(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item: unknown) => this.sanitizeUnknown(item));
+    }
+
+    if (value && typeof value === 'object') {
+      return this.sanitizeRequestBody(value as Record<string, unknown>);
+    }
+
+    return value;
   }
 }
