@@ -18,7 +18,27 @@ import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 
 const RENDICION_INCLUDE = {
-  solicitud: true,
+  solicitud: {
+    include: {
+      usuarioEmisor: {
+        select: {
+          id: true,
+          nombreCompleto: true,
+          email: true,
+          cargo: true,
+          rol: true,
+        },
+      },
+      aprobador: {
+        select: {
+          id: true,
+          nombreCompleto: true,
+          cargo: true,
+          rol: true,
+        },
+      },
+    },
+  },
   aprobadorActual: {
     select: {
       id: true,

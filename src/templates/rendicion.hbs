@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rendicion {{id}}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @page {
+        size: A4;
+        margin: 16mm 12mm;
+      }
+
+      body {
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        color: #0f172a;
+      }
+
+      .section-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .table-wrap,
+      .table-wrap table,
+      .table-wrap tr,
+      .table-wrap td,
+      .table-wrap th {
+        page-break-inside: avoid;
+      }
+
+      .informe-block {
+        white-space: pre-wrap;
+        word-break: break-word;
+        page-break-inside: auto;
+      }
+    </style>
+  </head>
+  <body class="bg-white px-2 py-3 text-[11px]">
+    <header class="mb-6 flex items-start justify-between border-b pb-4">
+      <div class="flex items-center gap-3">
+        {{#if logoUrl}}
+          <img src="{{logoUrl}}" alt="Logo" class="h-16 w-auto" />
+        {{else}}
+          <div class="rounded-md border px-3 py-2 text-xs font-semibold">
+            Conservacion Amazonica
+          </div>
+        {{/if}}
+        <div>
+          <p class="text-xs text-slate-500">Sistema de Rendiciones</p>
+          <p class="text-xs text-slate-500">Generado: {{generatedAt}}</p>
+        </div>
+      </div>
+
+      <div class="text-right">
+        <h1 class="text-xl font-extrabold text-slate-900">
+          Rendicion de Gastos: {{id}}
+        </h1>
+        <p class="text-xs text-slate-500">Documento de control financiero</p>
+      </div>
+    </header>
+
+    <section class="section-card mb-4 rounded-lg border border-slate-200 p-4">
+      <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+        Datos Generales
+      </h2>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-2">
+        <div>
+          <span class="font-semibold text-slate-700">Emisor:</span>
+          <span>{{usuario.nombre}}</span>
+        </div>
+        <div>
+          <span class="font-semibold text-slate-700">Fecha:</span>
+          <span>{{fechaRendicion}}</span>
+        </div>
+        <div>
+          <span class="font-semibold text-slate-700">Aprobador Actual:</span>
+          <span>{{aprobadorActualNombre}}</span>
+        </div>
+        <div>
+          <span class="font-semibold text-slate-700">Estado:</span>
+          <span>{{estado}}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-card mb-4 rounded-lg border border-slate-200 p-4">
+      <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+        Resumen Financiero
+      </h2>
+
+      <div class="grid grid-cols-3 gap-3">
+        <div class="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+          <p class="text-xs font-semibold uppercase text-emerald-700">
+            Dinero Recibido
+          </p>
+          <p class="mt-1 text-base font-bold">{{solicitud.montoTotalNeto}}</p>
+        </div>
+
+        <div class="rounded-md border border-blue-200 bg-blue-50 p-3">
+          <p class="text-xs font-semibold uppercase text-blue-700">
+            Efectivo Ejecutado
+          </p>
+          <p class="mt-1 text-base font-bold">Bs {{totalEfectivoPagado}}</p>
+        </div>
+
+        <div class="rounded-md border border-amber-200 bg-amber-50 p-3">
+          <p class="text-xs font-semibold uppercase text-amber-700">
+            Saldo Liquido
+          </p>
+          <p class="mt-1 text-base font-bold">Bs {{saldoLiquido}}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="table-wrap mb-4 rounded-lg border border-slate-200 p-4">
+      <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+        Detalle de Gastos
+      </h2>
+
+      <table class="w-full border-collapse text-[10px]">
+        <thead>
+          <tr class="bg-slate-100 text-slate-700">
+            <th class="border border-slate-300 px-2 py-2 text-left">Fecha</th>
+            <th class="border border-slate-300 px-2 py-2 text-left">Nro Doc</th>
+            <th class="border border-slate-300 px-2 py-2 text-left">Proveedor</th>
+            <th class="border border-slate-300 px-2 py-2 text-left">Concepto</th>
+            <th class="border border-slate-300 px-2 py-2 text-right">Total Bruto</th>
+            <th class="border border-slate-300 px-2 py-2 text-right">Retencion</th>
+            <th class="border border-slate-300 px-2 py-2 text-right">Neto Pagado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#if gastos.length}}
+            {{#each gastos}}
+              <tr>
+                <td class="border border-slate-300 px-2 py-2">{{fecha}}</td>
+                <td class="border border-slate-300 px-2 py-2">{{nroDocumento}}</td>
+                <td class="border border-slate-300 px-2 py-2">{{proveedor}}</td>
+                <td class="border border-slate-300 px-2 py-2">{{concepto}}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">
+                  {{montoBruto}}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right">
+                  {{montoImpuestos}}
+                </td>
+                <td class="border border-slate-300 px-2 py-2 text-right">
+                  {{montoNeto}}
+                </td>
+              </tr>
+            {{/each}}
+          {{else}}
+            <tr>
+              <td class="border border-slate-300 px-2 py-3 text-center" colspan="7">
+                Sin gastos registrados.
+              </td>
+            </tr>
+          {{/if}}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="mb-4 rounded-lg border border-slate-200 p-4">
+      <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+        Informe
+      </h2>
+      <div class="informe-block rounded-md bg-slate-50 p-3 text-[10.5px]">
+        {{informeGastos}}
+      </div>
+    </section>
+
+    <section class="mt-10 grid grid-cols-2 gap-10 text-center text-xs">
+      <div>
+        <div class="mx-auto mb-2 h-px w-48 bg-slate-500"></div>
+        <p class="font-semibold">Firma Emisor</p>
+        <p class="text-slate-600">{{usuario.nombre}}</p>
+      </div>
+
+      <div>
+        <div class="mx-auto mb-2 h-px w-48 bg-slate-500"></div>
+        <p class="font-semibold">Firma Aprobador</p>
+        <p class="text-slate-600">{{aprobadorActualNombre}}</p>
+      </div>
+    </section>
+  </body>
+</html>
