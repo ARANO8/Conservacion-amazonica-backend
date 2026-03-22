@@ -649,9 +649,11 @@ export class SolicitudesService {
         urlDestino: `/app/aprobaciones/${result.id}`,
       });
     } catch (error) {
-      console.error(
-        `[SolicitudesService] Error al crear notificación para solicitud ${result.id}:`,
-        error,
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación para solicitud ${result.id}: ${normalizedError.message}`,
+        normalizedError.stack,
       );
     }
 
@@ -1064,45 +1066,46 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma
-      .$transaction(async (tx) => {
-        const solicitudActualizada = await tx.solicitud.update({
-          where: { id },
-          data: { aprobadorId: nuevoAprobadorId },
-          include: SOLICITUD_INCLUDE,
-        });
-
-        // Registrar en historial (dentro de la misma transacción)
-        await tx.historialAprobacion.create({
-          data: {
-            accion: TipoAccionHistorial.DERIVADO,
-            solicitudId: id,
-            usuarioId,
-            derivadoAId: nuevoAprobadorId,
-          },
-        });
-
-        return solicitudActualizada;
-      })
-      .then(async (solicitudActualizada) => {
-        try {
-          // Crear notificación para el nuevo aprobador
-          await this.notificacionesService.crearNotificacion({
-            titulo: 'Solicitud derivada',
-            mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
-            tipo: 'SOLICITUD_DERIVADA',
-            usuarioId: nuevoAprobadorId,
-            solicitudId: solicitudActualizada.id,
-            urlDestino: `/app/aprobaciones/${solicitudActualizada.id}`,
-          });
-        } catch (error) {
-          console.error(
-            `[SolicitudesService] Error al crear notificación (derivar) para solicitud ${solicitudActualizada.id}:`,
-            error,
-          );
-        }
-        return solicitudActualizada;
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.solicitud.update({
+        where: { id },
+        data: { aprobadorId: nuevoAprobadorId },
+        include: SOLICITUD_INCLUDE,
       });
+
+      // Registrar en historial (dentro de la misma transacción)
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.DERIVADO,
+          solicitudId: id,
+          usuarioId,
+          derivadoAId: nuevoAprobadorId,
+        },
+      });
+
+      return updated;
+    });
+
+    try {
+      // Crear notificación para el nuevo aprobador
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Solicitud derivada',
+        mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
+        tipo: 'SOLICITUD_DERIVADA',
+        usuarioId: nuevoAprobadorId,
+        solicitudId: solicitudActualizada.id,
+        urlDestino: `/app/aprobaciones/${solicitudActualizada.id}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación (derivar) para solicitud ${solicitudActualizada.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return solicitudActualizada;
   }
 
   async observar(
@@ -1124,50 +1127,51 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma
-      .$transaction(async (tx) => {
-        const solicitudActualizada = await tx.solicitud.update({
-          where: { id },
-          data: {
-            estado: EstadoSolicitud.OBSERVADO,
-            observacion: observarDto.observacion,
-            aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
-          },
-          include: SOLICITUD_INCLUDE,
-        });
-
-        // Registrar en historial (dentro de la misma transacción)
-        await tx.historialAprobacion.create({
-          data: {
-            accion: TipoAccionHistorial.OBSERVADO,
-            comentario: observarDto.observacion,
-            solicitudId: id,
-            usuarioId,
-            derivadoAId: solicitud.usuarioEmisorId,
-          },
-        });
-
-        return solicitudActualizada;
-      })
-      .then(async (solicitudActualizada) => {
-        try {
-          // Crear notificación para el usuario emisor
-          await this.notificacionesService.crearNotificacion({
-            titulo: 'Solicitud observada',
-            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} requiere correcciones. Observación: ${observarDto.observacion}`,
-            tipo: 'SOLICITUD_OBSERVADA',
-            usuarioId: solicitud.usuarioEmisorId,
-            solicitudId: solicitudActualizada.id,
-            urlDestino: `/app/solicitudes/${id}/editar`,
-          });
-        } catch (error) {
-          console.error(
-            `[SolicitudesService] Error al crear notificación (observar) para solicitud ${solicitudActualizada.id}:`,
-            error,
-          );
-        }
-        return solicitudActualizada;
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.solicitud.update({
+        where: { id },
+        data: {
+          estado: EstadoSolicitud.OBSERVADO,
+          observacion: observarDto.observacion,
+          aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
+        },
+        include: SOLICITUD_INCLUDE,
       });
+
+      // Registrar en historial (dentro de la misma transacción)
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.OBSERVADO,
+          comentario: observarDto.observacion,
+          solicitudId: id,
+          usuarioId,
+          derivadoAId: solicitud.usuarioEmisorId,
+        },
+      });
+
+      return updated;
+    });
+
+    try {
+      // Crear notificación para el usuario emisor
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Solicitud observada',
+        mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} requiere correcciones. Observación: ${observarDto.observacion}`,
+        tipo: 'SOLICITUD_OBSERVADA',
+        usuarioId: solicitud.usuarioEmisorId,
+        solicitudId: solicitudActualizada.id,
+        urlDestino: `/app/solicitudes/${id}/editar`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación (observar) para solicitud ${solicitudActualizada.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return solicitudActualizada;
   }
 
   async desembolsar(
@@ -1193,49 +1197,50 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma
-      .$transaction(async (tx) => {
-        const solicitudActualizada = await tx.solicitud.update({
-          where: { id },
-          data: {
-            estado: EstadoSolicitud.DESEMBOLSADO,
-            codigoDesembolso: desembolsarDto.codigoDesembolso,
-            urlComprobante: desembolsarDto.urlComprobante ?? null,
-            aprobadorId: null, // Finalizado
-          },
-          include: SOLICITUD_INCLUDE,
-        });
-
-        // Registrar en historial (dentro de la misma transacción)
-        await tx.historialAprobacion.create({
-          data: {
-            accion: TipoAccionHistorial.APROBADO,
-            comentario: desembolsarDto.codigoDesembolso,
-            solicitudId: id,
-            usuarioId: usuario.id,
-          },
-        });
-
-        return solicitudActualizada;
-      })
-      .then(async (solicitudActualizada) => {
-        try {
-          // Crear notificación para el usuario emisor
-          await this.notificacionesService.crearNotificacion({
-            titulo: 'Solicitud desembolsada',
-            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada. Código: ${desembolsarDto.codigoDesembolso}. Procede a registrar tu rendición.`,
-            tipo: 'SOLICITUD_APROBADA',
-            usuarioId: solicitudActualizada.usuarioEmisorId,
-            solicitudId: solicitudActualizada.id,
-            urlDestino: `/app/rendiciones/nueva?solicitudId=${id}`,
-          });
-        } catch (error) {
-          console.error(
-            `[SolicitudesService] Error al crear notificación (desembolsar) para solicitud ${solicitudActualizada.id}:`,
-            error,
-          );
-        }
-        return solicitudActualizada;
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.solicitud.update({
+        where: { id },
+        data: {
+          estado: EstadoSolicitud.DESEMBOLSADO,
+          codigoDesembolso: desembolsarDto.codigoDesembolso,
+          urlComprobante: desembolsarDto.urlComprobante ?? null,
+          aprobadorId: null, // Finalizado
+        },
+        include: SOLICITUD_INCLUDE,
       });
+
+      // Registrar en historial (dentro de la misma transacción)
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.APROBADO,
+          comentario: desembolsarDto.codigoDesembolso,
+          solicitudId: id,
+          usuarioId: usuario.id,
+        },
+      });
+
+      return updated;
+    });
+
+    try {
+      // Crear notificación para el usuario emisor
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Solicitud desembolsada',
+        mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada. Código: ${desembolsarDto.codigoDesembolso}. Procede a registrar tu rendición.`,
+        tipo: 'SOLICITUD_APROBADA',
+        usuarioId: solicitudActualizada.usuarioEmisorId,
+        solicitudId: solicitudActualizada.id,
+        urlDestino: `/app/rendiciones/nueva?solicitudId=${id}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación (desembolsar) para solicitud ${solicitudActualizada.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return solicitudActualizada;
   }
 }

@@ -22,10 +22,40 @@ import { RendicionesModule } from './rendiciones/rendiciones.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PdfModule } from './pdf/pdf.module';
 
+const DEFAULT_THROTTLE_TTL_MS = 60000;
+const DEFAULT_THROTTLE_LIMIT = 10;
+
+function getPositiveIntFromEnv(
+  value: string | undefined,
+  fallback: number,
+): number {
+  if (!value) {
+    return fallback;
+  }
+
+  const parsedValue = Number(value);
+  if (!Number.isInteger(parsedValue) || parsedValue <= 0) {
+    return fallback;
+  }
+
+  return parsedValue;
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ThrottlerModule.forRoot([{ ttl: 60000, limit: 10 }]),
+    ThrottlerModule.forRoot([
+      {
+        ttl: getPositiveIntFromEnv(
+          process.env.THROTTLE_TTL_MS,
+          DEFAULT_THROTTLE_TTL_MS,
+        ),
+        limit: getPositiveIntFromEnv(
+          process.env.THROTTLE_LIMIT,
+          DEFAULT_THROTTLE_LIMIT,
+        ),
+      },
+    ]),
 
     PrismaModule,
     AuthModule,

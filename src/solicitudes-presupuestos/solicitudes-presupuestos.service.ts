@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class SolicitudPresupuestoService {
+  private readonly logger = new Logger(SolicitudPresupuestoService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async recalcularTotales(solicitudId: number, tx?: Prisma.TransactionClient) {
@@ -23,18 +25,19 @@ export class SolicitudPresupuestoService {
       where: { solicitudId },
     });
 
-    console.log('--- DEBUG RECALCULAR TOTALES ---');
-    console.log('Hospedajes leídos desde TX:', hospedajes.length);
-    console.log(
-      'Hospedaje POAs (Tipo):',
-      hospedajes.map((h) => `${h.poaId} (${typeof h.poaId})`),
+    this.logger.debug('--- DEBUG RECALCULAR TOTALES ---');
+    this.logger.debug(`Hospedajes leídos desde TX: ${hospedajes.length}`);
+    this.logger.debug(
+      `Hospedaje POAs (Tipo): ${hospedajes.map((h) => `${h.poaId} (${typeof h.poaId})`).join(', ')}`,
     );
 
     let totalSolicitudPresupuestado = new Prisma.Decimal(0);
     let totalSolicitudNeto = new Prisma.Decimal(0);
 
     for (const p of presupuestos) {
-      console.log(`Presupuesto POA (Tipo): ${p.poaId} (${typeof p.poaId})`);
+      this.logger.debug(
+        `Presupuesto POA (Tipo): ${p.poaId} (${typeof p.poaId})`,
+      );
       // 3. Sumamos viaticos
       const sumViaticosPresupuestado = p.viaticos.reduce(
         (acc, v) => acc.add(v.montoPresupuestado),
