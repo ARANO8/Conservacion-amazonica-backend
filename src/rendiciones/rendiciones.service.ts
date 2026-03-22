@@ -331,6 +331,7 @@ export class RendicionesService {
       const puedeActuar =
         rolUsuario === Rol.ADMIN ||
         rolUsuario === Rol.EJECUTIVO ||
+        rolUsuario === Rol.CONTADOR ||
         rolUsuario === Rol.TESORERO ||
         rendicion.aprobadorActualId === usuarioId;
 
@@ -340,11 +341,14 @@ export class RendicionesService {
         );
       }
 
-      if (rendicion.estado === EstadoRendicion.APROBADO) {
+      if (
+        rendicion.estado === EstadoRendicion.APROBADO ||
+        rendicion.estado === EstadoRendicion.APROBADA
+      ) {
         throw new BadRequestException('La rendición ya fue aprobada');
       }
 
-      if (rolUsuario === Rol.TESORERO) {
+      if (rolUsuario === Rol.CONTADOR) {
         const montoPorPartida = this.agruparMontosPorPartidaDesdeRendicion(
           rendicion.gastosRendicion,
         );
@@ -418,7 +422,7 @@ export class RendicionesService {
 
       if (!dto.derivadoAId) {
         throw new BadRequestException(
-          'Debes especificar derivadoAId para derivar la rendición',
+          'Solo un CONTADOR puede cerrar la rendición. Debes derivarla al siguiente aprobador o contador',
         );
       }
 
@@ -491,6 +495,7 @@ export class RendicionesService {
       const puedeActuar =
         rolUsuario === Rol.ADMIN ||
         rolUsuario === Rol.EJECUTIVO ||
+        rolUsuario === Rol.CONTADOR ||
         rolUsuario === Rol.TESORERO ||
         rendicion.aprobadorActualId === usuarioId;
 

@@ -41,9 +41,18 @@ interface RequestWithUser extends Request {
   };
 }
 
+const RENDICIONES_ALLOWED_ROLES: Rol[] = [
+  Rol.ADMIN,
+  Rol.EJECUTIVO,
+  Rol.CONTADOR,
+  Rol.TESORERO,
+  Rol.USUARIO,
+];
+
 @ApiTags('Rendiciones')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...RENDICIONES_ALLOWED_ROLES)
 @Controller('rendiciones')
 export class RendicionesController {
   constructor(
@@ -110,8 +119,6 @@ export class RendicionesController {
   }
 
   @Get(':id/pdf')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Rol.ADMIN, Rol.EJECUTIVO, Rol.TESORERO, Rol.USUARIO)
   @ApiOperation({ summary: 'Generar y visualizar PDF de una rendición' })
   @ApiProduces('application/pdf')
   @ApiOkResponse({
