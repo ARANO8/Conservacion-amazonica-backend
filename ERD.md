@@ -3,6 +3,7 @@ erDiagram
 
         Rol {
             ADMIN ADMIN
+EJECUTIVO EJECUTIVO
 TESORERO TESORERO
 USUARIO USUARIO
         }

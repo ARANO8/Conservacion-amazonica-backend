@@ -126,7 +126,7 @@ export class SolicitudesController {
   }
 
   @Patch(':id/restore')
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.EJECUTIVO)
   @ApiOperation({ summary: 'Restaurar una solicitud eliminada' })
   restore(@Param('id', ParseIntPipe) id: number) {
     return this.solicitudesService.restore(id);

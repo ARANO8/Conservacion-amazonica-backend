@@ -310,6 +310,7 @@ export class RendicionesService {
 
       const puedeActuar =
         rolUsuario === Rol.ADMIN ||
+        rolUsuario === Rol.EJECUTIVO ||
         rolUsuario === Rol.TESORERO ||
         rendicion.aprobadorActualId === usuarioId;
 
@@ -469,6 +470,7 @@ export class RendicionesService {
 
       const puedeActuar =
         rolUsuario === Rol.ADMIN ||
+        rolUsuario === Rol.EJECUTIVO ||
         rolUsuario === Rol.TESORERO ||
         rendicion.aprobadorActualId === usuarioId;
 

@@ -90,7 +90,7 @@ export class PoaController {
   }
 
   @Post()
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.EJECUTIVO)
   @ApiOperation({ summary: 'Crear una nueva fila de POA' })
   @ApiResponse({ status: 201, description: 'Fila creada exitosamente' })
   create(@Body() createPoaDto: CreatePoaDto) {
@@ -138,7 +138,7 @@ export class PoaController {
   }
 
   @Patch(':id')
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.EJECUTIVO)
   @ApiOperation({ summary: 'Actualizar una fila de POA' })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -148,14 +148,14 @@ export class PoaController {
   }
 
   @Delete(':id')
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.EJECUTIVO)
   @ApiOperation({ summary: 'Eliminar una fila de POA (Borrado lógico)' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.poaService.remove(id);
   }
 
   @Patch(':id/restore')
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.EJECUTIVO)
   @ApiOperation({ summary: 'Restaurar un registro de POA eliminado' })
   restore(@Param('id', ParseIntPipe) id: number) {
     return this.poaService.restore(id);

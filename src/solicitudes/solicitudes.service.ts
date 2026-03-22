@@ -1109,7 +1109,11 @@ export class SolicitudesService {
     usuario: { id: number; rol: Rol },
     desembolsarDto: DesembolsarSolicitudDto,
   ): Promise<Solicitud> {
-    if (usuario.rol !== Rol.TESORERO && usuario.rol !== Rol.ADMIN) {
+    if (
+      usuario.rol !== Rol.TESORERO &&
+      usuario.rol !== Rol.ADMIN &&
+      usuario.rol !== Rol.EJECUTIVO
+    ) {
       throw new ForbiddenException(
         'Solo el personal de Tesorería o Administración puede desembolsar',
       );
