@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ForbiddenException,
   Body,
   Controller,
   Get,
@@ -29,9 +28,6 @@ import { CreateRendicionDto } from './dto/create-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 import { RendicionesService } from './rendiciones.service';
-import { PdfService } from '../pdf/pdf.service';
-import { existsSync } from 'fs';
-import * as path from 'path';
 
 interface RequestWithUser extends Request {
   user?: {
@@ -55,10 +51,7 @@ const RENDICIONES_ALLOWED_ROLES: Rol[] = [
 @Roles(...RENDICIONES_ALLOWED_ROLES)
 @Controller('rendiciones')
 export class RendicionesController {
-  constructor(
-    private readonly rendicionesService: RendicionesService,
-    private readonly pdfService: PdfService,
-  ) {}
+  constructor(private readonly rendicionesService: RendicionesService) {}
 
   @Get()
   @ApiOperation({ summary: 'Listar rendiciones (filtrado por rol de usuario)' })
@@ -134,61 +127,9 @@ export class RendicionesController {
   })
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
-    @Req() req: RequestWithUser,
     @Res() res: Response,
   ): Promise<void> {
-    const rendicion = await this.rendicionesService.findOne(id);
-
-    if (
-      req.user!.rol === Rol.USUARIO &&
-      rendicion.solicitud.usuarioEmisorId !== req.user!.userId
-    ) {
-      throw new ForbiddenException(
-        'No tienes permisos para visualizar esta rendición',
-      );
-    }
-
-    const totalEfectivoPagado = Number(
-      (rendicion.gastosRendicion ?? [])
-        .reduce((acc, gasto) => acc + Number(gasto.montoNeto ?? 0), 0)
-        .toFixed(2),
-    );
-
-    const montoRecibido = Number(rendicion.solicitud.montoTotalNeto ?? 0);
-    const saldoLiquido = Number(
-      (montoRecibido - totalEfectivoPagado).toFixed(2),
-    );
-
-    const buffer = await this.pdfService.generatePdf('rendicion.hbs', {
-      ...rendicion,
-      usuario: {
-        nombre: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
-        cargo: rendicion.solicitud.usuarioEmisor?.cargo ?? 'N/A',
-      },
-      solicitud: {
-        ...rendicion.solicitud,
-        montoTotalNeto: this.formatCurrency(montoRecibido),
-      },
-      aprobadorActualNombre:
-        rendicion.aprobadorActual?.nombreCompleto ?? 'Sin asignar',
-      fechaRendicion: this.formatDate(rendicion.fechaRendicion),
-      totalEfectivoPagado,
-      saldoLiquido,
-      totalEfectivoPagadoFormat: this.formatCurrency(totalEfectivoPagado),
-      saldoLiquidoFormat: this.formatCurrency(saldoLiquido),
-      gastos: (rendicion.gastosRendicion ?? []).map((gasto) => ({
-        ...gasto,
-        fecha: this.formatDate(gasto.fecha),
-        proveedor: gasto.proveedor ?? 'N/A',
-        concepto: gasto.concepto ?? gasto.detalle ?? 'N/A',
-        montoBruto: this.formatCurrency(Number(gasto.montoBruto ?? 0)),
-        montoImpuestos: this.formatCurrency(Number(gasto.montoImpuestos ?? 0)),
-        montoNeto: this.formatCurrency(Number(gasto.montoNeto ?? 0)),
-      })),
-      informeGastos: this.buildInformeTexto(rendicion.informeGastos),
-      logoUrl: this.getLogoUrl(),
-      generatedAt: this.formatDate(new Date()),
-    });
+    const buffer = await this.rendicionesService.generatePdf(id);
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -246,63 +187,5 @@ export class RendicionesController {
       req.user!.userId,
       req.user!.rol,
     );
-  }
-
-  private formatCurrency(value: number): string {
-    return `Bs ${new Intl.NumberFormat('es-BO', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value)}`;
-  }
-
-  private formatDate(value: Date | string | null | undefined): string {
-    if (!value) return 'N/A';
-
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return 'N/A';
-
-    return new Intl.DateTimeFormat('es-BO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date);
-  }
-
-  private buildInformeTexto(
-    informe:
-      | {
-          fechaInicio: Date;
-          fechaFin: Date;
-          actividades?: {
-            fecha: Date;
-            lugar: string;
-            personaInstitucion: string;
-            actividadesRealizadas: string;
-          }[];
-        }
-      | null
-      | undefined,
-  ): string {
-    if (!informe) {
-      return 'Sin informe registrado.';
-    }
-
-    const encabezado = `Periodo: ${this.formatDate(informe.fechaInicio)} - ${this.formatDate(informe.fechaFin)}`;
-    const actividades = (informe.actividades ?? []).map(
-      (actividad, index) =>
-        `Actividad ${index + 1}:\nFecha: ${this.formatDate(actividad.fecha)}\nLugar: ${actividad.lugar}\nPersona / Institución: ${actividad.personaInstitucion}\nDetalle: ${actividad.actividadesRealizadas}`,
-    );
-
-    return [encabezado, ...actividades].join('\n\n');
-  }
-
-  private getLogoUrl(): string | null {
-    const logoPath = path.join(process.cwd(), 'logo.png');
-    if (!existsSync(logoPath)) {
-      return null;
-    }
-
-    const normalizedPath = logoPath.replace(/\\/g, '/');
-    return `file:///${normalizedPath}`;
   }
 }

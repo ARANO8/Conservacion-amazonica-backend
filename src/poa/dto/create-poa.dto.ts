@@ -1,9 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNumber, IsString, Min } from 'class-validator';
+import { IsInt, IsNotEmpty, IsNumber, IsString, Min } from 'class-validator';
 
 export class CreatePoaDto {
   @ApiProperty({ example: 'POA-2026-001' })
   @IsString()
+  @IsNotEmpty()
   codigoPoa: string;
 
   @ApiProperty({ example: 10 })

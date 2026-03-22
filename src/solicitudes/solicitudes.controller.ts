@@ -33,7 +33,6 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Request, Response } from 'express';
 import { Rol } from '@prisma/client';
-import { PdfService } from '../pdf/pdf.service';
 
 interface RequestWithUser extends Request {
   user: {
@@ -50,10 +49,7 @@ interface RequestWithUser extends Request {
 export class SolicitudesController {
   private readonly logger = new Logger(SolicitudesController.name);
 
-  constructor(
-    private readonly solicitudesService: SolicitudesService,
-    private readonly pdfService: PdfService,
-  ) {}
+  constructor(private readonly solicitudesService: SolicitudesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear una nueva solicitud en estado PENDIENTE' })
@@ -189,72 +185,12 @@ export class SolicitudesController {
     @Param('id', ParseIntPipe) id: number,
     @Res() res: Response,
   ): Promise<void> {
-    const solicitud = await this.solicitudesService.findOne(id);
-
-    const detalle = [
-      ...(solicitud.viaticos ?? []).map((viatico) => ({
-        categoria: 'Viático',
-        descripcion: viatico.concepto?.nombre ?? viatico.tipoDestino,
-        cantidad: `${Number(viatico.dias ?? 0)} días x ${viatico.cantidadPersonas} pers`,
-        montoNeto: this.formatCurrency(Number(viatico.montoNeto ?? 0)),
-      })),
-      ...(solicitud.gastos ?? []).map((gasto) => ({
-        categoria: 'Gasto',
-        descripcion: gasto.tipoGasto?.nombre ?? gasto.detalle ?? 'Sin detalle',
-        cantidad: `${gasto.cantidad}`,
-        montoNeto: this.formatCurrency(Number(gasto.montoNeto ?? 0)),
-      })),
-      ...(solicitud.hospedajes ?? []).map((hospedaje) => ({
-        categoria: 'Hospedaje',
-        descripcion: hospedaje.destino,
-        cantidad: `${hospedaje.noches} noches`,
-        montoNeto: this.formatCurrency(Number(hospedaje.costoTotal ?? 0)),
-      })),
-    ];
-
-    const buffer = await this.pdfService.generatePdf('solicitud.hbs', {
-      ...solicitud,
-      codigoSolicitud: solicitud.codigoSolicitud,
-      fechaSolicitud: this.formatDate(solicitud.fechaSolicitud),
-      fechaInicio: this.formatDate(solicitud.fechaInicio),
-      fechaFin: this.formatDate(solicitud.fechaFin),
-      montoTotalNeto: this.formatCurrency(
-        Number(solicitud.montoTotalNeto ?? 0),
-      ),
-      montoTotalPresupuestado: this.formatCurrency(
-        Number(solicitud.montoTotalPresupuestado ?? 0),
-      ),
-      emisorNombre: solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
-      emisorCargo: solicitud.usuarioEmisor?.cargo ?? 'N/A',
-      aprobadorNombre: solicitud.aprobador?.nombreCompleto ?? 'Sin asignar',
-      motivoViaje: solicitud.motivoViaje ?? 'Sin motivo registrado',
-      lugarViaje: solicitud.lugarViaje ?? 'Sin lugar registrado',
-      detalle,
-    });
+    const buffer = await this.solicitudesService.generatePdf(id);
 
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="solicitud.pdf"',
     });
     res.send(buffer);
-  }
-
-  private formatDate(value: Date | string | null | undefined): string {
-    if (!value) return 'N/A';
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return 'N/A';
-
-    return new Intl.DateTimeFormat('es-BO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date);
-  }
-
-  private formatCurrency(value: number): string {
-    return `Bs ${new Intl.NumberFormat('es-BO', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(value)}`;
   }
 }

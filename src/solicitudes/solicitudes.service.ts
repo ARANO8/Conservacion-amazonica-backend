@@ -34,6 +34,7 @@ import {
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { PdfService } from '../pdf/pdf.service';
 
 type DetalleSolicitud = {
   montoTotalPresupuestado: Prisma.Decimal;
@@ -79,6 +80,7 @@ export class SolicitudesService {
     private presupuestoService: SolicitudPresupuestoService,
     private poaService: PoaService,
     private notificacionesService: NotificacionesService,
+    private readonly pdfService: PdfService,
   ) {}
 
   private async generarCodigo(tx: Prisma.TransactionClient): Promise<string> {
@@ -762,6 +764,70 @@ export class SolicitudesService {
     }
 
     return solicitud;
+  }
+
+  async generatePdf(id: number): Promise<Buffer> {
+    const solicitud = await this.findOne(id);
+
+    const detalle = [
+      ...(solicitud.viaticos ?? []).map((viatico) => ({
+        categoria: 'Viático',
+        descripcion: viatico.concepto?.nombre ?? viatico.tipoDestino,
+        cantidad: `${Number(viatico.dias ?? 0)} días x ${viatico.cantidadPersonas} pers`,
+        montoNeto: this.formatCurrency(Number(viatico.montoNeto ?? 0)),
+      })),
+      ...(solicitud.gastos ?? []).map((gasto) => ({
+        categoria: 'Gasto',
+        descripcion: gasto.tipoGasto?.nombre ?? gasto.detalle ?? 'Sin detalle',
+        cantidad: `${gasto.cantidad}`,
+        montoNeto: this.formatCurrency(Number(gasto.montoNeto ?? 0)),
+      })),
+      ...(solicitud.hospedajes ?? []).map((hospedaje) => ({
+        categoria: 'Hospedaje',
+        descripcion: hospedaje.destino,
+        cantidad: `${hospedaje.noches} noches`,
+        montoNeto: this.formatCurrency(Number(hospedaje.costoTotal ?? 0)),
+      })),
+    ];
+
+    return this.pdfService.generatePdf('solicitud.hbs', {
+      ...solicitud,
+      codigoSolicitud: solicitud.codigoSolicitud,
+      fechaSolicitud: this.formatDate(solicitud.fechaSolicitud),
+      fechaInicio: this.formatDate(solicitud.fechaInicio),
+      fechaFin: this.formatDate(solicitud.fechaFin),
+      montoTotalNeto: this.formatCurrency(
+        Number(solicitud.montoTotalNeto ?? 0),
+      ),
+      montoTotalPresupuestado: this.formatCurrency(
+        Number(solicitud.montoTotalPresupuestado ?? 0),
+      ),
+      emisorNombre: solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
+      emisorCargo: solicitud.usuarioEmisor?.cargo ?? 'N/A',
+      aprobadorNombre: solicitud.aprobador?.nombreCompleto ?? 'Sin asignar',
+      motivoViaje: solicitud.motivoViaje ?? 'Sin motivo registrado',
+      lugarViaje: solicitud.lugarViaje ?? 'Sin lugar registrado',
+      detalle,
+    });
+  }
+
+  private formatDate(value: Date | string | null | undefined): string {
+    if (!value) return 'N/A';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+
+    return new Intl.DateTimeFormat('es-BO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
+  }
+
+  private formatCurrency(value: number): string {
+    return `Bs ${new Intl.NumberFormat('es-BO', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)}`;
   }
 
   private async enriquecerConSaldos(
