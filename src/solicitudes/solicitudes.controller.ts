@@ -10,7 +10,6 @@ import {
   Req,
   ParseIntPipe,
   Res,
-  StreamableFile,
   Logger,
   Query,
   BadRequestException,
@@ -33,9 +32,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Request, Response } from 'express';
-import { ReportsService } from '../reports/reports.service';
-import type { SolicitudReportData } from '../reports/reports.service';
 import { Rol } from '@prisma/client';
+import { PdfService } from '../pdf/pdf.service';
 
 interface RequestWithUser extends Request {
   user: {
@@ -54,7 +52,7 @@ export class SolicitudesController {
 
   constructor(
     private readonly solicitudesService: SolicitudesService,
-    private readonly reportsService: ReportsService,
+    private readonly pdfService: PdfService,
   ) {}
 
   @Post()
@@ -189,146 +187,74 @@ export class SolicitudesController {
   })
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
-    try {
-      console.log(`[PDF] Iniciando generación de PDF para solicitud ID: ${id}`);
+    @Res() res: Response,
+  ): Promise<void> {
+    const solicitud = await this.solicitudesService.findOne(id);
 
-      const solicitud = await this.solicitudesService.findOne(id);
-      console.log(`[PDF] Solicitud obtenida:`, {
-        codigoSolicitud: solicitud.codigoSolicitud,
-        hasEmisor: !!solicitud.usuarioEmisor,
-        hasAprobador: !!solicitud.aprobador,
-        hasBeneficiado: !!solicitud.usuarioBeneficiado,
-        viaticosCount: solicitud.viaticos?.length || 0,
-        gastosCount: solicitud.gastos?.length || 0,
-      });
+    const detalle = [
+      ...(solicitud.viaticos ?? []).map((viatico) => ({
+        categoria: 'Viático',
+        descripcion: viatico.concepto?.nombre ?? viatico.tipoDestino,
+        cantidad: `${Number(viatico.dias ?? 0)} días x ${viatico.cantidadPersonas} pers`,
+        montoNeto: this.formatCurrency(Number(viatico.montoNeto ?? 0)),
+      })),
+      ...(solicitud.gastos ?? []).map((gasto) => ({
+        categoria: 'Gasto',
+        descripcion: gasto.tipoGasto?.nombre ?? gasto.detalle ?? 'Sin detalle',
+        cantidad: `${gasto.cantidad}`,
+        montoNeto: this.formatCurrency(Number(gasto.montoNeto ?? 0)),
+      })),
+      ...(solicitud.hospedajes ?? []).map((hospedaje) => ({
+        categoria: 'Hospedaje',
+        descripcion: hospedaje.destino,
+        cantidad: `${hospedaje.noches} noches`,
+        montoNeto: this.formatCurrency(Number(hospedaje.costoTotal ?? 0)),
+      })),
+    ];
 
-      // Mapear datos de Solicitud a SolicitudReportData
-      const reportData = this.mapSolicitudToReportData(solicitud);
-      console.log(`[PDF] Datos mapeados correctamente`);
+    const buffer = await this.pdfService.generatePdf('solicitud.hbs', {
+      ...solicitud,
+      codigoSolicitud: solicitud.codigoSolicitud,
+      fechaSolicitud: this.formatDate(solicitud.fechaSolicitud),
+      fechaInicio: this.formatDate(solicitud.fechaInicio),
+      fechaFin: this.formatDate(solicitud.fechaFin),
+      montoTotalNeto: this.formatCurrency(
+        Number(solicitud.montoTotalNeto ?? 0),
+      ),
+      montoTotalPresupuestado: this.formatCurrency(
+        Number(solicitud.montoTotalPresupuestado ?? 0),
+      ),
+      emisorNombre: solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
+      emisorCargo: solicitud.usuarioEmisor?.cargo ?? 'N/A',
+      aprobadorNombre: solicitud.aprobador?.nombreCompleto ?? 'Sin asignar',
+      motivoViaje: solicitud.motivoViaje ?? 'Sin motivo registrado',
+      lugarViaje: solicitud.lugarViaje ?? 'Sin lugar registrado',
+      detalle,
+    });
 
-      const buffer = await this.reportsService.generateSolicitudPdf(reportData);
-      console.log(
-        `[PDF] PDF generado exitosamente, tamaño: ${buffer.length} bytes`,
-      );
-
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="Solicitud-${solicitud.codigoSolicitud}.pdf"`,
-        'Content-Length': buffer.length.toString(),
-      });
-
-      return new StreamableFile(buffer);
-    } catch (error) {
-      console.error('[PDF] Error generando PDF:', error);
-      if (error instanceof Error) {
-        console.error('[PDF] Stack trace:', error.stack);
-      }
-      throw error;
-    }
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="solicitud.pdf"',
+    });
+    res.send(buffer);
   }
 
-  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-  private mapSolicitudToReportData(solicitud: any): SolicitudReportData {
-    console.log('[PDF Mapping] Iniciando mapeo de datos de solicitud');
+  private formatDate(value: Date | string | null | undefined): string {
+    if (!value) return 'N/A';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
 
-    // Mapear viaticos con validación
-    const viaticos = (solicitud.viaticos || []).map((v: any, idx: number) => {
-      const mapped = {
-        tipoDestino: v.tipoDestino || '',
-        dias: v.dias || 0,
-        cantidadPersonas: v.cantidadPersonas || 0,
-        costoUnitario: v.costoUnitario,
-        montoPresupuestado: v.montoPresupuestado,
-        montoNeto: v.montoNeto,
-        concepto: v.concepto ? { nombre: v.concepto.nombre } : undefined,
-      };
-      console.log(`[PDF Mapping] Viatico ${idx}:`, mapped);
-      return mapped;
-    });
+    return new Intl.DateTimeFormat('es-BO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
+  }
 
-    // Mapear gastos con validación
-    const gastos = (solicitud.gastos || []).map((g: any, idx: number) => {
-      const mapped = {
-        detalle: g.detalle,
-        tipoDocumento: g.tipoDocumento || '',
-        cantidad: g.cantidad || 0,
-        costoUnitario: g.costoUnitario,
-        montoPresupuestado: g.montoPresupuestado,
-        montoNeto: g.montoNeto,
-        tipoGasto: g.tipoGasto ? { nombre: g.tipoGasto.nombre } : undefined,
-      };
-      console.log(`[PDF Mapping] Gasto ${idx}:`, mapped);
-      return mapped;
-    });
-
-    // Extraer cuenta bancaria del primer proyecto de los presupuestos
-    // (asume que todos los presupuestos tienen el mismo proyecto/cuenta)
-    let cuentaBancaria: any = undefined;
-    const presupuestos = solicitud.presupuestos || [];
-    if (presupuestos.length > 0) {
-      const firstPresupuesto = presupuestos[0];
-      if (firstPresupuesto?.poa?.estructura?.proyecto?.cuentaBancaria) {
-        cuentaBancaria = {
-          numeroCuenta:
-            firstPresupuesto.poa.estructura.proyecto.cuentaBancaria
-              .numeroCuenta,
-          banco: firstPresupuesto.poa.estructura.proyecto.cuentaBancaria.banco,
-          moneda:
-            firstPresupuesto.poa.estructura.proyecto.cuentaBancaria.moneda,
-        };
-        console.log('[PDF Mapping] Cuenta bancaria extraída:', cuentaBancaria);
-      }
-    }
-
-    const result: SolicitudReportData = {
-      codigoSolicitud: solicitud.codigoSolicitud || '',
-      lugarViaje: solicitud.lugarViaje,
-      motivoViaje: solicitud.motivoViaje,
-      fechaInicio: solicitud.fechaInicio,
-      fechaFin: solicitud.fechaFin,
-      montoTotalPresupuestado: solicitud.montoTotalPresupuestado,
-      montoTotalNeto: solicitud.montoTotalNeto,
-      usuarioEmisor: solicitud.usuarioEmisor
-        ? {
-            nombreCompleto: solicitud.usuarioEmisor.nombreCompleto,
-            cargo: solicitud.usuarioEmisor.cargo,
-          }
-        : undefined,
-      aprobador: solicitud.aprobador
-        ? {
-            nombreCompleto: solicitud.aprobador.nombreCompleto,
-          }
-        : undefined,
-      usuarioBeneficiado: solicitud.usuarioBeneficiado
-        ? {
-            nombreCompleto: solicitud.usuarioBeneficiado.nombreCompleto,
-          }
-        : undefined,
-      presupuestos: presupuestos.map((p: any) => ({
-        poa: p.poa
-          ? {
-              codigoPoa: p.poa.codigoPoa,
-              actividad: p.poa.actividad,
-              estructura: p.poa.estructura,
-              codigoPresupuestario: p.poa.codigoPresupuestario,
-            }
-          : undefined,
-      })),
-      planificaciones: (solicitud.planificaciones || []).map((plan: any) => ({
-        fechaInicio: plan.fechaInicio,
-        fechaFin: plan.fechaFin,
-        actividadProgramada: plan.actividadProgramada,
-        cantidadPersonasInstitucional: plan.cantidadPersonasInstitucional,
-        cantidadPersonasTerceros: plan.cantidadPersonasTerceros,
-      })),
-      viaticos,
-      gastos,
-      cuentaBancaria,
-    };
-
-    console.log('[PDF Mapping] Mapeo completado exitosamente');
-    return result;
+  private formatCurrency(value: number): string {
+    return `Bs ${new Intl.NumberFormat('es-BO', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)}`;
   }
 }

@@ -20,6 +20,7 @@ import { CuentasBancariasModule } from './catalogos/cuentas-bancarias/cuentas-ba
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { RendicionesModule } from './rendiciones/rendiciones.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { PdfModule } from './pdf/pdf.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     NotificacionesModule,
     RendicionesModule,
     DashboardModule,
+    PdfModule,
   ],
   providers: [
     {

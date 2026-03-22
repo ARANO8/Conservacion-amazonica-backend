@@ -6,11 +6,13 @@ import { ReportsModule } from '../reports/reports.module';
 import { SolicitudPresupuestoModule } from '../solicitudes-presupuestos/solicitudes-presupuestos.module';
 import { PoaModule } from '../poa/poa.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
+import { PdfModule } from '../pdf/pdf.module';
 
 @Module({
   imports: [
     PrismaModule,
     ReportsModule,
+    PdfModule,
     SolicitudPresupuestoModule,
     PoaModule,
     NotificacionesModule,

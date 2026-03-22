@@ -3,23 +3,19 @@ import {
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
-import { promises as fs } from 'fs';
-import * as path from 'path';
+import * as fs from 'fs';
+import { join } from 'path';
 import Handlebars from 'handlebars';
 import puppeteer from 'puppeteer';
-
-type PdfTemplateContext = Record<string, unknown>;
 
 @Injectable()
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
 
-  async generatePdf(
-    templateName: string,
-    context: PdfTemplateContext,
-  ): Promise<Buffer> {
-    const templateSource = await this.loadTemplate(templateName);
-    const html = Handlebars.compile(templateSource)(context);
+  async generatePdf(templateName: string, data: any): Promise<Buffer> {
+    const templateFile = this.readTemplate(templateName);
+    const template = Handlebars.compile(templateFile);
+    const html = template(data);
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -34,10 +30,10 @@ export class PdfService {
         format: 'A4',
         printBackground: true,
         margin: {
-          top: '16mm',
-          right: '12mm',
-          bottom: '16mm',
-          left: '12mm',
+          top: '20mm',
+          bottom: '20mm',
+          left: '20mm',
+          right: '20mm',
         },
       });
 
@@ -53,19 +49,16 @@ export class PdfService {
     }
   }
 
-  private async loadTemplate(templateName: string): Promise<string> {
-    const candidates = [
-      path.join(process.cwd(), 'src', 'templates', templateName),
-      path.join(process.cwd(), 'dist', 'src', 'templates', templateName),
-      path.join(process.cwd(), 'dist', 'templates', templateName),
+  private readTemplate(templateName: string): string {
+    const templatePaths = [
+      join(__dirname, '..', 'templates', templateName),
+      join(process.cwd(), 'src', 'templates', templateName),
+      join(process.cwd(), 'dist', 'templates', templateName),
     ];
 
-    for (const candidate of candidates) {
-      try {
-        await fs.access(candidate);
-        return await fs.readFile(candidate, 'utf8');
-      } catch {
-        continue;
+    for (const templatePath of templatePaths) {
+      if (fs.existsSync(templatePath)) {
+        return fs.readFileSync(templatePath, 'utf8');
       }
     }
 

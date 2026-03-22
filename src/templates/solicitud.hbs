@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solicitud de Fondos {{codigoSolicitud}}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @page {
+        size: A4;
+        margin: 20mm;
+      }
+
+      body {
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+      }
+
+      .avoid-break {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+    </style>
+  </head>
+  <body class="bg-white text-[11px] text-slate-900">
+    <header class="mb-6 border-b pb-4">
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-bold">Solicitud de Fondos</h1>
+          <p class="text-xs text-slate-500">Código: {{codigoSolicitud}}</p>
+        </div>
+        <div class="text-right text-xs text-slate-500">
+          <p>Fecha solicitud: {{fechaSolicitud}}</p>
+        </div>
+      </div>
+    </header>
+
+    <section class="avoid-break mb-4 rounded-lg border border-slate-200 p-4">
+      <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+        Datos Generales
+      </h2>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-2">
+        <div>
+          <span class="font-semibold text-slate-700">Emisor:</span>
+          <span>{{emisorNombre}}</span>
+        </div>
+        <div>
+          <span class="font-semibold text-slate-700">Cargo:</span>
+          <span>{{emisorCargo}}</span>
+        </div>
+        <div>
+          <span class="font-semibold text-slate-700">Aprobador:</span>
+          <span>{{aprobadorNombre}}</span>
+        </div>
+        <div>
+          <span class="font-semibold text-slate-700">Lugar de viaje:</span>
+          <span>{{lugarViaje}}</span>
+        </div>
+        <div class="col-span-2">
+          <span class="font-semibold text-slate-700">Motivo:</span>
+          <span>{{motivoViaje}}</span>
+        </div>
+        <div>
+          <span class="font-semibold text-slate-700">Fecha inicio:</span>
+          <span>{{fechaInicio}}</span>
+        </div>
+        <div>
+          <span class="font-semibold text-slate-700">Fecha fin:</span>
+          <span>{{fechaFin}}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="avoid-break mb-4 rounded-lg border border-slate-200 p-4">
+      <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+        Resumen Financiero
+      </h2>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="rounded-md border border-indigo-200 bg-indigo-50 p-3">
+          <p class="text-xs font-semibold uppercase text-indigo-700">
+            Total Presupuestado
+          </p>
+          <p class="mt-1 text-base font-bold">{{montoTotalPresupuestado}}</p>
+        </div>
+        <div class="rounded-md border border-emerald-200 bg-emerald-50 p-3">
+          <p class="text-xs font-semibold uppercase text-emerald-700">
+            Total Neto Solicitado
+          </p>
+          <p class="mt-1 text-base font-bold">{{montoTotalNeto}}</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="mb-4 rounded-lg border border-slate-200 p-4">
+      <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+        Detalle de Solicitud
+      </h2>
+
+      <table class="w-full border-collapse text-[10px]">
+        <thead>
+          <tr class="bg-slate-100 text-slate-700">
+            <th class="border border-slate-300 px-2 py-2 text-left">Tipo</th>
+            <th class="border border-slate-300 px-2 py-2 text-left">Descripción</th>
+            <th class="border border-slate-300 px-2 py-2 text-left">Cantidad</th>
+            <th class="border border-slate-300 px-2 py-2 text-right">Monto Neto</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#if detalle.length}}
+            {{#each detalle}}
+              <tr>
+                <td class="border border-slate-300 px-2 py-2">{{categoria}}</td>
+                <td class="border border-slate-300 px-2 py-2">{{descripcion}}</td>
+                <td class="border border-slate-300 px-2 py-2">{{cantidad}}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">
+                  {{montoNeto}}
+                </td>
+              </tr>
+            {{/each}}
+          {{else}}
+            <tr>
+              <td class="border border-slate-300 px-2 py-3 text-center" colspan="4">
+                Sin detalle económico registrado.
+              </td>
+            </tr>
+          {{/if}}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="mt-10 grid grid-cols-2 gap-10 text-center text-xs">
+      <div>
+        <div class="mx-auto mb-2 h-px w-48 bg-slate-500"></div>
+        <p class="font-semibold">Firma Emisor</p>
+        <p class="text-slate-600">{{emisorNombre}}</p>
+      </div>
+
+      <div>
+        <div class="mx-auto mb-2 h-px w-48 bg-slate-500"></div>
+        <p class="font-semibold">Firma Aprobador</p>
+        <p class="text-slate-600">{{aprobadorNombre}}</p>
+      </div>
+    </section>
+  </body>
+</html>
