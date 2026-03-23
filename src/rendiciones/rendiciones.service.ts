@@ -219,6 +219,12 @@ export class RendicionesService {
         throw new NotFoundException('Solicitud no encontrada');
       }
 
+      if (solicitud.usuarioEmisorId !== usuarioId) {
+        throw new ForbiddenException(
+          'Solo el emisor de la solicitud puede registrar esta rendición',
+        );
+      }
+
       if (solicitud.estado !== EstadoSolicitud.DESEMBOLSADO) {
         throw new BadRequestException(
           'Solo se puede rendir una solicitud en estado DESEMBOLSADO',
@@ -353,28 +359,30 @@ export class RendicionesService {
       return rendicion;
     });
 
-    try {
-      if (!rendicion.aprobadorActualId) {
-        this.logger.error(
-          `🔥 Falla al crear notificación de Rendición: aprobadorActualId no definido para rendición ${rendicion.id}`,
-        );
-        return rendicion;
-      }
+    const aprobadorId = rendicion.aprobadorActualId;
+    if (!aprobadorId) {
+      this.logger.error(
+        `[RendicionesService] No se pudo crear notificación para rendición ${rendicion.id}: aprobadorActualId no definido`,
+      );
+      return rendicion;
+    }
 
+    try {
       await this.notificacionesService.crearNotificacion({
-        usuarioId: rendicion.aprobadorActualId,
-        tipo: 'RENDICION_PENDIENTE',
         titulo: 'Nueva rendición asignada',
-        mensaje: `Tienes una nueva rendición pendiente de revisión (Rendición #${rendicion.id}).`,
+        mensaje: `Se ha asignado la rendición #${rendicion.id} para tu revisión`,
+        tipo: 'RENDICION_PENDIENTE',
+        usuarioId: aprobadorId,
+        solicitudId: rendicion.solicitudId,
         urlDestino: '/app/aprobaciones',
-        solicitudId: dto.solicitudId,
       });
     } catch (error: unknown) {
-      const trace =
-        error instanceof Error
-          ? (error.stack ?? error.message)
-          : JSON.stringify(error);
-      this.logger.error('🔥 Falla al crear notificación de Rendición:', trace);
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[RendicionesService] Error al crear notificación para rendición ${rendicion.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
     }
 
     return rendicion;
