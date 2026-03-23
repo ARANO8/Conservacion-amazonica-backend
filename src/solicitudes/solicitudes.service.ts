@@ -915,7 +915,7 @@ export class SolicitudesService {
       hospedajes !== undefined ||
       nominasTerceros !== undefined;
 
-    return this.prisma.$transaction(async (tx) => {
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
       let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
       let finalMontoTotalNeto = solicitud.montoTotalNeto;
       let finalFechaInicio: Date | null = solicitud.fechaInicio;
@@ -1051,6 +1051,26 @@ export class SolicitudesService {
         include: SOLICITUD_INCLUDE,
       });
     });
+
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Solicitud corregida',
+        mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido corregida y requiere tu revisión`,
+        tipo: 'SOLICITUD_ASIGNADA',
+        usuarioId: aprobadorId,
+        solicitudId: solicitudActualizada.id,
+        urlDestino: `/app/aprobaciones/${solicitudActualizada.id}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación (corrección) para solicitud ${solicitudActualizada.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return solicitudActualizada;
   }
 
   async remove(id: number, usuarioId: number): Promise<Solicitud> {
