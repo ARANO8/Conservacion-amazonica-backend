@@ -697,66 +697,10 @@ export class SolicitudesService {
   }
 
   async findOne(id: number) {
-    // Una sola consulta con todos los includes necesarios y filtro deletedAt: null
-    // Evita la doble consulta anterior y garantiza que las solicitudes borradas
-    // (soft-delete) nunca sean expuestas.
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
       include: {
-        usuarioEmisor: true,
-        aprobador: true,
-        usuarioBeneficiado: true,
-        historialAprobaciones: {
-          include: {
-            usuario: {
-              select: {
-                id: true,
-                nombreCompleto: true,
-                email: true,
-                cargo: true,
-                rol: true,
-              },
-            },
-            derivadoA: {
-              select: {
-                id: true,
-                nombreCompleto: true,
-                email: true,
-                cargo: true,
-                rol: true,
-              },
-            },
-          },
-          orderBy: { fecha: 'desc' },
-        },
-        presupuestos: {
-          include: {
-            poa: {
-              include: {
-                estructura: {
-                  include: {
-                    proyecto: { include: { cuentaBancaria: true } },
-                    grupo: true,
-                    partida: true,
-                  },
-                },
-                codigoPresupuestario: true,
-                actividad: true,
-              },
-            },
-          },
-        },
-        planificaciones: true,
-        viaticos: {
-          include: {
-            concepto: true,
-            planificaciones: true,
-          },
-        },
-        gastos: { include: { tipoGasto: true } },
-        hospedajes: true,
-        personasExternas: true,
-        nominasTerceros: true,
+        ...SOLICITUD_INCLUDE,
         rendicion: true,
       },
     });
@@ -765,7 +709,7 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
-    return solicitud;
+    return this.enriquecerConSaldos(solicitud);
   }
 
   async generatePdf(id: number): Promise<Buffer> {
