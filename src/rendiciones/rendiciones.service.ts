@@ -354,21 +354,27 @@ export class RendicionesService {
     });
 
     try {
+      if (!rendicion.aprobadorActualId) {
+        this.logger.error(
+          `🔥 Falla al crear notificación de Rendición: aprobadorActualId no definido para rendición ${rendicion.id}`,
+        );
+        return rendicion;
+      }
+
       await this.notificacionesService.crearNotificacion({
-        usuarioId: dto.aprobadorActualId,
+        usuarioId: rendicion.aprobadorActualId,
         tipo: 'RENDICION_PENDIENTE',
         titulo: 'Nueva rendición asignada',
         mensaje: `Tienes una nueva rendición pendiente de revisión (Rendición #${rendicion.id}).`,
-        urlDestino: `/app/rendiciones/${rendicion.id}`,
+        urlDestino: '/app/aprobaciones',
         solicitudId: dto.solicitudId,
       });
-    } catch (error) {
-      const normalizedError =
-        error instanceof Error ? error : new Error(String(error));
-      this.logger.error(
-        `[RendicionesService] Error al enviar notificación de rendición ${rendicion.id}: ${normalizedError.message}`,
-        normalizedError.stack,
-      );
+    } catch (error: unknown) {
+      const trace =
+        error instanceof Error
+          ? (error.stack ?? error.message)
+          : JSON.stringify(error);
+      this.logger.error('🔥 Falla al crear notificación de Rendición:', trace);
     }
 
     return rendicion;
