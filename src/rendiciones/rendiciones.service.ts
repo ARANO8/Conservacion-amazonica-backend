@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -17,6 +18,7 @@ import { CreateRendicionDto } from './dto/create-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 import { PdfService } from '../pdf/pdf.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
 const RENDICION_INCLUDE = {
   solicitud: {
@@ -98,9 +100,12 @@ const RENDICION_INCLUDE = {
 
 @Injectable()
 export class RendicionesService {
+  private readonly logger = new Logger(RendicionesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly pdfService: PdfService,
+    private readonly notificacionesService: NotificacionesService,
   ) {}
 
   async findAll(usuario: { id: number; rol: Rol }, solicitudId?: number) {
@@ -202,7 +207,7 @@ export class RendicionesService {
   }
 
   async create(dto: CreateRendicionDto, usuarioId: number) {
-    return this.prisma.$transaction(async (tx) => {
+    const rendicion = await this.prisma.$transaction(async (tx) => {
       const solicitud = await tx.solicitud.findUnique({
         where: { id: dto.solicitudId },
         include: {
@@ -347,6 +352,26 @@ export class RendicionesService {
 
       return rendicion;
     });
+
+    try {
+      await this.notificacionesService.crearNotificacion({
+        usuarioId: dto.aprobadorActualId,
+        tipo: 'RENDICION_PENDIENTE',
+        titulo: 'Nueva rendición asignada',
+        mensaje: `Tienes una nueva rendición pendiente de revisión (Rendición #${rendicion.id}).`,
+        urlDestino: `/app/rendiciones/${rendicion.id}`,
+        solicitudId: dto.solicitudId,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[RendicionesService] Error al enviar notificación de rendición ${rendicion.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return rendicion;
   }
 
   async aprobar(
