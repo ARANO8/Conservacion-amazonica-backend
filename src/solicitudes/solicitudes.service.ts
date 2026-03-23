@@ -873,6 +873,9 @@ export class SolicitudesService {
       lugarViaje,
       motivoViaje,
       descripcion,
+      urlCuadroComparativo,
+      urlCotizaciones,
+      poaIds,
       planificaciones,
       viaticos,
       gastos,
@@ -904,13 +907,13 @@ export class SolicitudesService {
       );
     }
 
-    // [SAFETY CHECK] Conditional Nuke: Solo reemplazamos si se envían planes/viaticos/gastos/nominas
-    const itemsActualizados =
-      (planificaciones && planificaciones.length > 0) ||
-      (viaticos && viaticos.length > 0) ||
-      (gastos && gastos.length > 0) ||
-      (hospedajes && hospedajes.length > 0) ||
-      (nominasTerceros && nominasTerceros.length > 0);
+    const debeReemplazarRelacionesAnidadas =
+      poaIds !== undefined ||
+      planificaciones !== undefined ||
+      viaticos !== undefined ||
+      gastos !== undefined ||
+      hospedajes !== undefined ||
+      nominasTerceros !== undefined;
 
     return this.prisma.$transaction(async (tx) => {
       let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
@@ -918,19 +921,66 @@ export class SolicitudesService {
       let finalFechaInicio: Date | null = solicitud.fechaInicio;
       let finalFechaFin: Date | null = solicitud.fechaFin;
 
-      if (itemsActualizados) {
+      if (debeReemplazarRelacionesAnidadas) {
+        const poaIdsActualizados =
+          poaIds ??
+          solicitud.presupuestos.map((presupuesto) => presupuesto.poaId);
+
+        if (poaIdsActualizados.length === 0) {
+          throw new BadRequestException(
+            'Debes seleccionar al menos una partida presupuestaria',
+          );
+        }
+
+        const dtoParaReemplazo: UpdateSolicitudDto = {
+          ...updateSolicitudDto,
+          poaIds: poaIdsActualizados,
+          planificaciones: planificaciones ?? [],
+          viaticos: viaticos ?? [],
+          gastos: gastos ?? [],
+          hospedajes: hospedajes ?? [],
+          nominasTerceros: nominasTerceros ?? [],
+        };
+
+        // B. Recalcular y re-insertar
+        const detalles = await this.prepararInsertAnidado(dtoParaReemplazo);
+
+        // Validación: todas las referencias por POA deben existir en poaIds
+        const poaIdSet = new Set(poaIdsActualizados);
+        for (const viatico of detalles.viaticosData) {
+          if (!poaIdSet.has(viatico.poaId)) {
+            throw new BadRequestException(
+              `El viático referencia la partida POA ${viatico.poaId} que no está incluida en poaIds`,
+            );
+          }
+        }
+
+        for (const gasto of detalles.gastosData) {
+          if (!poaIdSet.has(gasto.poaId)) {
+            throw new BadRequestException(
+              `El gasto referencia la partida POA ${gasto.poaId} que no está incluida en poaIds`,
+            );
+          }
+        }
+
+        for (const hospedaje of detalles.hospedajes) {
+          if (!poaIdSet.has(hospedaje.poaId)) {
+            throw new BadRequestException(
+              `El hospedaje referencia la partida POA ${hospedaje.poaId} que no está incluida en poaIds`,
+            );
+          }
+        }
+
         // A. Limpiar existentes (orden: hijos primero por FK)
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
+        await tx.nominaTerceros.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
         await tx.solicitudPresupuesto.deleteMany({
           where: { solicitudId: id },
         });
-
-        // B. Recalcular y re-insertar
-        const detalles = await this.prepararInsertAnidado(updateSolicitudDto);
         finalMontoTotalPresupuestado = detalles.montoTotalPresupuestado;
         finalMontoTotalNeto = detalles.montoTotalNeto;
 
@@ -957,9 +1007,8 @@ export class SolicitudesService {
         }
 
         // B.5 Recrear SolicitudPresupuesto
-        const updatePoaIds = updateSolicitudDto.poaIds ?? [];
         const presupuestosMap = new Map<number, number>();
-        for (const poaId of updatePoaIds) {
+        for (const poaId of poaIdsActualizados) {
           const sp = await tx.solicitudPresupuesto.create({
             data: { poaId, solicitudId: id },
           });
@@ -985,6 +1034,12 @@ export class SolicitudesService {
           lugarViaje,
           motivoViaje,
           descripcion,
+          urlCuadroComparativo:
+            urlCuadroComparativo !== undefined
+              ? urlCuadroComparativo
+              : undefined,
+          urlCotizaciones:
+            urlCotizaciones !== undefined ? urlCotizaciones : undefined,
           montoTotalPresupuestado: finalMontoTotalPresupuestado,
           montoTotalNeto: finalMontoTotalNeto,
           fechaInicio: finalFechaInicio,
