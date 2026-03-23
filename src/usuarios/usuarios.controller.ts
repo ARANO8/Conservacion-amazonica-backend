@@ -21,7 +21,6 @@ import { Rol } from '@prisma/client';
 @ApiTags('Usuarios')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Rol.ADMIN)
 @Controller('usuarios')
 export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
@@ -34,12 +33,21 @@ export class UsuariosController {
   }
 
   @Get()
+  @Roles(Rol.ADMIN)
   @ApiOperation({ summary: 'Obtener lista de usuarios activos' })
   findAll() {
     return this.usuariosService.findAll();
   }
 
+  @Get('lookup/activos')
+  @Roles(Rol.ADMIN, Rol.EJECUTIVO, Rol.TESORERO, Rol.CONTADOR, Rol.USUARIO)
+  @ApiOperation({ summary: 'Obtener listado básico de usuarios activos' })
+  getLookup() {
+    return this.usuariosService.getLookup();
+  }
+
   @Get(':id')
+  @Roles(Rol.ADMIN)
   @ApiOperation({ summary: 'Obtener un usuario por ID' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.usuariosService.findOne(id);

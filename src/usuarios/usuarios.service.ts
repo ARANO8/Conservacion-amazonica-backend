@@ -43,6 +43,19 @@ export class UsuariosService {
     });
   }
 
+  async getLookup() {
+    return this.prisma.usuario.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        nombreCompleto: true,
+        email: true,
+        rol: true,
+        cargo: true,
+      },
+    });
+  }
+
   async findOne(id: number) {
     const usuario = await this.prisma.usuario.findFirst({
       where: { id, deletedAt: null },
