@@ -17,8 +17,6 @@ import { CreateRendicionDto } from './dto/create-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 import { PdfService } from '../pdf/pdf.service';
-import { existsSync } from 'fs';
-import * as path from 'path';
 
 const RENDICION_INCLUDE = {
   solicitud: {
@@ -199,7 +197,6 @@ export class RendicionesService {
         montoNeto: this.formatCurrency(Number(gasto.montoNeto ?? 0)),
       })),
       informeGastos: this.buildInformeTexto(rendicion.informeGastos),
-      logoUrl: this.getLogoUrl(),
       generatedAt: this.formatDate(new Date()),
     });
   }
@@ -703,15 +700,5 @@ export class RendicionesService {
     );
 
     return [encabezado, ...actividades].join('\n\n');
-  }
-
-  private getLogoUrl(): string | null {
-    const logoPath = path.join(process.cwd(), 'logo.png');
-    if (!existsSync(logoPath)) {
-      return null;
-    }
-
-    const normalizedPath = logoPath.replace(/\\/g, '/');
-    return `file:///${normalizedPath}`;
   }
 }

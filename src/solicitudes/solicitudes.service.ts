@@ -714,6 +714,8 @@ export class SolicitudesService {
 
   async generatePdf(id: number): Promise<Buffer> {
     const solicitud = await this.findOne(id);
+    const cuentaBancaria =
+      solicitud.presupuestos?.[0]?.poa?.estructura?.proyecto?.cuentaBancaria;
 
     const detalle = [
       ...(solicitud.viaticos ?? []).map((viatico) => ({
@@ -753,6 +755,13 @@ export class SolicitudesService {
       aprobadorNombre: solicitud.aprobador?.nombreCompleto ?? 'Sin asignar',
       motivoViaje: solicitud.motivoViaje ?? 'Sin motivo registrado',
       lugarViaje: solicitud.lugarViaje ?? 'Sin lugar registrado',
+      cuentaBancaria: cuentaBancaria
+        ? {
+            banco: cuentaBancaria.banco ?? 'Banco no asignado',
+            numeroCuenta: cuentaBancaria.numeroCuenta ?? 'Sin número',
+            moneda: cuentaBancaria.moneda ?? 'M/N',
+          }
+        : null,
       detalle,
     });
   }

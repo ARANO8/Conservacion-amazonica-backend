@@ -15,7 +15,11 @@ export class PdfService {
   async generatePdf(templateName: string, data: any): Promise<Buffer> {
     const templateFile = this.readTemplate(templateName);
     const template = Handlebars.compile(templateFile);
-    const html = template(data);
+    const logoBase64 = this.readLogoBase64();
+    const html = template({
+      ...data,
+      logoBase64,
+    });
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -65,5 +69,17 @@ export class PdfService {
     throw new InternalServerErrorException(
       `Template PDF no encontrado: ${templateName}`,
     );
+  }
+
+  private readLogoBase64(): string | null {
+    const logoPath = join(process.cwd(), 'logo.png');
+
+    if (!fs.existsSync(logoPath)) {
+      this.logger.warn(`Logo no encontrado en ruta: ${logoPath}`);
+      return null;
+    }
+
+    const logoBuffer = fs.readFileSync(logoPath);
+    return logoBuffer.toString('base64');
   }
 }

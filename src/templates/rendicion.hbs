@@ -39,8 +39,12 @@
   <body class="bg-white px-2 py-3 text-[11px]">
     <header class="mb-6 flex items-start justify-between border-b pb-4">
       <div class="flex items-center gap-3">
-        {{#if logoUrl}}
-          <img src="{{logoUrl}}" alt="Logo" class="h-16 w-auto" />
+        {{#if logoBase64}}
+          <img
+            src="data:image/png;base64,{{logoBase64}}"
+            alt="Logo AMZ"
+            class="h-16 w-auto object-contain"
+          />
         {{else}}
           <div class="rounded-md border px-3 py-2 text-xs font-semibold">
             Conservacion Amazonica
