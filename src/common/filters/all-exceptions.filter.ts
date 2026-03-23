@@ -39,10 +39,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
-      message =
-        typeof res === 'string'
-          ? res
-          : ((res as { message?: string }).message ?? message);
+
+      if (typeof res === 'string') {
+        message = res;
+      } else {
+        const responseMessage = (res as { message?: unknown }).message;
+
+        if (typeof responseMessage === 'string') {
+          message = responseMessage;
+        } else if (Array.isArray(responseMessage)) {
+          message = responseMessage
+            .map((item) => this.serializeUnknown(item))
+            .join('. ');
+        } else if (responseMessage !== undefined && responseMessage !== null) {
+          message = this.serializeUnknown(responseMessage);
+        }
+      }
 
       // Las HttpException (400, 401, 403, 404) no necesitan stack trace
       if ((status as number) >= 500) {
@@ -62,9 +74,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
         requestBody && typeof requestBody === 'object'
           ? this.sanitizeRequestBody(requestBody as Record<string, unknown>)
           : requestBody;
-      this.logger.error(
-        `Payload recibido: ${JSON.stringify(sanitizedBody).slice(0, 2000)}`,
-      );
+
+      const serializedBody = this.serializeUnknown(sanitizedBody);
+
+      this.logger.error(`Payload recibido: ${serializedBody.slice(0, 2000)}`);
     } else {
       this.logger.error(
         `[${request.method}] ${request.url} → Excepción desconocida: ${JSON.stringify(exception)}`,
@@ -107,5 +120,31 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     return value;
+  }
+
+  private serializeUnknown(value: unknown): string {
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    try {
+      const serialized = JSON.stringify(value);
+
+      if (typeof serialized === 'string') {
+        return serialized;
+      }
+    } catch {
+      // noop
+    }
+
+    if (value === undefined || value === null) {
+      return 'Error desconocido';
+    }
+
+    if (typeof value === 'number' || typeof value === 'boolean') {
+      return String(value);
+    }
+
+    return 'Error desconocido';
   }
 }
