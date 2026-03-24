@@ -374,7 +374,7 @@ export class RendicionesService {
         tipo: 'RENDICION_PENDIENTE',
         usuarioId: aprobadorId,
         solicitudId: rendicion.solicitudId,
-        urlDestino: '/app/aprobaciones',
+        urlDestino: `/app/rendiciones/${rendicion.id}`,
       });
     } catch (error: unknown) {
       const normalizedError =

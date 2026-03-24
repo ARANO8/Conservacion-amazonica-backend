@@ -24,6 +24,11 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            rendicion: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
@@ -43,6 +48,11 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            rendicion: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
@@ -110,6 +120,11 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            rendicion: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },

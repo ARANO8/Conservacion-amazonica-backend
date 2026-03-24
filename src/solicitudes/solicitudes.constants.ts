@@ -58,6 +58,12 @@ export const SOLICITUD_INCLUDE = {
   hospedajes: true,
   nominasTerceros: true,
   personasExternas: true,
+  rendicion: {
+    select: {
+      id: true,
+      estado: true,
+    },
+  },
   presupuestos: {
     include: {
       poa: {

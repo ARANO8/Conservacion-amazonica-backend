@@ -6,7 +6,7 @@ import {
 import * as fs from 'fs';
 import { join } from 'path';
 import Handlebars from 'handlebars';
-import puppeteer from 'puppeteer';
+import puppeteer, { Browser } from 'puppeteer';
 
 @Injectable()
 export class PdfService {
@@ -21,12 +21,26 @@ export class PdfService {
       logoBase64,
     });
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    let browser: Browser | null = null;
 
     try {
+      // Configuración de Puppeteer con soporte para variables de entorno
+      const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      };
+
+      // Permitir ruta personalizada de Chrome/Chromium vía variable de entorno
+      const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+      if (executablePath) {
+        launchOptions.executablePath = executablePath;
+        this.logger.debug(
+          `Usando ejecutable de Chrome personalizado: ${executablePath}`,
+        );
+      }
+
+      browser = await puppeteer.launch(launchOptions);
+
       const page = await browser.newPage();
       await page.setContent(html, { waitUntil: 'networkidle0' });
 
@@ -43,13 +57,37 @@ export class PdfService {
 
       return Buffer.from(pdf);
     } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Error desconocido';
+      const errorStack =
+        error instanceof Error ? error.stack : 'Sin stack trace';
+
+      // Detectar error específico de Chrome no encontrado
+      if (errorMessage.includes('Could not find Chrome')) {
+        this.logger.error(
+          `Chrome/Chromium no encontrado. Ejecute: pnpm exec puppeteer browsers install chrome`,
+          errorStack,
+        );
+        throw new InternalServerErrorException(
+          'No se pudo generar el PDF: Chrome no está instalado. Contacte al administrador del sistema.',
+        );
+      }
+
       this.logger.error(
-        `No se pudo generar el PDF con template ${templateName}`,
-        error instanceof Error ? error.stack : undefined,
+        `No se pudo generar el PDF con template ${templateName}: ${errorMessage}`,
+        errorStack,
       );
-      throw new InternalServerErrorException('No se pudo generar el PDF');
+      throw new InternalServerErrorException(
+        'No se pudo generar el PDF. Intente nuevamente más tarde.',
+      );
     } finally {
-      await browser.close();
+      if (browser) {
+        await browser.close().catch((closeError) => {
+          this.logger.warn(
+            `Error al cerrar el navegador: ${closeError instanceof Error ? closeError.message : 'desconocido'}`,
+          );
+        });
+      }
     }
   }
 
