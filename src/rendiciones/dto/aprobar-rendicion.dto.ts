@@ -13,7 +13,7 @@ export class AprobarRendicionDto {
   @ApiPropertyOptional({
     example: 4,
     description:
-      'ID del usuario al que se deriva la rendición (obligatorio si quien aprueba no es TESORERO)',
+      'ID del usuario al que se deriva la rendición (obligatorio si quien aprueba no es CONTADOR)',
   })
   @IsOptional()
   @Type(() => Number)

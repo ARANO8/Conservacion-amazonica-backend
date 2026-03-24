@@ -6,12 +6,17 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exception.filter';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
+const DEFAULT_FRONTEND_URL = 'http://localhost:4200';
+const DEFAULT_PORT = 3000;
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const frontendUrl = process.env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL;
+  const port = Number(process.env.PORT ?? DEFAULT_PORT);
 
   // CORS: permitir solo el origen del frontend (configurable por variable de entorno)
   app.enableCors({
-    origin: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+    origin: frontendUrl,
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
     credentials: true,
   });
@@ -44,6 +49,6 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('doc', app, document);
 
-  await app.listen(process.env.PORT ?? 3000);
+  await app.listen(port);
 }
 void bootstrap();

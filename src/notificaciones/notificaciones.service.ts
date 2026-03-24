@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 export type TipoNotificacion =
@@ -6,10 +6,13 @@ export type TipoNotificacion =
   | 'SOLICITUD_DERIVADA'
   | 'SOLICITUD_APROBADA'
   | 'SOLICITUD_OBSERVADA'
-  | 'RENDICION_PENDIENTE';
+  | 'RENDICION_PENDIENTE'
+  | 'RENDICION_OBSERVADA';
 
 @Injectable()
 export class NotificacionesService {
+  private readonly logger = new Logger(NotificacionesService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getMisNotificaciones(usuarioId: number) {
@@ -22,6 +25,11 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            rendicion: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
@@ -41,6 +49,11 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            rendicion: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
@@ -89,12 +102,9 @@ export class NotificacionesService {
     solicitudId?: number;
     urlDestino?: string;
   }) {
-    console.log('[NotificacionesService] Creando notificación:', {
-      usuarioId: data.usuarioId,
-      tipo: data.tipo,
-      titulo: data.titulo,
-      solicitudId: data.solicitudId,
-    });
+    this.logger.log(
+      `[NotificacionesService] Creando notificación: usuarioId=${data.usuarioId} tipo=${data.tipo} titulo="${data.titulo}" solicitudId=${data.solicitudId ?? 'N/A'}`,
+    );
 
     const resultado = await this.prisma.notificacion.create({
       data: {
@@ -111,15 +121,19 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            rendicion: {
+              select: {
+                id: true,
+              },
+            },
           },
         },
       },
     });
 
-    console.log('[NotificacionesService] Notificación creada exitosamente:', {
-      id: resultado.id,
-      usuarioId: resultado.usuarioId,
-    });
+    this.logger.log(
+      `[NotificacionesService] Notificación creada exitosamente: id=${resultado.id} usuarioId=${resultado.usuarioId}`,
+    );
 
     return resultado;
   }

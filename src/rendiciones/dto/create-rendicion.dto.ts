@@ -7,6 +7,7 @@ import {
   IsDate,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsNumber,
   IsOptional,
   IsString,
@@ -46,11 +47,13 @@ export class CreateGastoRendicionDto {
 
   @ApiProperty({ example: 'Compra de materiales de campo' })
   @IsString()
+  @IsNotEmpty()
   concepto: string;
 
   @ApiPropertyOptional({ example: 'Incluye útiles y material impreso' })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   detalle?: string;
 
   @ApiProperty({ enum: TipoDocumentoRendicionDto, example: 'FACTURA' })
@@ -60,11 +63,13 @@ export class CreateGastoRendicionDto {
   @ApiPropertyOptional({ example: '0001-2026-0001234' })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   numeroDocumento?: string;
 
   @ApiPropertyOptional({ example: 'Proveedor S.R.L.' })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   proveedor?: string;
 
   @ApiPropertyOptional({
@@ -133,6 +138,7 @@ export class CreateGastoRendicionDto {
     description: 'URL del comprobante digital',
   })
   @IsUrl()
+  @IsNotEmpty()
   urlComprobante: string;
 
   @ApiPropertyOptional({ enum: TipoRetencionDto, example: 'SERVICIO' })
@@ -152,10 +158,12 @@ export class CreateActividadInformeDto {
 
   @ApiProperty({ example: 'Cobija' })
   @IsString()
+  @IsNotEmpty()
   lugar: string;
 
   @ApiProperty({ example: 'Gobierno Autónomo Municipal de Cobija' })
   @IsString()
+  @IsNotEmpty()
   personaInstitucion: string;
 
   @ApiProperty({
@@ -163,6 +171,7 @@ export class CreateActividadInformeDto {
       'Reunión de coordinación con actores locales y validación de agenda.',
   })
   @IsString()
+  @IsNotEmpty()
   actividadesRealizadas: string;
 }
 
@@ -203,6 +212,7 @@ export class CreateGastoSinRespaldoDto {
 
   @ApiProperty({ example: 'Pago de taxi urbano en zona sin facturación' })
   @IsString()
+  @IsNotEmpty()
   detalle: string;
 
   @ApiProperty({ example: 35.5 })
@@ -233,6 +243,7 @@ export class CreateDeclaracionJuradaDto {
   })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   tipoDeclaracion?: string;
 
   @ApiPropertyOptional({
@@ -250,6 +261,7 @@ export class CreateDeclaracionJuradaDto {
   })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   observaciones?: string;
 }
 
@@ -307,5 +319,6 @@ export class CreateRendicionDto {
   })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   observaciones?: string;
 }

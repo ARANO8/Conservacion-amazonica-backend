@@ -79,7 +79,10 @@ export class DashboardService {
     userId: number,
     userRol: string,
   ): Promise<DashboardMetricsResponse> {
-    const esGerencial = userRol === Rol.ADMIN || userRol === Rol.TESORERO;
+    const esGerencial =
+      userRol === Rol.ADMIN ||
+      userRol === Rol.EJECUTIVO ||
+      userRol === Rol.TESORERO;
 
     const [
       solicitudesActivas,
@@ -156,7 +159,10 @@ export class DashboardService {
   async getAdvancedAnalytics(
     userRol: string,
   ): Promise<DashboardAdvancedAnalyticsResponse> {
-    const esGerencial = userRol === Rol.ADMIN || userRol === Rol.TESORERO;
+    const esGerencial =
+      userRol === Rol.ADMIN ||
+      userRol === Rol.EJECUTIVO ||
+      userRol === Rol.TESORERO;
 
     if (!esGerencial) {
       throw new ForbiddenException(

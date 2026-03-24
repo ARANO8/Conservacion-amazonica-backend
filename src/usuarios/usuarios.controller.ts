@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  ParseIntPipe,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -32,28 +33,40 @@ export class UsuariosController {
   }
 
   @Get()
+  @Roles(Rol.ADMIN)
   @ApiOperation({ summary: 'Obtener lista de usuarios activos' })
   findAll() {
     return this.usuariosService.findAll();
   }
 
+  @Get('lookup/activos')
+  @Roles(Rol.ADMIN, Rol.EJECUTIVO, Rol.TESORERO, Rol.CONTADOR, Rol.USUARIO)
+  @ApiOperation({ summary: 'Obtener listado básico de usuarios activos' })
+  getLookup() {
+    return this.usuariosService.getLookup();
+  }
+
   @Get(':id')
+  @Roles(Rol.ADMIN)
   @ApiOperation({ summary: 'Obtener un usuario por ID' })
-  findOne(@Param('id') id: string) {
-    return this.usuariosService.findOne(+id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.findOne(id);
   }
 
   @Patch(':id')
   @Roles(Rol.ADMIN)
   @ApiOperation({ summary: 'Actualizar un usuario' })
-  update(@Param('id') id: string, @Body() updateUsuarioDto: UpdateUsuarioDto) {
-    return this.usuariosService.update(+id, updateUsuarioDto);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateUsuarioDto: UpdateUsuarioDto,
+  ) {
+    return this.usuariosService.update(id, updateUsuarioDto);
   }
 
   @Delete(':id')
   @Roles(Rol.ADMIN)
   @ApiOperation({ summary: 'Eliminar un usuario (Borrado lógico)' })
-  remove(@Param('id') id: string) {
-    return this.usuariosService.remove(+id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.usuariosService.remove(id);
   }
 }

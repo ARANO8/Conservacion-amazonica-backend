@@ -10,7 +10,6 @@ import {
   Req,
   ParseIntPipe,
   Res,
-  StreamableFile,
   Logger,
   Query,
   BadRequestException,
@@ -33,8 +32,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import type { Request, Response } from 'express';
-import { ReportsService } from '../reports/reports.service';
-import type { SolicitudReportData } from '../reports/reports.service';
 import { Rol } from '@prisma/client';
 
 interface RequestWithUser extends Request {
@@ -52,10 +49,7 @@ interface RequestWithUser extends Request {
 export class SolicitudesController {
   private readonly logger = new Logger(SolicitudesController.name);
 
-  constructor(
-    private readonly solicitudesService: SolicitudesService,
-    private readonly reportsService: ReportsService,
-  ) {}
+  constructor(private readonly solicitudesService: SolicitudesService) {}
 
   @Post()
   @ApiOperation({ summary: 'Crear una nueva solicitud en estado PENDIENTE' })
@@ -126,7 +120,7 @@ export class SolicitudesController {
   }
 
   @Patch(':id/restore')
-  @Roles(Rol.ADMIN)
+  @Roles(Rol.ADMIN, Rol.EJECUTIVO)
   @ApiOperation({ summary: 'Restaurar una solicitud eliminada' })
   restore(@Param('id', ParseIntPipe) id: number) {
     return this.solicitudesService.restore(id);
@@ -189,146 +183,14 @@ export class SolicitudesController {
   })
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
-    @Res({ passthrough: true }) res: Response,
-  ): Promise<StreamableFile> {
-    try {
-      console.log(`[PDF] Iniciando generación de PDF para solicitud ID: ${id}`);
+    @Res() res: Response,
+  ): Promise<void> {
+    const buffer = await this.solicitudesService.generatePdf(id);
 
-      const solicitud = await this.solicitudesService.findOne(id);
-      console.log(`[PDF] Solicitud obtenida:`, {
-        codigoSolicitud: solicitud.codigoSolicitud,
-        hasEmisor: !!solicitud.usuarioEmisor,
-        hasAprobador: !!solicitud.aprobador,
-        hasBeneficiado: !!solicitud.usuarioBeneficiado,
-        viaticosCount: solicitud.viaticos?.length || 0,
-        gastosCount: solicitud.gastos?.length || 0,
-      });
-
-      // Mapear datos de Solicitud a SolicitudReportData
-      const reportData = this.mapSolicitudToReportData(solicitud);
-      console.log(`[PDF] Datos mapeados correctamente`);
-
-      const buffer = await this.reportsService.generateSolicitudPdf(reportData);
-      console.log(
-        `[PDF] PDF generado exitosamente, tamaño: ${buffer.length} bytes`,
-      );
-
-      res.set({
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="Solicitud-${solicitud.codigoSolicitud}.pdf"`,
-        'Content-Length': buffer.length.toString(),
-      });
-
-      return new StreamableFile(buffer);
-    } catch (error) {
-      console.error('[PDF] Error generando PDF:', error);
-      if (error instanceof Error) {
-        console.error('[PDF] Stack trace:', error.stack);
-      }
-      throw error;
-    }
-  }
-
-  /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
-  private mapSolicitudToReportData(solicitud: any): SolicitudReportData {
-    console.log('[PDF Mapping] Iniciando mapeo de datos de solicitud');
-
-    // Mapear viaticos con validación
-    const viaticos = (solicitud.viaticos || []).map((v: any, idx: number) => {
-      const mapped = {
-        tipoDestino: v.tipoDestino || '',
-        dias: v.dias || 0,
-        cantidadPersonas: v.cantidadPersonas || 0,
-        costoUnitario: v.costoUnitario,
-        montoPresupuestado: v.montoPresupuestado,
-        montoNeto: v.montoNeto,
-        concepto: v.concepto ? { nombre: v.concepto.nombre } : undefined,
-      };
-      console.log(`[PDF Mapping] Viatico ${idx}:`, mapped);
-      return mapped;
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="solicitud.pdf"',
     });
-
-    // Mapear gastos con validación
-    const gastos = (solicitud.gastos || []).map((g: any, idx: number) => {
-      const mapped = {
-        detalle: g.detalle,
-        tipoDocumento: g.tipoDocumento || '',
-        cantidad: g.cantidad || 0,
-        costoUnitario: g.costoUnitario,
-        montoPresupuestado: g.montoPresupuestado,
-        montoNeto: g.montoNeto,
-        tipoGasto: g.tipoGasto ? { nombre: g.tipoGasto.nombre } : undefined,
-      };
-      console.log(`[PDF Mapping] Gasto ${idx}:`, mapped);
-      return mapped;
-    });
-
-    // Extraer cuenta bancaria del primer proyecto de los presupuestos
-    // (asume que todos los presupuestos tienen el mismo proyecto/cuenta)
-    let cuentaBancaria: any = undefined;
-    const presupuestos = solicitud.presupuestos || [];
-    if (presupuestos.length > 0) {
-      const firstPresupuesto = presupuestos[0];
-      if (firstPresupuesto?.poa?.estructura?.proyecto?.cuentaBancaria) {
-        cuentaBancaria = {
-          numeroCuenta:
-            firstPresupuesto.poa.estructura.proyecto.cuentaBancaria
-              .numeroCuenta,
-          banco: firstPresupuesto.poa.estructura.proyecto.cuentaBancaria.banco,
-          moneda:
-            firstPresupuesto.poa.estructura.proyecto.cuentaBancaria.moneda,
-        };
-        console.log('[PDF Mapping] Cuenta bancaria extraída:', cuentaBancaria);
-      }
-    }
-
-    const result: SolicitudReportData = {
-      codigoSolicitud: solicitud.codigoSolicitud || '',
-      lugarViaje: solicitud.lugarViaje,
-      motivoViaje: solicitud.motivoViaje,
-      fechaInicio: solicitud.fechaInicio,
-      fechaFin: solicitud.fechaFin,
-      montoTotalPresupuestado: solicitud.montoTotalPresupuestado,
-      montoTotalNeto: solicitud.montoTotalNeto,
-      usuarioEmisor: solicitud.usuarioEmisor
-        ? {
-            nombreCompleto: solicitud.usuarioEmisor.nombreCompleto,
-            cargo: solicitud.usuarioEmisor.cargo,
-          }
-        : undefined,
-      aprobador: solicitud.aprobador
-        ? {
-            nombreCompleto: solicitud.aprobador.nombreCompleto,
-          }
-        : undefined,
-      usuarioBeneficiado: solicitud.usuarioBeneficiado
-        ? {
-            nombreCompleto: solicitud.usuarioBeneficiado.nombreCompleto,
-          }
-        : undefined,
-      presupuestos: presupuestos.map((p: any) => ({
-        poa: p.poa
-          ? {
-              codigoPoa: p.poa.codigoPoa,
-              actividad: p.poa.actividad,
-              estructura: p.poa.estructura,
-              codigoPresupuestario: p.poa.codigoPresupuestario,
-            }
-          : undefined,
-      })),
-      planificaciones: (solicitud.planificaciones || []).map((plan: any) => ({
-        fechaInicio: plan.fechaInicio,
-        fechaFin: plan.fechaFin,
-        actividadProgramada: plan.actividadProgramada,
-        cantidadPersonasInstitucional: plan.cantidadPersonasInstitucional,
-        cantidadPersonasTerceros: plan.cantidadPersonasTerceros,
-      })),
-      viaticos,
-      gastos,
-      cuentaBancaria,
-    };
-
-    console.log('[PDF Mapping] Mapeo completado exitosamente');
-    return result;
+    res.send(buffer);
   }
 }

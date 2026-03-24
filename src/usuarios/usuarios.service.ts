@@ -4,6 +4,8 @@ import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { UpdateUsuarioDto } from './dto/update-usuario.dto';
 import * as bcrypt from 'bcrypt';
 
+const BCRYPT_SALT_ROUNDS = 10;
+
 @Injectable()
 export class UsuariosService {
   constructor(private prisma: PrismaService) {}
@@ -20,7 +22,10 @@ export class UsuariosService {
   };
 
   async create(createUsuarioDto: CreateUsuarioDto) {
-    const hashedPassword = await bcrypt.hash(createUsuarioDto.password, 10);
+    const hashedPassword = await bcrypt.hash(
+      createUsuarioDto.password,
+      BCRYPT_SALT_ROUNDS,
+    );
 
     return this.prisma.usuario.create({
       data: {
@@ -35,6 +40,19 @@ export class UsuariosService {
     return this.prisma.usuario.findMany({
       where: { deletedAt: null },
       select: this.userSelect,
+    });
+  }
+
+  async getLookup() {
+    return this.prisma.usuario.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        nombreCompleto: true,
+        email: true,
+        rol: true,
+        cargo: true,
+      },
     });
   }
 
@@ -62,7 +80,7 @@ export class UsuariosService {
 
     const data = { ...updateUsuarioDto };
     if (data.password) {
-      data.password = await bcrypt.hash(data.password, 10);
+      data.password = await bcrypt.hash(data.password, BCRYPT_SALT_ROUNDS);
     }
 
     return this.prisma.usuario.update({

@@ -6,6 +6,8 @@ import { AuthController } from './auth.controller';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { JwtStrategy } from './jwt.strategy';
 
+const DEFAULT_JWT_EXPIRES_IN = '24h';
+
 @Module({
   imports: [
     UsuariosModule,
@@ -18,8 +20,8 @@ import { JwtStrategy } from './jwt.strategy';
         return {
           secret: process.env.JWT_SECRET,
           signOptions: {
-            expiresIn: (process.env.JWT_EXPIRES_IN ||
-              '24h') as `${number}${'h' | 'm' | 's' | 'd'}`,
+            expiresIn: (process.env.JWT_EXPIRES_IN ??
+              DEFAULT_JWT_EXPIRES_IN) as `${number}${'h' | 'm' | 's' | 'd'}`,
           },
         };
       },

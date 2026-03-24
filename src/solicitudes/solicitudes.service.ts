@@ -34,6 +34,7 @@ import {
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { PdfService } from '../pdf/pdf.service';
 
 type DetalleSolicitud = {
   montoTotalPresupuestado: Prisma.Decimal;
@@ -79,6 +80,7 @@ export class SolicitudesService {
     private presupuestoService: SolicitudPresupuestoService,
     private poaService: PoaService,
     private notificacionesService: NotificacionesService,
+    private readonly pdfService: PdfService,
   ) {}
 
   private async generarCodigo(tx: Prisma.TransactionClient): Promise<string> {
@@ -647,9 +649,11 @@ export class SolicitudesService {
         urlDestino: `/app/aprobaciones/${result.id}`,
       });
     } catch (error) {
-      console.error(
-        `[SolicitudesService] Error al crear notificación para solicitud ${result.id}:`,
-        error,
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación para solicitud ${result.id}: ${normalizedError.message}`,
+        normalizedError.stack,
       );
     }
 
@@ -693,47 +697,10 @@ export class SolicitudesService {
   }
 
   async findOne(id: number) {
-    // Una sola consulta con todos los includes necesarios y filtro deletedAt: null
-    // Evita la doble consulta anterior y garantiza que las solicitudes borradas
-    // (soft-delete) nunca sean expuestas.
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
       include: {
-        usuarioEmisor: true,
-        aprobador: true,
-        usuarioBeneficiado: true,
-        historialAprobaciones: {
-          include: { usuario: true, derivadoA: true },
-          orderBy: { fecha: 'desc' },
-        },
-        presupuestos: {
-          include: {
-            poa: {
-              include: {
-                estructura: {
-                  include: {
-                    proyecto: { include: { cuentaBancaria: true } },
-                    grupo: true,
-                    partida: true,
-                  },
-                },
-                codigoPresupuestario: true,
-                actividad: true,
-              },
-            },
-          },
-        },
-        planificaciones: true,
-        viaticos: {
-          include: {
-            concepto: true,
-            planificaciones: true,
-          },
-        },
-        gastos: { include: { tipoGasto: true } },
-        hospedajes: true,
-        personasExternas: true,
-        nominasTerceros: true,
+        ...SOLICITUD_INCLUDE,
         rendicion: true,
       },
     });
@@ -742,7 +709,127 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
-    return solicitud;
+    return this.enriquecerConSaldos(solicitud);
+  }
+
+  async generatePdf(id: number): Promise<Buffer> {
+    const solicitud = await this.findOne(id);
+    const cuentaBancaria =
+      solicitud.presupuestos?.[0]?.poa?.estructura?.proyecto?.cuentaBancaria;
+
+    const emisor = {
+      nombre: solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
+      cargo: solicitud.usuarioEmisor?.cargo ?? 'N/A',
+    };
+
+    const directorProyecto = this.obtenerDirectorProyecto(
+      solicitud.historialAprobaciones ?? [],
+      Rol.TESORERO,
+      solicitud.aprobador?.nombreCompleto,
+      solicitud.aprobador?.cargo,
+    );
+
+    const aprobadorFinal = {
+      nombre: 'Marcos Fernando Terán Valenzuela',
+      cargo: 'Director Ejecutivo',
+    };
+
+    const detalle = [
+      ...(solicitud.viaticos ?? []).map((viatico) => ({
+        categoria: 'Viático',
+        descripcion: viatico.concepto?.nombre ?? viatico.tipoDestino,
+        cantidad: `${Number(viatico.dias ?? 0)} días x ${viatico.cantidadPersonas} pers`,
+        montoNeto: this.formatCurrency(Number(viatico.montoNeto ?? 0)),
+      })),
+      ...(solicitud.gastos ?? []).map((gasto) => ({
+        categoria: 'Gasto',
+        descripcion: gasto.tipoGasto?.nombre ?? gasto.detalle ?? 'Sin detalle',
+        cantidad: `${gasto.cantidad}`,
+        montoNeto: this.formatCurrency(Number(gasto.montoNeto ?? 0)),
+      })),
+      ...(solicitud.hospedajes ?? []).map((hospedaje) => ({
+        categoria: 'Hospedaje',
+        descripcion: hospedaje.destino,
+        cantidad: `${hospedaje.noches} noches`,
+        montoNeto: this.formatCurrency(Number(hospedaje.costoTotal ?? 0)),
+      })),
+    ];
+
+    return this.pdfService.generatePdf('solicitud.hbs', {
+      ...solicitud,
+      codigoSolicitud: solicitud.codigoSolicitud,
+      fechaSolicitud: this.formatDate(solicitud.fechaSolicitud),
+      fechaInicio: this.formatDate(solicitud.fechaInicio),
+      fechaFin: this.formatDate(solicitud.fechaFin),
+      montoTotalNeto: this.formatCurrency(
+        Number(solicitud.montoTotalNeto ?? 0),
+      ),
+      montoTotalPresupuestado: this.formatCurrency(
+        Number(solicitud.montoTotalPresupuestado ?? 0),
+      ),
+      emisorNombre: emisor.nombre,
+      emisorCargo: emisor.cargo,
+      aprobadorNombre: solicitud.aprobador?.nombreCompleto ?? 'Sin asignar',
+      firmas: {
+        emitidoPor: emisor,
+        directorProyecto,
+        aprobadoPor: aprobadorFinal,
+      },
+      motivoViaje: solicitud.motivoViaje ?? 'Sin motivo registrado',
+      lugarViaje: solicitud.lugarViaje ?? 'Sin lugar registrado',
+      cuentaBancaria: cuentaBancaria
+        ? {
+            banco: cuentaBancaria.banco ?? 'Banco no asignado',
+            numeroCuenta: cuentaBancaria.numeroCuenta ?? 'Sin número',
+            moneda: cuentaBancaria.moneda ?? 'M/N',
+          }
+        : null,
+      detalle,
+    });
+  }
+
+  private formatDate(value: Date | string | null | undefined): string {
+    if (!value) return 'N/A';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return 'N/A';
+
+    return new Intl.DateTimeFormat('es-BO', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).format(date);
+  }
+
+  private formatCurrency(value: number): string {
+    return `Bs ${new Intl.NumberFormat('es-BO', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value)}`;
+  }
+
+  private obtenerDirectorProyecto(
+    historial: {
+      usuario: {
+        nombreCompleto: string | null;
+        cargo: string | null;
+        rol: Rol;
+      } | null;
+      derivadoA: { rol: Rol | null } | null;
+    }[],
+    rolObjetivo: Rol,
+    fallbackNombre?: string | null,
+    fallbackCargo?: string | null,
+  ): { nombre: string; cargo: string } {
+    const idx = historial.findIndex(
+      (h) => h.derivadoA?.rol === rolObjetivo || h.usuario?.rol === rolObjetivo,
+    );
+
+    const candidato = idx > 0 ? historial[idx - 1]?.usuario : null;
+
+    const nombre = candidato?.nombreCompleto ?? fallbackNombre ?? 'Sin asignar';
+    const cargo = candidato?.cargo ?? fallbackCargo ?? 'Sin cargo asignado';
+
+    return { nombre, cargo };
   }
 
   private async enriquecerConSaldos(
@@ -786,6 +873,9 @@ export class SolicitudesService {
       lugarViaje,
       motivoViaje,
       descripcion,
+      urlCuadroComparativo,
+      urlCotizaciones,
+      poaIds,
       planificaciones,
       viaticos,
       gastos,
@@ -817,33 +907,80 @@ export class SolicitudesService {
       );
     }
 
-    // [SAFETY CHECK] Conditional Nuke: Solo reemplazamos si se envían planes/viaticos/gastos/nominas
-    const itemsActualizados =
-      (planificaciones && planificaciones.length > 0) ||
-      (viaticos && viaticos.length > 0) ||
-      (gastos && gastos.length > 0) ||
-      (hospedajes && hospedajes.length > 0) ||
-      (nominasTerceros && nominasTerceros.length > 0);
+    const debeReemplazarRelacionesAnidadas =
+      poaIds !== undefined ||
+      planificaciones !== undefined ||
+      viaticos !== undefined ||
+      gastos !== undefined ||
+      hospedajes !== undefined ||
+      nominasTerceros !== undefined;
 
-    return this.prisma.$transaction(async (tx) => {
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
       let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
       let finalMontoTotalNeto = solicitud.montoTotalNeto;
       let finalFechaInicio: Date | null = solicitud.fechaInicio;
       let finalFechaFin: Date | null = solicitud.fechaFin;
 
-      if (itemsActualizados) {
+      if (debeReemplazarRelacionesAnidadas) {
+        const poaIdsActualizados =
+          poaIds ??
+          solicitud.presupuestos.map((presupuesto) => presupuesto.poaId);
+
+        if (poaIdsActualizados.length === 0) {
+          throw new BadRequestException(
+            'Debes seleccionar al menos una partida presupuestaria',
+          );
+        }
+
+        const dtoParaReemplazo: UpdateSolicitudDto = {
+          ...updateSolicitudDto,
+          poaIds: poaIdsActualizados,
+          planificaciones: planificaciones ?? [],
+          viaticos: viaticos ?? [],
+          gastos: gastos ?? [],
+          hospedajes: hospedajes ?? [],
+          nominasTerceros: nominasTerceros ?? [],
+        };
+
+        // B. Recalcular y re-insertar
+        const detalles = await this.prepararInsertAnidado(dtoParaReemplazo);
+
+        // Validación: todas las referencias por POA deben existir en poaIds
+        const poaIdSet = new Set(poaIdsActualizados);
+        for (const viatico of detalles.viaticosData) {
+          if (!poaIdSet.has(viatico.poaId)) {
+            throw new BadRequestException(
+              `El viático referencia la partida POA ${viatico.poaId} que no está incluida en poaIds`,
+            );
+          }
+        }
+
+        for (const gasto of detalles.gastosData) {
+          if (!poaIdSet.has(gasto.poaId)) {
+            throw new BadRequestException(
+              `El gasto referencia la partida POA ${gasto.poaId} que no está incluida en poaIds`,
+            );
+          }
+        }
+
+        for (const hospedaje of detalles.hospedajes) {
+          if (!poaIdSet.has(hospedaje.poaId)) {
+            throw new BadRequestException(
+              `El hospedaje referencia la partida POA ${hospedaje.poaId} que no está incluida en poaIds`,
+            );
+          }
+        }
+
         // A. Limpiar existentes (orden: hijos primero por FK)
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
+        await tx.nominaTerceros.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
         await tx.solicitudPresupuesto.deleteMany({
           where: { solicitudId: id },
         });
-
-        // B. Recalcular y re-insertar
-        const detalles = await this.prepararInsertAnidado(updateSolicitudDto);
         finalMontoTotalPresupuestado = detalles.montoTotalPresupuestado;
         finalMontoTotalNeto = detalles.montoTotalNeto;
 
@@ -870,9 +1007,8 @@ export class SolicitudesService {
         }
 
         // B.5 Recrear SolicitudPresupuesto
-        const updatePoaIds = updateSolicitudDto.poaIds ?? [];
         const presupuestosMap = new Map<number, number>();
-        for (const poaId of updatePoaIds) {
+        for (const poaId of poaIdsActualizados) {
           const sp = await tx.solicitudPresupuesto.create({
             data: { poaId, solicitudId: id },
           });
@@ -898,6 +1034,12 @@ export class SolicitudesService {
           lugarViaje,
           motivoViaje,
           descripcion,
+          urlCuadroComparativo:
+            urlCuadroComparativo !== undefined
+              ? urlCuadroComparativo
+              : undefined,
+          urlCotizaciones:
+            urlCotizaciones !== undefined ? urlCotizaciones : undefined,
           montoTotalPresupuestado: finalMontoTotalPresupuestado,
           montoTotalNeto: finalMontoTotalNeto,
           fechaInicio: finalFechaInicio,
@@ -909,6 +1051,26 @@ export class SolicitudesService {
         include: SOLICITUD_INCLUDE,
       });
     });
+
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Solicitud corregida',
+        mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido corregida y requiere tu revisión`,
+        tipo: 'SOLICITUD_ASIGNADA',
+        usuarioId: aprobadorId,
+        solicitudId: solicitudActualizada.id,
+        urlDestino: `/app/aprobaciones/${solicitudActualizada.id}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación (corrección) para solicitud ${solicitudActualizada.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return solicitudActualizada;
   }
 
   async remove(id: number, usuarioId: number): Promise<Solicitud> {
@@ -979,45 +1141,46 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma
-      .$transaction(async (tx) => {
-        const solicitudActualizada = await tx.solicitud.update({
-          where: { id },
-          data: { aprobadorId: nuevoAprobadorId },
-          include: SOLICITUD_INCLUDE,
-        });
-
-        // Registrar en historial (dentro de la misma transacción)
-        await tx.historialAprobacion.create({
-          data: {
-            accion: TipoAccionHistorial.DERIVADO,
-            solicitudId: id,
-            usuarioId,
-            derivadoAId: nuevoAprobadorId,
-          },
-        });
-
-        return solicitudActualizada;
-      })
-      .then(async (solicitudActualizada) => {
-        try {
-          // Crear notificación para el nuevo aprobador
-          await this.notificacionesService.crearNotificacion({
-            titulo: 'Solicitud derivada',
-            mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
-            tipo: 'SOLICITUD_DERIVADA',
-            usuarioId: nuevoAprobadorId,
-            solicitudId: solicitudActualizada.id,
-            urlDestino: `/app/aprobaciones/${solicitudActualizada.id}`,
-          });
-        } catch (error) {
-          console.error(
-            `[SolicitudesService] Error al crear notificación (derivar) para solicitud ${solicitudActualizada.id}:`,
-            error,
-          );
-        }
-        return solicitudActualizada;
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.solicitud.update({
+        where: { id },
+        data: { aprobadorId: nuevoAprobadorId },
+        include: SOLICITUD_INCLUDE,
       });
+
+      // Registrar en historial (dentro de la misma transacción)
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.DERIVADO,
+          solicitudId: id,
+          usuarioId,
+          derivadoAId: nuevoAprobadorId,
+        },
+      });
+
+      return updated;
+    });
+
+    try {
+      // Crear notificación para el nuevo aprobador
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Solicitud derivada',
+        mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
+        tipo: 'SOLICITUD_DERIVADA',
+        usuarioId: nuevoAprobadorId,
+        solicitudId: solicitudActualizada.id,
+        urlDestino: `/app/aprobaciones/${solicitudActualizada.id}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación (derivar) para solicitud ${solicitudActualizada.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return solicitudActualizada;
   }
 
   async observar(
@@ -1039,50 +1202,51 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma
-      .$transaction(async (tx) => {
-        const solicitudActualizada = await tx.solicitud.update({
-          where: { id },
-          data: {
-            estado: EstadoSolicitud.OBSERVADO,
-            observacion: observarDto.observacion,
-            aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
-          },
-          include: SOLICITUD_INCLUDE,
-        });
-
-        // Registrar en historial (dentro de la misma transacción)
-        await tx.historialAprobacion.create({
-          data: {
-            accion: TipoAccionHistorial.OBSERVADO,
-            comentario: observarDto.observacion,
-            solicitudId: id,
-            usuarioId,
-            derivadoAId: solicitud.usuarioEmisorId,
-          },
-        });
-
-        return solicitudActualizada;
-      })
-      .then(async (solicitudActualizada) => {
-        try {
-          // Crear notificación para el usuario emisor
-          await this.notificacionesService.crearNotificacion({
-            titulo: 'Solicitud observada',
-            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} requiere correcciones. Observación: ${observarDto.observacion}`,
-            tipo: 'SOLICITUD_OBSERVADA',
-            usuarioId: solicitud.usuarioEmisorId,
-            solicitudId: solicitudActualizada.id,
-            urlDestino: `/app/solicitudes/${id}/editar`,
-          });
-        } catch (error) {
-          console.error(
-            `[SolicitudesService] Error al crear notificación (observar) para solicitud ${solicitudActualizada.id}:`,
-            error,
-          );
-        }
-        return solicitudActualizada;
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.solicitud.update({
+        where: { id },
+        data: {
+          estado: EstadoSolicitud.OBSERVADO,
+          observacion: observarDto.observacion,
+          aprobadorId: solicitud.usuarioEmisorId, // Se devuelve al dueño
+        },
+        include: SOLICITUD_INCLUDE,
       });
+
+      // Registrar en historial (dentro de la misma transacción)
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.OBSERVADO,
+          comentario: observarDto.observacion,
+          solicitudId: id,
+          usuarioId,
+          derivadoAId: solicitud.usuarioEmisorId,
+        },
+      });
+
+      return updated;
+    });
+
+    try {
+      // Crear notificación para el usuario emisor
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Solicitud observada',
+        mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} requiere correcciones. Observación: ${observarDto.observacion}`,
+        tipo: 'SOLICITUD_OBSERVADA',
+        usuarioId: solicitud.usuarioEmisorId,
+        solicitudId: solicitudActualizada.id,
+        urlDestino: `/app/solicitudes/${id}/editar`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación (observar) para solicitud ${solicitudActualizada.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return solicitudActualizada;
   }
 
   async desembolsar(
@@ -1090,7 +1254,11 @@ export class SolicitudesService {
     usuario: { id: number; rol: Rol },
     desembolsarDto: DesembolsarSolicitudDto,
   ): Promise<Solicitud> {
-    if (usuario.rol !== Rol.TESORERO && usuario.rol !== Rol.ADMIN) {
+    if (
+      usuario.rol !== Rol.TESORERO &&
+      usuario.rol !== Rol.ADMIN &&
+      usuario.rol !== Rol.EJECUTIVO
+    ) {
       throw new ForbiddenException(
         'Solo el personal de Tesorería o Administración puede desembolsar',
       );
@@ -1104,49 +1272,50 @@ export class SolicitudesService {
       );
     }
 
-    return this.prisma
-      .$transaction(async (tx) => {
-        const solicitudActualizada = await tx.solicitud.update({
-          where: { id },
-          data: {
-            estado: EstadoSolicitud.DESEMBOLSADO,
-            codigoDesembolso: desembolsarDto.codigoDesembolso,
-            urlComprobante: desembolsarDto.urlComprobante ?? null,
-            aprobadorId: null, // Finalizado
-          },
-          include: SOLICITUD_INCLUDE,
-        });
-
-        // Registrar en historial (dentro de la misma transacción)
-        await tx.historialAprobacion.create({
-          data: {
-            accion: TipoAccionHistorial.APROBADO,
-            comentario: desembolsarDto.codigoDesembolso,
-            solicitudId: id,
-            usuarioId: usuario.id,
-          },
-        });
-
-        return solicitudActualizada;
-      })
-      .then(async (solicitudActualizada) => {
-        try {
-          // Crear notificación para el usuario emisor
-          await this.notificacionesService.crearNotificacion({
-            titulo: 'Solicitud desembolsada',
-            mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada. Código: ${desembolsarDto.codigoDesembolso}. Procede a registrar tu rendición.`,
-            tipo: 'SOLICITUD_APROBADA',
-            usuarioId: solicitudActualizada.usuarioEmisorId,
-            solicitudId: solicitudActualizada.id,
-            urlDestino: `/app/rendiciones/nueva?solicitudId=${id}`,
-          });
-        } catch (error) {
-          console.error(
-            `[SolicitudesService] Error al crear notificación (desembolsar) para solicitud ${solicitudActualizada.id}:`,
-            error,
-          );
-        }
-        return solicitudActualizada;
+    const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.solicitud.update({
+        where: { id },
+        data: {
+          estado: EstadoSolicitud.DESEMBOLSADO,
+          codigoDesembolso: desembolsarDto.codigoDesembolso,
+          urlComprobante: desembolsarDto.urlComprobante ?? null,
+          aprobadorId: null, // Finalizado
+        },
+        include: SOLICITUD_INCLUDE,
       });
+
+      // Registrar en historial (dentro de la misma transacción)
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.APROBADO,
+          comentario: desembolsarDto.codigoDesembolso,
+          solicitudId: id,
+          usuarioId: usuario.id,
+        },
+      });
+
+      return updated;
+    });
+
+    try {
+      // Crear notificación para el usuario emisor
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Solicitud desembolsada',
+        mensaje: `Tu solicitud ${solicitudActualizada.codigoSolicitud} ha sido desembolsada. Código: ${desembolsarDto.codigoDesembolso}. Procede a registrar tu rendición.`,
+        tipo: 'SOLICITUD_APROBADA',
+        usuarioId: solicitudActualizada.usuarioEmisorId,
+        solicitudId: solicitudActualizada.id,
+        urlDestino: `/app/rendiciones/nueva?solicitudId=${id}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al crear notificación (desembolsar) para solicitud ${solicitudActualizada.id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return solicitudActualizada;
   }
 }

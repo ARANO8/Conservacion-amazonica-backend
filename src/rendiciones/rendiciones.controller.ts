@@ -5,21 +5,28 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
   Query,
+  Res,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
+  ApiOkResponse,
   ApiOperation,
+  ApiProduces,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { Rol } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import { CreateRendicionDto } from './dto/create-rendicion.dto';
+import { UpdateRendicionDto } from './dto/update-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 import { RendicionesService } from './rendiciones.service';
@@ -32,23 +39,31 @@ interface RequestWithUser extends Request {
   };
 }
 
+const RENDICIONES_ALLOWED_ROLES: Rol[] = [
+  Rol.ADMIN,
+  Rol.EJECUTIVO,
+  Rol.CONTADOR,
+  Rol.TESORERO,
+  Rol.USUARIO,
+];
+
 @ApiTags('Rendiciones')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...RENDICIONES_ALLOWED_ROLES)
 @Controller('rendiciones')
 export class RendicionesController {
   constructor(private readonly rendicionesService: RendicionesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar rendiciones (filtrado por rol de usuario)' })
+  @ApiOperation({
+    summary: 'Listar todas las rendiciones (para monitores y auditoría)',
+  })
   @ApiResponse({
     status: 200,
     description: 'Listado de rendiciones obtenido correctamente',
   })
-  findAll(
-    @Req() req: RequestWithUser,
-    @Query('solicitudId') solicitudId?: string,
-  ) {
+  findAll(@Query('solicitudId') solicitudId?: string) {
     const solicitudIdNumber =
       solicitudId && solicitudId.trim() !== ''
         ? Number(solicitudId)
@@ -60,13 +75,19 @@ export class RendicionesController {
       );
     }
 
-    return this.rendicionesService.findAll(
-      {
-        id: req.user!.userId,
-        rol: req.user!.rol,
-      },
-      solicitudIdNumber,
-    );
+    return this.rendicionesService.findAll(solicitudIdNumber);
+  }
+
+  @Get('mis-rendiciones')
+  @ApiOperation({
+    summary: 'Listar únicamente las rendiciones creadas por el usuario actual',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Listado de mis rendiciones obtenido correctamente',
+  })
+  findMisRendiciones(@Req() req: RequestWithUser) {
+    return this.rendicionesService.findMisRendiciones(req.user!.userId);
   }
 
   @Get('solicitud/:solicitudId')
@@ -97,6 +118,33 @@ export class RendicionesController {
     return this.rendicionesService.findOne(id);
   }
 
+  @Get(':id/pdf')
+  @ApiOperation({ summary: 'Generar y visualizar PDF de una rendición' })
+  @ApiProduces('application/pdf')
+  @ApiOkResponse({
+    description: 'PDF de rendición generado correctamente',
+    content: {
+      'application/pdf': {
+        schema: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  async generatePdf(
+    @Param('id', ParseIntPipe) id: number,
+    @Res() res: Response,
+  ): Promise<void> {
+    const buffer = await this.rendicionesService.generatePdf(id);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="rendicion.pdf"',
+    });
+    res.send(buffer);
+  }
+
   @Post()
   @ApiOperation({ summary: 'Crear una rendición con detalle completo' })
   @ApiResponse({
@@ -108,6 +156,38 @@ export class RendicionesController {
     @Req() req: RequestWithUser,
   ) {
     return this.rendicionesService.create(createRendicionDto, req.user!.userId);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Actualizar una rendición observada y reenviar a revisión',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Rendición actualizada y reenviada exitosamente',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Solo se pueden editar rendiciones en estado OBSERVADO',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Solo el creador de la solicitud puede editar la rendición',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Rendición no encontrada',
+  })
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() updateRendicionDto: UpdateRendicionDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.rendicionesService.update(
+      id,
+      updateRendicionDto,
+      req.user!.userId,
+    );
   }
 
   @Post(':id/aprobar')

@@ -1,8 +1,20 @@
 # Usamos una versión ligera de Node
 FROM node:20-alpine
 
-# Instalamos pnpm (gestor de paquetes)
-RUN apk add --no-cache openssl
+# Instalamos dependencias del sistema necesarias para Puppeteer/Chromium
+RUN apk add --no-cache \
+    openssl \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    font-noto-emoji
+
+# Configuramos Puppeteer para usar Chromium del sistema
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 RUN npm install -g pnpm
 

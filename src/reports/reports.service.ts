@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TDocumentDefinitions } from 'pdfmake/interfaces';
 import { formatDate, formatCurrency } from '../shared/utils/formatters.util';
 
@@ -83,13 +83,14 @@ import * as path from 'path';
 
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger(ReportsService.name);
+
   constructor() {}
 
   async generateSolicitudPdf(solicitud: SolicitudReportData): Promise<Buffer> {
     try {
-      console.log(
-        '[Reports] Iniciando generación de PDF para:',
-        solicitud.codigoSolicitud,
+      this.logger.log(
+        `[Reports] Iniciando generación de PDF para: ${solicitud.codigoSolicitud}`,
       );
 
       // 1. Cargar el módulo (nota: case-sensitive en Linux, debe ser 'Printer' con mayúscula)
@@ -108,7 +109,7 @@ export class ReportsService {
 
       const printer = new PdfPrinter(fonts);
 
-      console.log('[Reports] Construyendo docDefinition...');
+      this.logger.log('[Reports] Construyendo docDefinition...');
       const docDefinition: TDocumentDefinitions = {
         content: [
           this.buildHeader(solicitud),
@@ -141,42 +142,50 @@ export class ReportsService {
         },
       };
 
-      console.log('[Reports] Creando documento PDF...');
+      this.logger.log('[Reports] Creando documento PDF...');
       let doc = printer.createPdfKitDocument(docDefinition);
 
       if (doc instanceof Promise) {
         doc = await doc;
       }
 
-      console.log('[Reports] Capturando datos del documento...');
+      this.logger.log('[Reports] Capturando datos del documento...');
       return new Promise((resolve, reject) => {
         try {
           const chunks: Buffer[] = [];
           doc.on('data', (chunk: Buffer) => {
             chunks.push(chunk);
-            console.log(`[Reports] Datos recibidos: ${chunk.length} bytes`);
+            this.logger.log(`[Reports] Datos recibidos: ${chunk.length} bytes`);
           });
           doc.on('end', () => {
             const buffer = Buffer.concat(chunks);
-            console.log(
+            this.logger.log(
               `[Reports] PDF completado, tamaño total: ${buffer.length} bytes`,
             );
             resolve(buffer);
           });
           doc.on('error', (err: unknown) => {
-            console.error('[Reports] Error en documento:', err);
-            reject(err instanceof Error ? err : new Error(String(err)));
+            const error = err instanceof Error ? err : new Error(String(err));
+            this.logger.error('[Reports] Error en documento', error.stack);
+            reject(error);
           });
           doc.end();
         } catch (error) {
-          console.error('[Reports] Error en Promise:', error);
-          reject(error instanceof Error ? error : new Error(String(error)));
+          const normalizedError =
+            error instanceof Error ? error : new Error(String(error));
+          this.logger.error(
+            '[Reports] Error en Promise',
+            normalizedError.stack,
+          );
+          reject(normalizedError);
         }
       });
       /* eslint-enable @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
     } catch (error) {
-      console.error('[Reports] Error generando PDF:', error);
-      throw error;
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error('[Reports] Error generando PDF', normalizedError.stack);
+      throw normalizedError;
     }
   }
 
@@ -203,7 +212,9 @@ export class ReportsService {
         };
       }
     } catch (error) {
-      console.warn('No se pudo cargar el logo:', error);
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.warn(`No se pudo cargar el logo: ${normalizedError.message}`);
     }
 
     return [

@@ -11,6 +11,8 @@ datasource db {
 
 enum Rol {
   ADMIN
+  EJECUTIVO
+  CONTADOR
   TESORERO
   USUARIO
 }
@@ -61,6 +63,7 @@ enum TipoNotificacion {
    SOLICITUD_APROBADA
    SOLICITUD_OBSERVADA
    RENDICION_PENDIENTE
+   RENDICION_OBSERVADA
 }
 
 // --- MODELOS ---
