@@ -717,6 +717,23 @@ export class SolicitudesService {
     const cuentaBancaria =
       solicitud.presupuestos?.[0]?.poa?.estructura?.proyecto?.cuentaBancaria;
 
+    const emisor = {
+      nombre: solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
+      cargo: solicitud.usuarioEmisor?.cargo ?? 'N/A',
+    };
+
+    const directorProyecto = this.obtenerDirectorProyecto(
+      solicitud.historialAprobaciones ?? [],
+      Rol.TESORERO,
+      solicitud.aprobador?.nombreCompleto,
+      solicitud.aprobador?.cargo,
+    );
+
+    const aprobadorFinal = {
+      nombre: 'Marcos Fernando Terán Valenzuela',
+      cargo: 'Director Ejecutivo',
+    };
+
     const detalle = [
       ...(solicitud.viaticos ?? []).map((viatico) => ({
         categoria: 'Viático',
@@ -750,9 +767,14 @@ export class SolicitudesService {
       montoTotalPresupuestado: this.formatCurrency(
         Number(solicitud.montoTotalPresupuestado ?? 0),
       ),
-      emisorNombre: solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
-      emisorCargo: solicitud.usuarioEmisor?.cargo ?? 'N/A',
+      emisorNombre: emisor.nombre,
+      emisorCargo: emisor.cargo,
       aprobadorNombre: solicitud.aprobador?.nombreCompleto ?? 'Sin asignar',
+      firmas: {
+        emitidoPor: emisor,
+        directorProyecto,
+        aprobadoPor: aprobadorFinal,
+      },
       motivoViaje: solicitud.motivoViaje ?? 'Sin motivo registrado',
       lugarViaje: solicitud.lugarViaje ?? 'Sin lugar registrado',
       cuentaBancaria: cuentaBancaria
@@ -783,6 +805,31 @@ export class SolicitudesService {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)}`;
+  }
+
+  private obtenerDirectorProyecto(
+    historial: {
+      usuario: {
+        nombreCompleto: string | null;
+        cargo: string | null;
+        rol: Rol;
+      } | null;
+      derivadoA: { rol: Rol | null } | null;
+    }[],
+    rolObjetivo: Rol,
+    fallbackNombre?: string | null,
+    fallbackCargo?: string | null,
+  ): { nombre: string; cargo: string } {
+    const idx = historial.findIndex(
+      (h) => h.derivadoA?.rol === rolObjetivo || h.usuario?.rol === rolObjetivo,
+    );
+
+    const candidato = idx > 0 ? historial[idx - 1]?.usuario : null;
+
+    const nombre = candidato?.nombreCompleto ?? fallbackNombre ?? 'Sin asignar';
+    const cargo = candidato?.cargo ?? fallbackCargo ?? 'Sin cargo asignado';
+
+    return { nombre, cargo };
   }
 
   private async enriquecerConSaldos(

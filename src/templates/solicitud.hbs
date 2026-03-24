@@ -156,17 +156,26 @@
       </table>
     </section>
 
-    <section class="mt-10 grid grid-cols-2 gap-10 text-center text-xs">
+    <section class="mt-10 grid grid-cols-3 gap-8 text-center text-xs">
       <div>
-        <div class="mx-auto mb-2 h-px w-48 bg-slate-500"></div>
-        <p class="font-semibold">Firma Emisor</p>
-        <p class="text-slate-600">{{emisorNombre}}</p>
+        <div class="mx-auto mb-2 h-px w-40 bg-slate-500"></div>
+        <p class="font-semibold">Emitido por</p>
+        <p class="text-slate-600">{{firmas.emitidoPor.nombre}}</p>
+        <p class="text-[10px] text-slate-500">{{firmas.emitidoPor.cargo}}</p>
       </div>
 
       <div>
-        <div class="mx-auto mb-2 h-px w-48 bg-slate-500"></div>
-        <p class="font-semibold">Firma Aprobador</p>
-        <p class="text-slate-600">{{aprobadorNombre}}</p>
+        <div class="mx-auto mb-2 h-px w-40 bg-slate-500"></div>
+        <p class="font-semibold">Director del proyecto</p>
+        <p class="text-slate-600">{{firmas.directorProyecto.nombre}}</p>
+        <p class="text-[10px] text-slate-500">{{firmas.directorProyecto.cargo}}</p>
+      </div>
+
+      <div>
+        <div class="mx-auto mb-2 h-px w-40 bg-slate-500"></div>
+        <p class="font-semibold">Aprobado por</p>
+        <p class="text-slate-600">{{firmas.aprobadoPor.nombre}}</p>
+        <p class="text-[10px] text-slate-500">{{firmas.aprobadoPor.cargo}}</p>
       </div>
     </section>
   </body>

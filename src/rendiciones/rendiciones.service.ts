@@ -15,6 +15,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateRendicionDto } from './dto/create-rendicion.dto';
+import { UpdateRendicionDto } from './dto/update-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 import { PdfService } from '../pdf/pdf.service';
@@ -108,19 +109,16 @@ export class RendicionesService {
     private readonly notificacionesService: NotificacionesService,
   ) {}
 
-  async findAll(usuario: { id: number; rol: Rol }, solicitudId?: number) {
-    const where: Prisma.RendicionWhereInput = {};
-
-    if (usuario.rol === Rol.USUARIO) {
-      where.solicitud = {
-        usuarioEmisorId: usuario.id,
+  /**
+   * Devuelve todas las rendiciones del sistema (para monitores, auditoría, etc.).
+   * Solo filtra por deletedAt de la solicitud.
+   */
+  async findAll(solicitudId?: number) {
+    const where: Prisma.RendicionWhereInput = {
+      solicitud: {
         deletedAt: null,
-      };
-    } else {
-      where.solicitud = {
-        deletedAt: null,
-      };
-    }
+      },
+    };
 
     if (solicitudId !== undefined) {
       where.solicitudId = solicitudId;
@@ -128,6 +126,23 @@ export class RendicionesService {
 
     return this.prisma.rendicion.findMany({
       where,
+      include: RENDICION_INCLUDE,
+      orderBy: { fechaRendicion: 'desc' },
+    });
+  }
+
+  /**
+   * Devuelve únicamente las rendiciones creadas por el usuario actual.
+   * (Para "Mis Trámites > Rendiciones")
+   */
+  async findMisRendiciones(usuarioId: number) {
+    return this.prisma.rendicion.findMany({
+      where: {
+        solicitud: {
+          usuarioEmisorId: usuarioId,
+          deletedAt: null,
+        },
+      },
       include: RENDICION_INCLUDE,
       orderBy: { fechaRendicion: 'desc' },
     });
@@ -175,6 +190,23 @@ export class RendicionesService {
       (montoRecibido - totalEfectivoPagado).toFixed(2),
     );
 
+    const emisor = {
+      nombre: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
+      cargo: rendicion.solicitud.usuarioEmisor?.cargo ?? 'N/A',
+    };
+
+    const directorProyecto = this.obtenerDirectorProyecto(
+      rendicion.historialAprobaciones ?? [],
+      Rol.CONTADOR,
+      rendicion.aprobadorActual?.nombreCompleto,
+      rendicion.aprobadorActual?.cargo,
+    );
+
+    const aprobadorFinal = {
+      nombre: 'Marcos Fernando Terán Valenzuela',
+      cargo: 'Director Ejecutivo',
+    };
+
     return this.pdfService.generatePdf('rendicion.hbs', {
       ...rendicion,
       usuario: {
@@ -192,6 +224,11 @@ export class RendicionesService {
       saldoLiquido,
       totalEfectivoPagadoFormat: this.formatCurrency(totalEfectivoPagado),
       saldoLiquidoFormat: this.formatCurrency(saldoLiquido),
+      firmas: {
+        emitidoPor: emisor,
+        directorProyecto,
+        aprobadoPor: aprobadorFinal,
+      },
       gastos: (rendicion.gastosRendicion ?? []).map((gasto) => ({
         ...gasto,
         fecha: this.formatDate(gasto.fecha),
@@ -388,6 +425,248 @@ export class RendicionesService {
     return rendicion;
   }
 
+  /**
+   * Actualiza una rendición observada.
+   * Solo el creador de la solicitud puede editar, y solo si el estado es OBSERVADO.
+   * Requiere seleccionar un nuevo aprobador y reenvía la rendición a revisión.
+   */
+  async update(id: number, dto: UpdateRendicionDto, usuarioId: number) {
+    // Guardar datos para notificación fuera de la transacción
+    let nuevoAprobadorId: number;
+    let solicitudId: number;
+    let codigoSolicitud = '';
+
+    const rendicionActualizada = await this.prisma.$transaction(async (tx) => {
+      // 1. Verificar que existe la rendición
+      const rendicion = await tx.rendicion.findUnique({
+        where: { id },
+        include: {
+          solicitud: {
+            select: {
+              id: true,
+              usuarioEmisorId: true,
+              codigoSolicitud: true,
+            },
+          },
+          gastosRendicion: true,
+          declaracionesJuradas: true,
+          informeGastos: {
+            include: {
+              actividades: true,
+            },
+          },
+        },
+      });
+
+      if (!rendicion) {
+        throw new NotFoundException('Rendición no encontrada');
+      }
+
+      // 2. Verificar que el usuario es el creador de la solicitud
+      if (rendicion.solicitud.usuarioEmisorId !== usuarioId) {
+        throw new ForbiddenException(
+          'Solo el creador de la solicitud puede editar esta rendición',
+        );
+      }
+
+      // 3. Verificar que el estado es OBSERVADO
+      if (
+        rendicion.estado !== EstadoRendicion.OBSERVADO &&
+        rendicion.estado !== EstadoRendicion.OBSERVADA
+      ) {
+        throw new BadRequestException(
+          'Solo se pueden editar rendiciones en estado OBSERVADO',
+        );
+      }
+
+      // 4. Verificar que el nuevo aprobador no sea el mismo usuario
+      if (dto.aprobadorActualId === usuarioId) {
+        throw new BadRequestException(
+          'No puedes asignarte a ti mismo como aprobador de la rendición',
+        );
+      }
+
+      // 5. Verificar que el nuevo aprobador existe y está activo
+      const nuevoAprobador = await tx.usuario.findFirst({
+        where: {
+          id: dto.aprobadorActualId,
+          deletedAt: null,
+        },
+      });
+
+      if (!nuevoAprobador) {
+        throw new NotFoundException(
+          `El usuario aprobador con ID ${dto.aprobadorActualId} no existe o está inactivo`,
+        );
+      }
+
+      // 6. Validar partidas si se enviaron gastos
+      if (dto.gastos && dto.gastos.length > 0) {
+        const montosPorPartida = this.agruparMontosPorPartida({
+          ...dto,
+          solicitudId: rendicion.solicitudId,
+          fechaRendicion: dto.fechaRendicion ?? rendicion.fechaRendicion,
+          gastos: dto.gastos,
+        } as CreateRendicionDto);
+        const partidaIds = Array.from(montosPorPartida.keys());
+
+        const partidas =
+          partidaIds.length > 0
+            ? await tx.solicitudPresupuesto.findMany({
+                where: {
+                  id: { in: partidaIds },
+                  solicitudId: rendicion.solicitudId,
+                },
+                select: {
+                  id: true,
+                  poaId: true,
+                },
+              })
+            : [];
+
+        if (partidas.length !== partidaIds.length) {
+          throw new BadRequestException(
+            'Se detectaron partidas que no pertenecen a la solicitud rendida',
+          );
+        }
+      }
+
+      // 7. Eliminar gastos, declaraciones e informe anteriores
+      await tx.gastoRendicion.deleteMany({
+        where: { rendicionId: id },
+      });
+
+      await tx.declaracionJurada.deleteMany({
+        where: { rendicionId: id },
+      });
+
+      if (rendicion.informeGastos) {
+        await tx.actividadInforme.deleteMany({
+          where: { informeId: rendicion.informeGastos.id },
+        });
+        await tx.informeGastos.delete({
+          where: { id: rendicion.informeGastos.id },
+        });
+      }
+
+      // 8. Calcular nuevos totales
+      const fechaRendicion = dto.fechaRendicion ?? rendicion.fechaRendicion;
+      const gastos = dto.gastos ?? [];
+      const gastosSinRespaldo = dto.gastosSinRespaldo ?? [];
+
+      const totalRespaldado = this.calcularTotalRespaldado({
+        solicitudId: rendicion.solicitudId,
+        fechaRendicion,
+        aprobadorActualId: dto.aprobadorActualId,
+        gastos,
+        gastosSinRespaldo,
+      } as CreateRendicionDto);
+
+      const solicitud = await tx.solicitud.findUnique({
+        where: { id: rendicion.solicitudId },
+        select: { montoTotalNeto: true },
+      });
+
+      const saldoLiquido = new Prisma.Decimal(
+        solicitud?.montoTotalNeto ?? 0,
+      ).minus(totalRespaldado);
+
+      // 9. Actualizar rendición con nuevos datos
+      const updated = await tx.rendicion.update({
+        where: { id },
+        data: {
+          fechaRendicion,
+          estado: EstadoRendicion.PENDIENTE,
+          aprobadorActualId: dto.aprobadorActualId,
+          observaciones:
+            dto.observaciones ?? dto.declaracionJurada?.observaciones,
+          montoRespaldado: totalRespaldado,
+          saldoLiquido,
+          gastosRendicion: {
+            create: gastos.map((gasto) => ({
+              tipoDocumento: this.toTipoDocumento(gasto.tipoDocumento),
+              nroDocumento: gasto.numeroDocumento ?? 'S/N',
+              fecha: gasto.fechaDocumento ?? fechaRendicion,
+              concepto: gasto.concepto,
+              detalle: gasto.detalle ?? gasto.concepto,
+              proveedor: gasto.proveedor,
+              partidaId: gasto.partidaId,
+              urlComprobante: gasto.urlComprobante,
+              monto: new Prisma.Decimal(gasto.montoBruto),
+              montoBruto: new Prisma.Decimal(gasto.montoBruto),
+              montoImpuestos: new Prisma.Decimal(gasto.montoImpuestos),
+              montoNeto: new Prisma.Decimal(gasto.montoNeto),
+            })),
+          },
+          declaracionesJuradas: {
+            create: gastosSinRespaldo.map((declaracion) => ({
+              fecha: declaracion.fechaGasto ?? fechaRendicion,
+              detalle: declaracion.detalle,
+              monto: new Prisma.Decimal(declaracion.monto),
+            })),
+          },
+          informeGastos: dto.informeGastos
+            ? {
+                create: {
+                  fechaInicio: dto.informeGastos.fechaInicio,
+                  fechaFin: dto.informeGastos.fechaFin,
+                  actividades: {
+                    create: dto.informeGastos.actividades.map((actividad) => ({
+                      fecha: actividad.fecha,
+                      lugar: actividad.lugar,
+                      personaInstitucion: actividad.personaInstitucion,
+                      actividadesRealizadas: actividad.actividadesRealizadas,
+                    })),
+                  },
+                },
+              }
+            : undefined,
+        },
+        include: RENDICION_INCLUDE,
+      });
+
+      // 10. Registrar en historial
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.DERIVADO,
+          comentario: 'Rendición corregida y reenviada a revisión',
+          usuarioId,
+          derivadoAId: dto.aprobadorActualId,
+          solicitudId: rendicion.solicitudId,
+          rendicionId: id,
+        },
+      });
+
+      // Guardar datos para notificación
+      nuevoAprobadorId = dto.aprobadorActualId;
+      solicitudId = rendicion.solicitudId;
+      codigoSolicitud = rendicion.solicitud.codigoSolicitud ?? '';
+
+      return updated;
+    });
+
+    // 11. Crear notificación para el nuevo aprobador (fuera de transacción)
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Rendición corregida asignada',
+        mensaje: `Se ha asignado la rendición de la solicitud ${codigoSolicitud} (corregida) para tu revisión`,
+        tipo: 'RENDICION_PENDIENTE',
+        usuarioId: nuevoAprobadorId!,
+        solicitudId: solicitudId!,
+        urlDestino: `/app/rendiciones/${id}`,
+      });
+    } catch (error: unknown) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[RendicionesService] Error al crear notificación (update) para rendición ${id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return rendicionActualizada;
+  }
+
   async aprobar(
     id: number,
     dto: AprobarRendicionDto,
@@ -563,7 +842,10 @@ export class RendicionesService {
     usuarioId: number,
     rolUsuario: Rol,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    // Guardar el creadorId para usarlo fuera de la transacción
+    let creadorId: number;
+
+    const rendicionObservada = await this.prisma.$transaction(async (tx) => {
       const rendicion = await tx.rendicion.findUnique({
         where: { id },
         include: {
@@ -571,6 +853,7 @@ export class RendicionesService {
             select: {
               id: true,
               usuarioEmisorId: true,
+              codigoSolicitud: true,
             },
           },
         },
@@ -593,9 +876,9 @@ export class RendicionesService {
         );
       }
 
-      const creadorId = rendicion.solicitud.usuarioEmisorId;
+      creadorId = rendicion.solicitud.usuarioEmisorId;
 
-      const rendicionObservada = await tx.rendicion.update({
+      const updated = await tx.rendicion.update({
         where: { id },
         data: {
           estado: EstadoRendicion.OBSERVADO,
@@ -615,8 +898,29 @@ export class RendicionesService {
         },
       });
 
-      return rendicionObservada;
+      return { updated, codigoSolicitud: rendicion.solicitud.codigoSolicitud };
     });
+
+    // Crear notificación para el creador (fuera de la transacción para no afectar el flujo principal)
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Rendición observada',
+        mensaje: `Tu rendición de la solicitud ${rendicionObservada.codigoSolicitud} requiere correcciones. Observación: ${dto.comentario}`,
+        tipo: 'RENDICION_OBSERVADA',
+        usuarioId: creadorId!,
+        solicitudId: rendicionObservada.updated.solicitudId,
+        urlDestino: `/app/rendiciones/${id}/editar`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[RendicionesService] Error al crear notificación (observar) para rendición ${id}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return rendicionObservada.updated;
   }
 
   private toTipoDocumento(tipoDocumento: string): TipoDocumento {
@@ -698,6 +1002,31 @@ export class RendicionesService {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)}`;
+  }
+
+  private obtenerDirectorProyecto(
+    historial: {
+      usuario: {
+        nombreCompleto: string | null;
+        cargo: string | null;
+        rol: Rol;
+      } | null;
+      derivadoA: { rol: Rol | null } | null;
+    }[],
+    rolObjetivo: Rol,
+    fallbackNombre?: string | null,
+    fallbackCargo?: string | null,
+  ): { nombre: string; cargo: string } {
+    const idx = historial.findIndex(
+      (h) => h.derivadoA?.rol === rolObjetivo || h.usuario?.rol === rolObjetivo,
+    );
+
+    const candidato = idx > 0 ? historial[idx - 1]?.usuario : null;
+
+    const nombre = candidato?.nombreCompleto ?? fallbackNombre ?? 'Sin asignar';
+    const cargo = candidato?.cargo ?? fallbackCargo ?? 'Sin cargo asignado';
+
+    return { nombre, cargo };
   }
 
   private formatDate(value: Date | string | null | undefined): string {
