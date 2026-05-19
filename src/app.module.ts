@@ -21,6 +21,7 @@ import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { RendicionesModule } from './rendiciones/rendiciones.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PdfModule } from './pdf/pdf.module';
+import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
 
 const DEFAULT_THROTTLE_TTL_MS = 60000;
 const DEFAULT_THROTTLE_LIMIT = 10;
@@ -75,6 +76,7 @@ function getPositiveIntFromEnv(
     RendicionesModule,
     DashboardModule,
     PdfModule,
+    CotizacionesModule,
   ],
   providers: [
     {

@@ -86,6 +86,7 @@ model Usuario {
   historialesRecibidos    HistorialAprobacion[] @relation("DestinatarioHistorial")
   rendicionesPorAprobar   Rendicion[]           @relation("RendicionAprobador")
   notificaciones          Notificacion[]
+  cotizacionesEmitidas    Cotizacion[]          @relation("CotizacionesEmitidas")
 }
 
 model Proyecto {
@@ -459,4 +460,42 @@ model Hospedaje {
 
   poaId Int
   poa   Poa @relation(fields: [poaId], references: [id])
+}
+
+// --- COMPRAS Y SERVICIOS ---
+
+model Cotizacion {
+  id                 Int       @id @default(autoincrement())
+  codigoCotizacion   String    @unique
+  fecha              DateTime  @default(now())
+  proveedorNombre    String
+  proveedorTelefono  String?
+  proveedorDireccion String?
+  proveedorCorreo    String?
+  garantia           String?
+  disponibilidad     String?
+  duracionCotizacion String?
+  emiteFactura       Boolean   @default(false)
+  observaciones      String?
+  total              Decimal   @default(0) @db.Decimal(10, 2)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("CotizacionesEmitidas", fields: [usuarioEmisorId], references: [id])
+
+  lineas LineaCotizacion[]
+}
+
+model LineaCotizacion {
+  id             Int     @id @default(autoincrement())
+  cantidad       Decimal @db.Decimal(10, 2)
+  unidad         String?
+  detalle        String
+  precioUnitario Decimal @db.Decimal(10, 2)
+  total          Decimal @db.Decimal(10, 2)
+
+  cotizacionId Int
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
 }

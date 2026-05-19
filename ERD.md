@@ -323,6 +323,36 @@ RENDICION_OBSERVADA RENDICION_OBSERVADA
     Decimal it 
     }
   
+
+  "Cotizacion" {
+    Int id "🗝️"
+    String codigoCotizacion 
+    DateTime fecha 
+    String proveedorNombre 
+    String proveedorTelefono "❓"
+    String proveedorDireccion "❓"
+    String proveedorCorreo "❓"
+    String garantia "❓"
+    String disponibilidad "❓"
+    String duracionCotizacion "❓"
+    Boolean emiteFactura 
+    String observaciones "❓"
+    Decimal total 
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
+  "LineaCotizacion" {
+    Int id "🗝️"
+    Decimal cantidad 
+    String unidad "❓"
+    String detalle 
+    Decimal precioUnitario 
+    Decimal total 
+    }
+  
     "Usuario" |o--|| "Rol" : "enum:rol"
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
@@ -370,4 +400,6 @@ RENDICION_OBSERVADA RENDICION_OBSERVADA
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" }o--|| "Poa" : "poa"
+    "Cotizacion" }o--|| "Usuario" : "usuarioEmisor"
+    "LineaCotizacion" }o--|| "Cotizacion" : "cotizacion"
 ```
