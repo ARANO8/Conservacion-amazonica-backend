@@ -87,6 +87,7 @@ model Usuario {
   rendicionesPorAprobar   Rendicion[]           @relation("RendicionAprobador")
   notificaciones          Notificacion[]
   cotizacionesEmitidas    Cotizacion[]          @relation("CotizacionesEmitidas")
+  cuadrosEmitidos         CuadroComparativo[]   @relation("CuadrosEmitidos")
 }
 
 model Proyecto {
@@ -485,7 +486,8 @@ model Cotizacion {
   usuarioEmisorId Int
   usuarioEmisor   Usuario @relation("CotizacionesEmitidas", fields: [usuarioEmisorId], references: [id])
 
-  lineas LineaCotizacion[]
+  lineas             LineaCotizacion[]
+  cuadroCotizaciones CuadroCotizacion[]
 }
 
 model LineaCotizacion {
@@ -498,4 +500,81 @@ model LineaCotizacion {
 
   cotizacionId Int
   cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+}
+
+enum EstadoCuadroComparativo {
+  BORRADOR
+  EN_VALIDACION
+  OBSERVADO
+  EN_REVISION
+  APROBADO
+}
+
+model CuadroComparativo {
+  id               Int                     @id @default(autoincrement())
+  codigoCuadro     String                  @unique
+  lugarFecha       String?
+  observaciones    String?
+  estado           EstadoCuadroComparativo @default(BORRADOR)
+  totalRecomendado Decimal?                @db.Decimal(12, 2)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  deletedAt        DateTime?
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("CuadrosEmitidos", fields: [usuarioEmisorId], references: [id])
+
+  cotizacionRecomendadaId Int?
+  cotizacionRecomendada   CuadroCotizacion? @relation("CuadroRecomendada", fields: [cotizacionRecomendadaId], references: [id])
+
+  cotizaciones CuadroCotizacion[] @relation("CuadroCotizaciones")
+  items        CuadroItem[]
+}
+
+model CuadroCotizacion {
+  id              Int     @id @default(autoincrement())
+  orden           Int
+  proveedorNombre String
+  total           Decimal @default(0) @db.Decimal(12, 2)
+
+  cuadroId Int
+  cuadro   CuadroComparativo @relation("CuadroCotizaciones", fields: [cuadroId], references: [id], onDelete: Cascade)
+
+  cotizacionId Int
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id])
+
+  precios       CuadroPrecio[]
+  itemsGanados  CuadroItem[]        @relation("ItemGanadora")
+  recomendadaEn CuadroComparativo[] @relation("CuadroRecomendada")
+}
+
+model CuadroItem {
+  id          Int     @id @default(autoincrement())
+  orden       Int
+  descripcion String
+  cantidad    Decimal @db.Decimal(10, 2)
+  unidad      String?
+
+  cuadroId Int
+  cuadro   CuadroComparativo @relation(fields: [cuadroId], references: [id], onDelete: Cascade)
+
+  cotizacionGanadoraId Int?
+  cotizacionGanadora   CuadroCotizacion? @relation("ItemGanadora", fields: [cotizacionGanadoraId], references: [id])
+
+  precios CuadroPrecio[]
+}
+
+model CuadroPrecio {
+  id             Int      @id @default(autoincrement())
+  precioUnitario Decimal? @db.Decimal(12, 2)
+  total          Decimal? @db.Decimal(12, 2)
+  noMenciona     Boolean  @default(false)
+
+  cuadroItemId Int
+  cuadroItem   CuadroItem @relation(fields: [cuadroItemId], references: [id], onDelete: Cascade)
+
+  cuadroCotizacionId Int
+  cuadroCotizacion   CuadroCotizacion @relation(fields: [cuadroCotizacionId], references: [id], onDelete: Cascade)
+
+  @@unique([cuadroItemId, cuadroCotizacionId])
 }

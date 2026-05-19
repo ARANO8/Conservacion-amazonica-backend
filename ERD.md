@@ -72,6 +72,16 @@ RENDICION_PENDIENTE RENDICION_PENDIENTE
 RENDICION_OBSERVADA RENDICION_OBSERVADA
         }
     
+
+
+        EstadoCuadroComparativo {
+            BORRADOR BORRADOR
+EN_VALIDACION EN_VALIDACION
+OBSERVADO OBSERVADO
+EN_REVISION EN_REVISION
+APROBADO APROBADO
+        }
+    
   "Usuario" {
     Int id "🗝️"
     String email 
@@ -353,6 +363,44 @@ RENDICION_OBSERVADA RENDICION_OBSERVADA
     Decimal total 
     }
   
+
+  "CuadroComparativo" {
+    Int id "🗝️"
+    String codigoCuadro 
+    String lugarFecha "❓"
+    String observaciones "❓"
+    EstadoCuadroComparativo estado 
+    Decimal totalRecomendado "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
+  "CuadroCotizacion" {
+    Int id "🗝️"
+    Int orden 
+    String proveedorNombre 
+    Decimal total 
+    }
+  
+
+  "CuadroItem" {
+    Int id "🗝️"
+    Int orden 
+    String descripcion 
+    Decimal cantidad 
+    String unidad "❓"
+    }
+  
+
+  "CuadroPrecio" {
+    Int id "🗝️"
+    Decimal precioUnitario "❓"
+    Decimal total "❓"
+    Boolean noMenciona 
+    }
+  
     "Usuario" |o--|| "Rol" : "enum:rol"
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
@@ -402,4 +450,13 @@ RENDICION_OBSERVADA RENDICION_OBSERVADA
     "Hospedaje" }o--|| "Poa" : "poa"
     "Cotizacion" }o--|| "Usuario" : "usuarioEmisor"
     "LineaCotizacion" }o--|| "Cotizacion" : "cotizacion"
+    "CuadroComparativo" |o--|| "EstadoCuadroComparativo" : "enum:estado"
+    "CuadroComparativo" }o--|| "Usuario" : "usuarioEmisor"
+    "CuadroComparativo" }o--|o "CuadroCotizacion" : "cotizacionRecomendada"
+    "CuadroCotizacion" }o--|| "CuadroComparativo" : "cuadro"
+    "CuadroCotizacion" }o--|| "Cotizacion" : "cotizacion"
+    "CuadroItem" }o--|| "CuadroComparativo" : "cuadro"
+    "CuadroItem" }o--|o "CuadroCotizacion" : "cotizacionGanadora"
+    "CuadroPrecio" }o--|| "CuadroItem" : "cuadroItem"
+    "CuadroPrecio" }o--|| "CuadroCotizacion" : "cuadroCotizacion"
 ```

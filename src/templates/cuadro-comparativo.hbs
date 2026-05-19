@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cuadro Comparativo {{codigoCuadro}}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @page {
+        size: A4 landscape;
+        margin: 12mm;
+      }
+
+      body {
+        font-family: Georgia, 'Times New Roman', serif;
+      }
+
+      table.cmp {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      table.cmp th,
+      table.cmp td {
+        border: 1px solid #1f3a5f;
+        padding: 3px 5px;
+      }
+
+      .hd {
+        background: #cdddf0;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .nomenciona {
+        background: #fff2a8;
+        color: #92400e;
+        font-style: italic;
+        text-align: center;
+      }
+
+      .rec {
+        background: #d8efd8;
+      }
+
+      .gana {
+        background: #eef7ee;
+      }
+
+      .leader {
+        flex: 1 1 auto;
+        border-bottom: 1px dotted #334155;
+        padding-left: 4px;
+        min-height: 1rem;
+      }
+    </style>
+  </head>
+  <body class="bg-white text-[9px] text-slate-900">
+    <div class="mb-1 text-right text-[12px] font-bold">ANEXO 11</div>
+
+    <header class="mb-3 flex items-center gap-4">
+      <div class="w-28 shrink-0">
+        {{#if logoBase64}}
+          <img
+            src="data:image/png;base64,{{logoBase64}}"
+            alt="Conservación Amazónica"
+            class="h-12 w-auto object-contain"
+          />
+        {{/if}}
+      </div>
+      <div class="flex-1 text-center">
+        <h1 class="text-[15px] font-bold uppercase tracking-wide">
+          Cuadro Comparativo de Cotizaciones
+        </h1>
+        <p class="text-[10px] font-bold text-slate-700">
+          (Expresado en Bolivianos)
+        </p>
+      </div>
+      <div class="w-28 shrink-0 text-right text-[8px] text-slate-500">
+        {{codigoCuadro}}
+      </div>
+    </header>
+
+    <table class="cmp text-[9px]">
+      <thead>
+        <tr>
+          <th class="hd" rowspan="4" style="width: 3%">ITEM</th>
+          <th class="hd" rowspan="4" style="width: 22%">DESCRIPCIÓN</th>
+          <th class="hd" rowspan="4" style="width: 5%">CANT.</th>
+          <th class="hd" rowspan="4" style="width: 6%">UNID.</th>
+          <th class="hd" colspan="{{colspanCotizaciones}}">
+            COTIZACIONES
+          </th>
+        </tr>
+        <tr>
+          {{#each columnas}}
+            <th
+              class="hd {{#if recomendada}}rec{{/if}}"
+              colspan="2"
+            >{{proveedorNombre}}</th>
+          {{/each}}
+        </tr>
+        <tr>
+          {{#each columnas}}
+            <th class="hd" colspan="2">{{orden}}</th>
+          {{/each}}
+        </tr>
+        <tr>
+          {{#each columnas}}
+            <th class="hd">P/UNIT.</th>
+            <th class="hd">TOTAL</th>
+          {{/each}}
+        </tr>
+      </thead>
+      <tbody>
+        {{#each items}}
+          <tr>
+            <td class="text-center">{{orden}}</td>
+            <td>{{descripcion}}</td>
+            <td class="text-center">{{cantidad}}</td>
+            <td class="text-center">{{unidad}}</td>
+            {{#each celdas}}
+              {{#if noMenciona}}
+                <td class="nomenciona">No menciona</td>
+                <td class="text-right {{#if ganadora}}gana{{/if}}">0,00</td>
+              {{else}}
+                <td class="text-right {{#if ganadora}}gana{{/if}}">
+                  {{precioUnitario}}
+                </td>
+                <td class="text-right {{#if ganadora}}gana{{/if}}">
+                  {{total}}
+                </td>
+              {{/if}}
+            {{/each}}
+          </tr>
+        {{/each}}
+        <tr>
+          <td class="hd text-right" colspan="4">TOTALES</td>
+          {{#each columnas}}
+            <td class="hd"></td>
+            <td
+              class="text-right font-bold {{#if recomendada}}rec{{/if}}"
+            >{{total}}</td>
+          {{/each}}
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="mt-4 flex items-baseline gap-2 text-[10px]">
+      <span class="font-bold italic">Lugar y Fecha:</span>
+      <span class="leader">{{lugarFecha}}</span>
+    </div>
+
+    <div class="mt-3 border border-slate-700 p-2 text-[10px]">
+      <p class="font-bold">Observaciones:</p>
+      <p class="min-h-[2.5rem] whitespace-pre-line">{{observaciones}}</p>
+    </div>
+
+    <section class="mt-12 grid grid-cols-3 gap-8 text-center text-[9px]">
+      <div>
+        <div class="mx-auto mb-1 h-px w-48 bg-slate-500"></div>
+        <p class="font-bold">PREPARADO POR RESP. COTIZACIÓN</p>
+        <p>{{preparadoPor}}</p>
+        <p class="text-[8px] font-bold uppercase">{{preparadoCargo}}</p>
+      </div>
+      <div>
+        <div class="mx-auto mb-1 h-px w-48 bg-slate-500"></div>
+        <p class="font-bold">REVISADO POR</p>
+        <p>{{revisadoPor}}</p>
+        <p class="text-[8px] font-bold uppercase">{{revisadoCargo}}</p>
+      </div>
+      <div>
+        <div class="mx-auto mb-1 h-px w-48 bg-slate-500"></div>
+        <p class="font-bold">APROBADO POR</p>
+        <p>{{aprobadoPor}}</p>
+        <p class="text-[8px] font-bold uppercase">{{aprobadoCargo}}</p>
+      </div>
+    </section>
+  </body>
+</html>

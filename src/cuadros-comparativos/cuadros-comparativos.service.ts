@@ -1,0 +1,476 @@
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateCuadroComparativoDto } from './dto/create-cuadro-comparativo.dto';
+import { UpdateCuadroComparativoDto } from './dto/update-cuadro-comparativo.dto';
+import { Rol, Prisma } from '@prisma/client';
+import { PdfService } from '../pdf/pdf.service';
+import { CUADRO_INCLUDE } from './cuadros-comparativos.constants';
+
+type UsuarioContexto = { id: number; rol: Rol };
+
+const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
+
+const REVISOR = {
+  nombre: 'Shirley Ramirez Teodovich',
+  cargo: 'Director Financiero',
+};
+const APROBADOR = {
+  nombre: 'Marcos Teran Valenzuela',
+  cargo: 'Director Ejecutivo',
+};
+
+@Injectable()
+export class CuadrosComparativosService {
+  private readonly logger = new Logger(CuadrosComparativosService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pdfService: PdfService,
+  ) {}
+
+  private async generarCodigo(tx: Prisma.TransactionClient): Promise<string> {
+    const anioActual = new Date().getFullYear();
+    const count = await tx.cuadroComparativo.count({
+      where: {
+        createdAt: {
+          gte: new Date(`${anioActual}-01-01`),
+          lte: new Date(`${anioActual}-12-31`),
+        },
+      },
+    });
+    const correlativo = (count + 1).toString().padStart(3, '0');
+    return `CUA-${anioActual}-${correlativo}`;
+  }
+
+  private esVistaGlobal(rol: Rol): boolean {
+    return ROLES_VISTA_GLOBAL.includes(rol);
+  }
+
+  async create(dto: CreateCuadroComparativoDto, usuarioId: number) {
+    const cotizacionIds = dto.cotizaciones.map((c) => c.cotizacionId);
+    const cotizaciones = await this.prisma.cotizacion.findMany({
+      where: { id: { in: cotizacionIds }, deletedAt: null },
+      select: { id: true, proveedorNombre: true },
+    });
+
+    if (cotizaciones.length !== cotizacionIds.length) {
+      throw new BadRequestException(
+        'Una o más cotizaciones seleccionadas no existen o fueron eliminadas',
+      );
+    }
+
+    const proveedorPorId = new Map(
+      cotizaciones.map((c) => [c.id, c.proveedorNombre]),
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      const codigoCuadro = await this.generarCodigo(tx);
+
+      const cuadro = await tx.cuadroComparativo.create({
+        data: {
+          codigoCuadro,
+          lugarFecha: dto.lugarFecha?.trim() || null,
+          observaciones: dto.observaciones?.trim() || null,
+          usuarioEmisorId: usuarioId,
+        },
+      });
+
+      // Columnas (cotizaciones del cuadro)
+      const colIdPorIndex: number[] = [];
+      const totalPorIndex: Prisma.Decimal[] = dto.cotizaciones.map(
+        () => new Prisma.Decimal(0),
+      );
+
+      for (let i = 0; i < dto.cotizaciones.length; i++) {
+        const col = dto.cotizaciones[i];
+        const creada = await tx.cuadroCotizacion.create({
+          data: {
+            orden: col.orden,
+            proveedorNombre: proveedorPorId.get(col.cotizacionId) ?? 'N/D',
+            cuadroId: cuadro.id,
+            cotizacionId: col.cotizacionId,
+          },
+        });
+        colIdPorIndex[i] = creada.id;
+      }
+
+      // Filas (ítems) + precios por columna
+      for (const item of dto.items) {
+        const cantidad = new Prisma.Decimal(item.cantidad);
+        const ganadoraColId =
+          item.ganadoraCotizacionIndex !== undefined
+            ? colIdPorIndex[item.ganadoraCotizacionIndex]
+            : null;
+
+        const itemCreado = await tx.cuadroItem.create({
+          data: {
+            orden: item.orden,
+            descripcion: item.descripcion.trim(),
+            cantidad,
+            unidad: item.unidad?.trim() || null,
+            cuadroId: cuadro.id,
+            cotizacionGanadoraId: ganadoraColId,
+          },
+        });
+
+        for (const precio of item.precios) {
+          const colId = colIdPorIndex[precio.cotizacionIndex];
+          if (colId === undefined) {
+            throw new BadRequestException(
+              `Índice de cotización inválido en precios: ${precio.cotizacionIndex}`,
+            );
+          }
+
+          const noMenciona = precio.noMenciona === true;
+          const precioUnitario = noMenciona
+            ? null
+            : new Prisma.Decimal(precio.precioUnitario ?? 0);
+          const total = noMenciona
+            ? null
+            : (precioUnitario as Prisma.Decimal).times(cantidad);
+
+          if (total) {
+            totalPorIndex[precio.cotizacionIndex] =
+              totalPorIndex[precio.cotizacionIndex].plus(total);
+          }
+
+          await tx.cuadroPrecio.create({
+            data: {
+              precioUnitario,
+              total,
+              noMenciona,
+              cuadroItemId: itemCreado.id,
+              cuadroCotizacionId: colId,
+            },
+          });
+        }
+      }
+
+      // Totales por columna
+      for (let i = 0; i < colIdPorIndex.length; i++) {
+        await tx.cuadroCotizacion.update({
+          where: { id: colIdPorIndex[i] },
+          data: { total: totalPorIndex[i] },
+        });
+      }
+
+      // Cotización recomendada global
+      if (dto.recomendadaCotizacionIndex !== undefined) {
+        const recId = colIdPorIndex[dto.recomendadaCotizacionIndex];
+        if (recId !== undefined) {
+          await tx.cuadroComparativo.update({
+            where: { id: cuadro.id },
+            data: {
+              cotizacionRecomendadaId: recId,
+              totalRecomendado: totalPorIndex[dto.recomendadaCotizacionIndex],
+            },
+          });
+        }
+      }
+
+      this.logger.log(
+        `[create] usuarioId=${usuarioId} | codigo=${codigoCuadro} | columnas=${dto.cotizaciones.length} | items=${dto.items.length}`,
+      );
+
+      return tx.cuadroComparativo.findUniqueOrThrow({
+        where: { id: cuadro.id },
+        include: CUADRO_INCLUDE,
+      });
+    });
+  }
+
+  async findAll(user: UsuarioContexto) {
+    return this.prisma.cuadroComparativo.findMany({
+      where: {
+        deletedAt: null,
+        ...(this.esVistaGlobal(user.rol) ? {} : { usuarioEmisorId: user.id }),
+      },
+      include: CUADRO_INCLUDE,
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async findOne(id: number) {
+    const cuadro = await this.prisma.cuadroComparativo.findFirst({
+      where: { id, deletedAt: null },
+      include: CUADRO_INCLUDE,
+    });
+
+    if (!cuadro) {
+      throw new NotFoundException(`Cuadro comparativo ${id} no encontrado`);
+    }
+
+    return cuadro;
+  }
+
+  private asegurarPropietario(emisorId: number, user: UsuarioContexto): void {
+    if (!this.esVistaGlobal(user.rol) && emisorId !== user.id) {
+      throw new ForbiddenException(
+        'No tienes permiso para modificar este cuadro comparativo',
+      );
+    }
+  }
+
+  async update(
+    id: number,
+    dto: UpdateCuadroComparativoDto,
+    user: UsuarioContexto,
+  ) {
+    const cuadro = await this.findOne(id);
+    this.asegurarPropietario(cuadro.usuarioEmisorId, user);
+
+    // Si llegan estructuras nuevas, se reconstruye el cuadro completo.
+    const reconstruir =
+      dto.cotizaciones !== undefined || dto.items !== undefined;
+
+    if (!reconstruir) {
+      return this.prisma.cuadroComparativo.update({
+        where: { id },
+        data: {
+          ...(dto.lugarFecha !== undefined
+            ? { lugarFecha: dto.lugarFecha?.trim() || null }
+            : {}),
+          ...(dto.observaciones !== undefined
+            ? { observaciones: dto.observaciones?.trim() || null }
+            : {}),
+        },
+        include: CUADRO_INCLUDE,
+      });
+    }
+
+    if (dto.cotizaciones === undefined || dto.items === undefined) {
+      throw new BadRequestException(
+        'Para reestructurar el cuadro se requieren cotizaciones e items',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.cuadroComparativo.update({
+        where: { id },
+        data: {
+          cotizacionRecomendadaId: null,
+          totalRecomendado: null,
+        },
+      });
+      await tx.cuadroPrecio.deleteMany({
+        where: { cuadroItem: { cuadroId: id } },
+      });
+      await tx.cuadroItem.deleteMany({ where: { cuadroId: id } });
+      await tx.cuadroCotizacion.deleteMany({ where: { cuadroId: id } });
+    });
+
+    // Reusar la lógica de armado dentro de una nueva transacción.
+    const dtoCompleto: CreateCuadroComparativoDto = {
+      lugarFecha: dto.lugarFecha ?? cuadro.lugarFecha ?? undefined,
+      observaciones: dto.observaciones ?? cuadro.observaciones ?? undefined,
+      recomendadaCotizacionIndex: dto.recomendadaCotizacionIndex,
+      cotizaciones: dto.cotizaciones,
+      items: dto.items,
+    };
+
+    return this.reconstruir(id, dtoCompleto);
+  }
+
+  private async reconstruir(cuadroId: number, dto: CreateCuadroComparativoDto) {
+    const cotizacionIds = dto.cotizaciones.map((c) => c.cotizacionId);
+    const cotizaciones = await this.prisma.cotizacion.findMany({
+      where: { id: { in: cotizacionIds }, deletedAt: null },
+      select: { id: true, proveedorNombre: true },
+    });
+    const proveedorPorId = new Map(
+      cotizaciones.map((c) => [c.id, c.proveedorNombre]),
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.cuadroComparativo.update({
+        where: { id: cuadroId },
+        data: {
+          lugarFecha: dto.lugarFecha?.trim() || null,
+          observaciones: dto.observaciones?.trim() || null,
+        },
+      });
+
+      const colIdPorIndex: number[] = [];
+      const totalPorIndex: Prisma.Decimal[] = dto.cotizaciones.map(
+        () => new Prisma.Decimal(0),
+      );
+
+      for (let i = 0; i < dto.cotizaciones.length; i++) {
+        const col = dto.cotizaciones[i];
+        const creada = await tx.cuadroCotizacion.create({
+          data: {
+            orden: col.orden,
+            proveedorNombre: proveedorPorId.get(col.cotizacionId) ?? 'N/D',
+            cuadroId,
+            cotizacionId: col.cotizacionId,
+          },
+        });
+        colIdPorIndex[i] = creada.id;
+      }
+
+      for (const item of dto.items) {
+        const cantidad = new Prisma.Decimal(item.cantidad);
+        const ganadoraColId =
+          item.ganadoraCotizacionIndex !== undefined
+            ? colIdPorIndex[item.ganadoraCotizacionIndex]
+            : null;
+
+        const itemCreado = await tx.cuadroItem.create({
+          data: {
+            orden: item.orden,
+            descripcion: item.descripcion.trim(),
+            cantidad,
+            unidad: item.unidad?.trim() || null,
+            cuadroId,
+            cotizacionGanadoraId: ganadoraColId,
+          },
+        });
+
+        for (const precio of item.precios) {
+          const colId = colIdPorIndex[precio.cotizacionIndex];
+          const noMenciona = precio.noMenciona === true;
+          const precioUnitario = noMenciona
+            ? null
+            : new Prisma.Decimal(precio.precioUnitario ?? 0);
+          const total = noMenciona
+            ? null
+            : (precioUnitario as Prisma.Decimal).times(cantidad);
+
+          if (total) {
+            totalPorIndex[precio.cotizacionIndex] =
+              totalPorIndex[precio.cotizacionIndex].plus(total);
+          }
+
+          await tx.cuadroPrecio.create({
+            data: {
+              precioUnitario,
+              total,
+              noMenciona,
+              cuadroItemId: itemCreado.id,
+              cuadroCotizacionId: colId,
+            },
+          });
+        }
+      }
+
+      for (let i = 0; i < colIdPorIndex.length; i++) {
+        await tx.cuadroCotizacion.update({
+          where: { id: colIdPorIndex[i] },
+          data: { total: totalPorIndex[i] },
+        });
+      }
+
+      if (dto.recomendadaCotizacionIndex !== undefined) {
+        const recId = colIdPorIndex[dto.recomendadaCotizacionIndex];
+        if (recId !== undefined) {
+          await tx.cuadroComparativo.update({
+            where: { id: cuadroId },
+            data: {
+              cotizacionRecomendadaId: recId,
+              totalRecomendado: totalPorIndex[dto.recomendadaCotizacionIndex],
+            },
+          });
+        }
+      }
+
+      return tx.cuadroComparativo.findUniqueOrThrow({
+        where: { id: cuadroId },
+        include: CUADRO_INCLUDE,
+      });
+    });
+  }
+
+  async remove(id: number, user: UsuarioContexto) {
+    const cuadro = await this.findOne(id);
+    this.asegurarPropietario(cuadro.usuarioEmisorId, user);
+
+    await this.prisma.cuadroComparativo.update({
+      where: { id },
+      data: { deletedAt: new Date() },
+    });
+
+    return { message: 'Cuadro comparativo eliminado correctamente' };
+  }
+
+  async generatePdf(id: number): Promise<Buffer> {
+    const cuadro = await this.findOne(id);
+
+    const columnas = cuadro.cotizaciones.map((col) => ({
+      id: col.id,
+      orden: col.orden,
+      proveedorNombre: col.proveedorNombre,
+      total: this.formatNumber(Number(col.total ?? 0)),
+      recomendada: cuadro.cotizacionRecomendadaId === col.id,
+    }));
+
+    const items = cuadro.items.map((item) => {
+      const preciosPorColId = new Map(
+        item.precios.map((p) => [p.cuadroCotizacionId, p]),
+      );
+
+      const celdas = cuadro.cotizaciones.map((col) => {
+        const p = preciosPorColId.get(col.id);
+        const noMenciona = p?.noMenciona ?? true;
+        return {
+          noMenciona,
+          ganadora: item.cotizacionGanadoraId === col.id,
+          precioUnitario: noMenciona
+            ? ''
+            : this.formatNumber(Number(p?.precioUnitario ?? 0)),
+          total: noMenciona ? '' : this.formatNumber(Number(p?.total ?? 0)),
+        };
+      });
+
+      return {
+        orden: item.orden,
+        descripcion: item.descripcion,
+        cantidad: this.formatCantidad(Number(item.cantidad ?? 0)),
+        unidad: item.unidad ?? '',
+        celdas,
+      };
+    });
+
+    const emisorNombre = cuadro.usuarioEmisor?.nombreCompleto ?? '';
+    const emisorCargo = cuadro.usuarioEmisor?.cargo ?? 'Resp. Cotización';
+
+    return this.pdfService.generatePdf(
+      'cuadro-comparativo.hbs',
+      {
+        codigoCuadro: cuadro.codigoCuadro,
+        lugarFecha: cuadro.lugarFecha ?? '',
+        observaciones: cuadro.observaciones ?? '',
+        columnas,
+        columnasCount: columnas.length,
+        colspanCotizaciones: columnas.length * 2,
+        items,
+        preparadoPor: emisorNombre,
+        preparadoCargo: emisorCargo,
+        revisadoPor: REVISOR.nombre,
+        revisadoCargo: REVISOR.cargo,
+        aprobadoPor: APROBADOR.nombre,
+        aprobadoCargo: APROBADOR.cargo,
+      },
+      { landscape: true },
+    );
+  }
+
+  private formatNumber(value: number): string {
+    return new Intl.NumberFormat('es-BO', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  }
+
+  private formatCantidad(value: number): string {
+    return new Intl.NumberFormat('es-BO', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(value);
+  }
+}
