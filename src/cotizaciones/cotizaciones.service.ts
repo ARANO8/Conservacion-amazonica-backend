@@ -16,6 +16,10 @@ type UsuarioContexto = { id: number; rol: Rol };
 
 const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
 
+// Filas mínimas que muestra la tabla del PDF, para replicar el formato
+// impreso oficial (rellena con filas en blanco cuando hay menos ítems).
+const FILAS_TABLA_PDF = 9;
+
 @Injectable()
 export class CotizacionesService {
   private readonly logger = new Logger(CotizacionesService.name);
@@ -198,6 +202,17 @@ export class CotizacionesService {
     const cotizacion = await this.findOne(id);
     const totalNumero = Number(cotizacion.total ?? 0);
 
+    const lineas = cotizacion.lineas.map((linea) => ({
+      cantidad: this.formatCantidad(Number(linea.cantidad ?? 0)),
+      unidad: linea.unidad ?? '',
+      detalle: linea.detalle,
+      precioUnitario: this.formatNumber(Number(linea.precioUnitario ?? 0)),
+      total: this.formatNumber(Number(linea.total ?? 0)),
+    }));
+
+    const filasMinimas = Math.max(0, FILAS_TABLA_PDF - lineas.length);
+    const filasVacias = Array.from({ length: filasMinimas }, () => ({}));
+
     return this.pdfService.generatePdf('cotizacion.hbs', {
       codigoCotizacion: cotizacion.codigoCotizacion,
       fecha: this.formatDate(cotizacion.fecha),
@@ -212,13 +227,8 @@ export class CotizacionesService {
       observaciones: cotizacion.observaciones ?? '',
       total: this.formatNumber(totalNumero),
       totalEnLetras: montoEnLetrasBolivianos(totalNumero),
-      lineas: cotizacion.lineas.map((linea) => ({
-        cantidad: this.formatNumber(Number(linea.cantidad ?? 0)),
-        unidad: linea.unidad ?? '',
-        detalle: linea.detalle,
-        precioUnitario: this.formatNumber(Number(linea.precioUnitario ?? 0)),
-        total: this.formatNumber(Number(linea.total ?? 0)),
-      })),
+      lineas,
+      filasVacias,
     });
   }
 
@@ -232,6 +242,13 @@ export class CotizacionesService {
       month: '2-digit',
       year: 'numeric',
     }).format(date);
+  }
+
+  private formatCantidad(value: number): string {
+    return new Intl.NumberFormat('es-BO', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(value);
   }
 
   private formatNumber(value: number): string {
