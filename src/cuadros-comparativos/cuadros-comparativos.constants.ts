@@ -20,4 +20,10 @@ export const CUADRO_INCLUDE = {
     include: { precios: true },
   },
   cotizacionRecomendada: true,
+  historialAprobaciones: {
+    orderBy: { fecha: 'desc' },
+    include: {
+      usuario: { select: CUADRO_USUARIO_SELECT },
+    },
+  },
 } satisfies Prisma.CuadroComparativoInclude;

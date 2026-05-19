@@ -15,6 +15,7 @@ enum Rol {
   CONTADOR
   TESORERO
   USUARIO
+  VALIDADOR_COMPRAS
 }
 
 enum EstadoSolicitud {
@@ -35,6 +36,8 @@ enum TipoAccionHistorial {
   OBSERVADO
   DERIVADO
   RECHAZADO
+  ENVIADO
+  VALIDADO
 }
 
 enum TipoDestino {
@@ -64,6 +67,10 @@ enum TipoNotificacion {
    SOLICITUD_OBSERVADA
    RENDICION_PENDIENTE
    RENDICION_OBSERVADA
+   CUADRO_PENDIENTE_VALIDACION
+   CUADRO_PENDIENTE_REVISION
+   CUADRO_OBSERVADO
+   CUADRO_APROBADO
 }
 
 // --- MODELOS ---
@@ -227,6 +234,9 @@ model HistorialAprobacion {
 
   rendicionId Int?
   rendicion   Rendicion? @relation("RendicionHistorial", fields: [rendicionId], references: [id])
+
+  cuadroComparativoId Int?
+  cuadroComparativo   CuadroComparativo? @relation("CuadroHistorial", fields: [cuadroComparativoId], references: [id])
 }
 
 model Notificacion {
@@ -244,6 +254,9 @@ model Notificacion {
 
    solicitudId Int?
    solicitud   Solicitud? @relation(fields: [solicitudId], references: [id], onDelete: SetNull)
+
+   cuadroComparativoId Int?
+   cuadroComparativo   CuadroComparativo? @relation(fields: [cuadroComparativoId], references: [id], onDelete: SetNull)
 }
 
 model Rendicion {
@@ -514,12 +527,13 @@ model CuadroComparativo {
   id               Int                     @id @default(autoincrement())
   codigoCuadro     String                  @unique
   lugarFecha       String?
-  observaciones    String?
-  estado           EstadoCuadroComparativo @default(BORRADOR)
-  totalRecomendado Decimal?                @db.Decimal(12, 2)
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
-  deletedAt        DateTime?
+  observaciones     String?
+  estado            EstadoCuadroComparativo @default(BORRADOR)
+  totalRecomendado  Decimal?                @db.Decimal(12, 2)
+  motivoObservacion String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  deletedAt         DateTime?
 
   usuarioEmisorId Int
   usuarioEmisor   Usuario @relation("CuadrosEmitidos", fields: [usuarioEmisorId], references: [id])
@@ -527,8 +541,10 @@ model CuadroComparativo {
   cotizacionRecomendadaId Int?
   cotizacionRecomendada   CuadroCotizacion? @relation("CuadroRecomendada", fields: [cotizacionRecomendadaId], references: [id])
 
-  cotizaciones CuadroCotizacion[] @relation("CuadroCotizaciones")
-  items        CuadroItem[]
+  cotizaciones          CuadroCotizacion[]    @relation("CuadroCotizaciones")
+  items                 CuadroItem[]
+  historialAprobaciones HistorialAprobacion[] @relation("CuadroHistorial")
+  notificaciones        Notificacion[]
 }
 
 model CuadroCotizacion {

@@ -7,6 +7,7 @@ EJECUTIVO EJECUTIVO
 CONTADOR CONTADOR
 TESORERO TESORERO
 USUARIO USUARIO
+VALIDADOR_COMPRAS VALIDADOR_COMPRAS
         }
     
 
@@ -33,6 +34,8 @@ APROBADO APROBADO
 OBSERVADO OBSERVADO
 DERIVADO DERIVADO
 RECHAZADO RECHAZADO
+ENVIADO ENVIADO
+VALIDADO VALIDADO
         }
     
 
@@ -70,6 +73,10 @@ SOLICITUD_APROBADA SOLICITUD_APROBADA
 SOLICITUD_OBSERVADA SOLICITUD_OBSERVADA
 RENDICION_PENDIENTE RENDICION_PENDIENTE
 RENDICION_OBSERVADA RENDICION_OBSERVADA
+CUADRO_PENDIENTE_VALIDACION CUADRO_PENDIENTE_VALIDACION
+CUADRO_PENDIENTE_REVISION CUADRO_PENDIENTE_REVISION
+CUADRO_OBSERVADO CUADRO_OBSERVADO
+CUADRO_APROBADO CUADRO_APROBADO
         }
     
 
@@ -371,6 +378,7 @@ APROBADO APROBADO
     String observaciones "❓"
     EstadoCuadroComparativo estado 
     Decimal totalRecomendado "❓"
+    String motivoObservacion "❓"
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
@@ -419,9 +427,11 @@ APROBADO APROBADO
     "HistorialAprobacion" }o--|o "Usuario" : "derivadoA"
     "HistorialAprobacion" }o--|o "Solicitud" : "solicitud"
     "HistorialAprobacion" }o--|o "Rendicion" : "rendicion"
+    "HistorialAprobacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
     "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
+    "Notificacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
     "Rendicion" }o--|o "Usuario" : "aprobadorActual"

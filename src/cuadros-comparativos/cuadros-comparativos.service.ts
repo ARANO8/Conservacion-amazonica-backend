@@ -8,13 +8,25 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCuadroComparativoDto } from './dto/create-cuadro-comparativo.dto';
 import { UpdateCuadroComparativoDto } from './dto/update-cuadro-comparativo.dto';
-import { Rol, Prisma } from '@prisma/client';
+import {
+  Rol,
+  Prisma,
+  EstadoCuadroComparativo,
+  TipoAccionHistorial,
+} from '@prisma/client';
 import { PdfService } from '../pdf/pdf.service';
+import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CUADRO_INCLUDE } from './cuadros-comparativos.constants';
 
 type UsuarioContexto = { id: number; rol: Rol };
 
 const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
+const ROLES_VALIDADOR: Rol[] = [Rol.VALIDADOR_COMPRAS, Rol.ADMIN];
+const ROLES_REVISOR: Rol[] = [Rol.TESORERO, Rol.ADMIN];
+const ESTADOS_EDITABLES: EstadoCuadroComparativo[] = [
+  EstadoCuadroComparativo.BORRADOR,
+  EstadoCuadroComparativo.OBSERVADO,
+];
 
 const REVISOR = {
   nombre: 'Shirley Ramirez Teodovich',
@@ -32,6 +44,7 @@ export class CuadrosComparativosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pdfService: PdfService,
+    private readonly notificaciones: NotificacionesService,
   ) {}
 
   private async generarCodigo(tx: Prisma.TransactionClient): Promise<string> {
@@ -186,11 +199,34 @@ export class CuadrosComparativosService {
   }
 
   async findAll(user: UsuarioContexto) {
-    return this.prisma.cuadroComparativo.findMany({
-      where: {
+    let where: Prisma.CuadroComparativoWhereInput = {
+      deletedAt: null,
+    };
+
+    if (this.esVistaGlobal(user.rol)) {
+      // ADMIN/EJECUTIVO ven todo
+    } else if (user.rol === Rol.VALIDADOR_COMPRAS) {
+      where = {
         deletedAt: null,
-        ...(this.esVistaGlobal(user.rol) ? {} : { usuarioEmisorId: user.id }),
-      },
+        OR: [
+          { usuarioEmisorId: user.id },
+          { estado: EstadoCuadroComparativo.EN_VALIDACION },
+        ],
+      };
+    } else if (user.rol === Rol.TESORERO) {
+      where = {
+        deletedAt: null,
+        OR: [
+          { usuarioEmisorId: user.id },
+          { estado: EstadoCuadroComparativo.EN_REVISION },
+        ],
+      };
+    } else {
+      where = { deletedAt: null, usuarioEmisorId: user.id };
+    }
+
+    return this.prisma.cuadroComparativo.findMany({
+      where,
       include: CUADRO_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
@@ -224,6 +260,12 @@ export class CuadrosComparativosService {
   ) {
     const cuadro = await this.findOne(id);
     this.asegurarPropietario(cuadro.usuarioEmisorId, user);
+
+    if (!ESTADOS_EDITABLES.includes(cuadro.estado)) {
+      throw new BadRequestException(
+        `El cuadro no es editable en estado ${cuadro.estado}. Solo se puede editar en BORRADOR u OBSERVADO.`,
+      );
+    }
 
     // Si llegan estructuras nuevas, se reconstruye el cuadro completo.
     const reconstruir =
@@ -396,6 +438,213 @@ export class CuadrosComparativosService {
     });
 
     return { message: 'Cuadro comparativo eliminado correctamente' };
+  }
+
+  private async registrarHistorial(data: {
+    accion: TipoAccionHistorial;
+    comentario?: string;
+    usuarioId: number;
+    cuadroComparativoId: number;
+  }) {
+    await this.prisma.historialAprobacion.create({
+      data: {
+        accion: data.accion,
+        comentario: data.comentario ?? null,
+        usuarioId: data.usuarioId,
+        cuadroComparativoId: data.cuadroComparativoId,
+      },
+    });
+  }
+
+  private async notificarRol(
+    rol: Rol,
+    cuadroId: number,
+    titulo: string,
+    mensaje: string,
+    tipo:
+      | 'CUADRO_PENDIENTE_VALIDACION'
+      | 'CUADRO_PENDIENTE_REVISION'
+      | 'CUADRO_OBSERVADO'
+      | 'CUADRO_APROBADO',
+  ) {
+    const usuarios = await this.prisma.usuario.findMany({
+      where: { rol, deletedAt: null },
+      select: { id: true },
+    });
+    for (const u of usuarios) {
+      await this.notificaciones.crearNotificacion({
+        titulo,
+        mensaje,
+        tipo,
+        usuarioId: u.id,
+        cuadroComparativoId: cuadroId,
+        urlDestino: `/app/cuadros-comparativos/${cuadroId}`,
+      });
+    }
+  }
+
+  private async notificarUsuario(
+    usuarioId: number,
+    cuadroId: number,
+    titulo: string,
+    mensaje: string,
+    tipo: 'CUADRO_OBSERVADO' | 'CUADRO_APROBADO',
+  ) {
+    await this.notificaciones.crearNotificacion({
+      titulo,
+      mensaje,
+      tipo,
+      usuarioId,
+      cuadroComparativoId: cuadroId,
+      urlDestino: `/app/cuadros-comparativos/${cuadroId}`,
+    });
+  }
+
+  async enviarAValidacion(id: number, user: UsuarioContexto) {
+    const cuadro = await this.findOne(id);
+    this.asegurarPropietario(cuadro.usuarioEmisorId, user);
+
+    if (!ESTADOS_EDITABLES.includes(cuadro.estado)) {
+      throw new BadRequestException(
+        `Solo se puede enviar a validación un cuadro en BORRADOR u OBSERVADO (estado actual: ${cuadro.estado}).`,
+      );
+    }
+
+    await this.prisma.cuadroComparativo.update({
+      where: { id },
+      data: {
+        estado: EstadoCuadroComparativo.EN_VALIDACION,
+        motivoObservacion: null,
+      },
+    });
+
+    await this.registrarHistorial({
+      accion: TipoAccionHistorial.ENVIADO,
+      comentario: 'Enviado a validación',
+      usuarioId: user.id,
+      cuadroComparativoId: id,
+    });
+
+    await this.notificarRol(
+      Rol.VALIDADOR_COMPRAS,
+      id,
+      'Cuadro comparativo por validar',
+      `El cuadro ${cuadro.codigoCuadro} requiere tu validación.`,
+      'CUADRO_PENDIENTE_VALIDACION',
+    );
+
+    return this.findOne(id);
+  }
+
+  async validar(id: number, user: UsuarioContexto) {
+    const cuadro = await this.findOne(id);
+
+    if (cuadro.estado !== EstadoCuadroComparativo.EN_VALIDACION) {
+      throw new BadRequestException(
+        `Solo se puede validar un cuadro EN_VALIDACION (estado actual: ${cuadro.estado}).`,
+      );
+    }
+
+    await this.prisma.cuadroComparativo.update({
+      where: { id },
+      data: { estado: EstadoCuadroComparativo.EN_REVISION },
+    });
+
+    await this.registrarHistorial({
+      accion: TipoAccionHistorial.VALIDADO,
+      comentario: 'Validación conforme',
+      usuarioId: user.id,
+      cuadroComparativoId: id,
+    });
+
+    await this.notificarRol(
+      Rol.TESORERO,
+      id,
+      'Cuadro comparativo por revisar',
+      `El cuadro ${cuadro.codigoCuadro} fue validado y requiere tu revisión.`,
+      'CUADRO_PENDIENTE_REVISION',
+    );
+
+    return this.findOne(id);
+  }
+
+  async observar(id: number, user: UsuarioContexto, motivo: string) {
+    const cuadro = await this.findOne(id);
+
+    if (cuadro.estado === EstadoCuadroComparativo.EN_VALIDACION) {
+      if (!ROLES_VALIDADOR.includes(user.rol)) {
+        throw new ForbiddenException(
+          'Solo el validador puede observar un cuadro EN_VALIDACION.',
+        );
+      }
+    } else if (cuadro.estado === EstadoCuadroComparativo.EN_REVISION) {
+      if (!ROLES_REVISOR.includes(user.rol)) {
+        throw new ForbiddenException(
+          'Solo el revisor puede observar un cuadro EN_REVISION.',
+        );
+      }
+    } else {
+      throw new BadRequestException(
+        `No se puede observar un cuadro en estado ${cuadro.estado}.`,
+      );
+    }
+
+    await this.prisma.cuadroComparativo.update({
+      where: { id },
+      data: {
+        estado: EstadoCuadroComparativo.OBSERVADO,
+        motivoObservacion: motivo.trim(),
+      },
+    });
+
+    await this.registrarHistorial({
+      accion: TipoAccionHistorial.OBSERVADO,
+      comentario: motivo.trim(),
+      usuarioId: user.id,
+      cuadroComparativoId: id,
+    });
+
+    await this.notificarUsuario(
+      cuadro.usuarioEmisorId,
+      id,
+      'Cuadro comparativo observado',
+      `Tu cuadro ${cuadro.codigoCuadro} fue observado: ${motivo.trim()}`,
+      'CUADRO_OBSERVADO',
+    );
+
+    return this.findOne(id);
+  }
+
+  async aprobar(id: number, user: UsuarioContexto) {
+    const cuadro = await this.findOne(id);
+
+    if (cuadro.estado !== EstadoCuadroComparativo.EN_REVISION) {
+      throw new BadRequestException(
+        `Solo se puede aprobar un cuadro EN_REVISION (estado actual: ${cuadro.estado}).`,
+      );
+    }
+
+    await this.prisma.cuadroComparativo.update({
+      where: { id },
+      data: { estado: EstadoCuadroComparativo.APROBADO },
+    });
+
+    await this.registrarHistorial({
+      accion: TipoAccionHistorial.APROBADO,
+      comentario: 'Aprobado por revisión',
+      usuarioId: user.id,
+      cuadroComparativoId: id,
+    });
+
+    await this.notificarUsuario(
+      cuadro.usuarioEmisorId,
+      id,
+      'Cuadro comparativo aprobado',
+      `Tu cuadro ${cuadro.codigoCuadro} fue aprobado.`,
+      'CUADRO_APROBADO',
+    );
+
+    return this.findOne(id);
   }
 
   async generatePdf(id: number): Promise<Buffer> {

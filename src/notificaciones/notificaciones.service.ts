@@ -7,7 +7,11 @@ export type TipoNotificacion =
   | 'SOLICITUD_APROBADA'
   | 'SOLICITUD_OBSERVADA'
   | 'RENDICION_PENDIENTE'
-  | 'RENDICION_OBSERVADA';
+  | 'RENDICION_OBSERVADA'
+  | 'CUADRO_PENDIENTE_VALIDACION'
+  | 'CUADRO_PENDIENTE_REVISION'
+  | 'CUADRO_OBSERVADO'
+  | 'CUADRO_APROBADO';
 
 @Injectable()
 export class NotificacionesService {
@@ -100,6 +104,7 @@ export class NotificacionesService {
     tipo: TipoNotificacion;
     usuarioId: number;
     solicitudId?: number;
+    cuadroComparativoId?: number;
     urlDestino?: string;
   }) {
     this.logger.log(
@@ -113,6 +118,7 @@ export class NotificacionesService {
         tipo: data.tipo,
         usuarioId: data.usuarioId,
         solicitudId: data.solicitudId,
+        cuadroComparativoId: data.cuadroComparativoId,
         urlDestino: data.urlDestino,
       },
       include: {

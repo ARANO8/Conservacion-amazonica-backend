@@ -21,8 +21,10 @@ import {
 import { CuadrosComparativosService } from './cuadros-comparativos.service';
 import { CreateCuadroComparativoDto } from './dto/create-cuadro-comparativo.dto';
 import { UpdateCuadroComparativoDto } from './dto/update-cuadro-comparativo.dto';
+import { ObservarCuadroDto } from './dto/observar-cuadro.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 import type { Request, Response } from 'express';
 import { Rol } from '@prisma/client';
 
@@ -87,6 +89,57 @@ export class CuadrosComparativosController {
   @ApiOperation({ summary: 'Eliminar un cuadro comparativo (Soft Delete)' })
   remove(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
     return this.cuadrosService.remove(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  @Patch(':id/enviar-validacion')
+  @ApiOperation({
+    summary: 'Enviar el cuadro a validación (emisor; BORRADOR/OBSERVADO)',
+  })
+  enviarAValidacion(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.cuadrosService.enviarAValidacion(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  @Patch(':id/validar')
+  @Roles(Rol.VALIDADOR_COMPRAS, Rol.ADMIN)
+  @ApiOperation({ summary: 'Validar el cuadro (Denis) → EN_REVISION' })
+  validar(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.cuadrosService.validar(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  @Patch(':id/observar')
+  @Roles(Rol.VALIDADOR_COMPRAS, Rol.TESORERO, Rol.ADMIN)
+  @ApiOperation({
+    summary: 'Observar el cuadro y devolver al emisor (validador o revisor)',
+  })
+  observar(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ObservarCuadroDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.cuadrosService.observar(
+      id,
+      { id: req.user.userId, rol: req.user.rol },
+      dto.motivo,
+    );
+  }
+
+  @Patch(':id/aprobar')
+  @Roles(Rol.TESORERO, Rol.ADMIN)
+  @ApiOperation({ summary: 'Aprobar el cuadro (Shirley) → APROBADO' })
+  aprobar(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.cuadrosService.aprobar(id, {
       id: req.user.userId,
       rol: req.user.rol,
     });
