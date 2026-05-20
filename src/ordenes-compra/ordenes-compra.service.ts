@@ -92,12 +92,15 @@ export class OrdenesCompraService {
     const cotizacion = recomendada.cotizacion;
 
     const items = cuadro.items
-      .filter((item) => item.cotizacionGanadoraId === recomendada.id)
-      .map((item, idx) => {
+      .map((item) => {
         const precio = item.precios.find(
-          (p) => p.cuadroCotizacionId === recomendada.id,
+          (p) => p.cuadroCotizacionId === recomendada.id && !p.noMenciona,
         );
-        const precioUnitario = Number(precio?.precioUnitario ?? 0);
+        return { item, precio };
+      })
+      .filter(({ precio }) => precio !== undefined)
+      .map(({ item, precio }, idx) => {
+        const precioUnitario = Number(precio!.precioUnitario ?? 0);
         const cantidad = Number(item.cantidad ?? 0);
         return {
           orden: idx + 1,
