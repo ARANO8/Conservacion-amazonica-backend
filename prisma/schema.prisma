@@ -518,9 +518,11 @@ model LineaCotizacion {
 
 enum EstadoCuadroComparativo {
   BORRADOR
-  EN_VALIDACION
-  OBSERVADO
   EN_REVISION
+  EN_VALIDACION
+  REVISADO
+  EN_APROBACION
+  OBSERVADO
   APROBADO
 }
 

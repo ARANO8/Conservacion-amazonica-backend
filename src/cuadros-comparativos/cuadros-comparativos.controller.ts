@@ -94,9 +94,32 @@ export class CuadrosComparativosController {
     });
   }
 
-  @Patch(':id/enviar-validacion')
+  /**
+   * PASO 1 — Emisor → CONTADOR
+   * BORRADOR / OBSERVADO → EN_REVISION
+   */
+  @Patch(':id/enviar-revision')
   @ApiOperation({
-    summary: 'Enviar el cuadro a validación (emisor; BORRADOR/OBSERVADO)',
+    summary: 'Emisor envía el cuadro al CONTADOR para revisión inicial',
+  })
+  enviarARevision(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.cuadrosService.enviarARevision(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  /**
+   * PASO 2 — CONTADOR → Denis (VALIDADOR_COMPRAS)
+   * EN_REVISION → EN_VALIDACION
+   */
+  @Patch(':id/enviar-validacion')
+  @Roles(Rol.CONTADOR, Rol.ADMIN)
+  @ApiOperation({
+    summary: 'CONTADOR envía el cuadro a validación (Denis)',
   })
   enviarAValidacion(
     @Param('id', ParseIntPipe) id: number,
@@ -108,9 +131,13 @@ export class CuadrosComparativosController {
     });
   }
 
+  /**
+   * PASO 3 — Denis valida, devuelve al CONTADOR
+   * EN_VALIDACION → REVISADO
+   */
   @Patch(':id/validar')
   @Roles(Rol.VALIDADOR_COMPRAS, Rol.ADMIN)
-  @ApiOperation({ summary: 'Validar el cuadro (Denis) → EN_REVISION' })
+  @ApiOperation({ summary: 'Denis valida el cuadro y lo devuelve al CONTADOR' })
   validar(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
     return this.cuadrosService.validar(id, {
       id: req.user.userId,
@@ -118,10 +145,46 @@ export class CuadrosComparativosController {
     });
   }
 
-  @Patch(':id/observar')
-  @Roles(Rol.VALIDADOR_COMPRAS, Rol.TESORERO, Rol.ADMIN)
+  /**
+   * PASO 4 — CONTADOR → Shirley (EJECUTIVO)
+   * REVISADO → EN_APROBACION
+   */
+  @Patch(':id/enviar-aprobacion')
+  @Roles(Rol.CONTADOR, Rol.ADMIN)
   @ApiOperation({
-    summary: 'Observar el cuadro y devolver al emisor (validador o revisor)',
+    summary: 'CONTADOR envía el cuadro validado a Shirley para aprobación',
+  })
+  enviarAAprobacion(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.cuadrosService.enviarAAprobacion(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  /**
+   * PASO 5 — Shirley (EJECUTIVO) aprueba
+   * EN_APROBACION → APROBADO
+   */
+  @Patch(':id/aprobar')
+  @Roles(Rol.EJECUTIVO, Rol.ADMIN)
+  @ApiOperation({ summary: 'Shirley aprueba el cuadro → APROBADO' })
+  aprobar(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.cuadrosService.aprobar(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  /**
+   * Observar — devuelve al emisor desde cualquier etapa activa
+   */
+  @Patch(':id/observar')
+  @Roles(Rol.VALIDADOR_COMPRAS, Rol.CONTADOR, Rol.EJECUTIVO, Rol.ADMIN)
+  @ApiOperation({
+    summary: 'Observar el cuadro y devolver al emisor (cualquier revisor)',
   })
   observar(
     @Param('id', ParseIntPipe) id: number,
@@ -133,16 +196,6 @@ export class CuadrosComparativosController {
       { id: req.user.userId, rol: req.user.rol },
       dto.motivo,
     );
-  }
-
-  @Patch(':id/aprobar')
-  @Roles(Rol.TESORERO, Rol.ADMIN)
-  @ApiOperation({ summary: 'Aprobar el cuadro (Shirley) → APROBADO' })
-  aprobar(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
-    return this.cuadrosService.aprobar(id, {
-      id: req.user.userId,
-      rol: req.user.rol,
-    });
   }
 
   @Get(':id/pdf')
