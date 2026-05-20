@@ -409,6 +409,37 @@ APROBADO APROBADO
     Boolean noMenciona 
     }
   
+
+  "OrdenCompra" {
+    Int id "🗝️"
+    String codigoOrden 
+    DateTime fecha 
+    String proveedorNombre 
+    String proveedorDireccion "❓"
+    String proveedorTelefono "❓"
+    String lugarEntrega "❓"
+    String formaPago 
+    String garantia 
+    String observaciones "❓"
+    Decimal total 
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
+  "OrdenCompraItem" {
+    Int id "🗝️"
+    Int orden 
+    String item 
+    Decimal cantidad 
+    String unidad "❓"
+    String detalle "❓"
+    Decimal precioUnitario 
+    Decimal total 
+    Boolean sinCuadro 
+    }
+  
     "Usuario" |o--|| "Rol" : "enum:rol"
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
@@ -469,4 +500,8 @@ APROBADO APROBADO
     "CuadroItem" }o--|o "CuadroCotizacion" : "cotizacionGanadora"
     "CuadroPrecio" }o--|| "CuadroItem" : "cuadroItem"
     "CuadroPrecio" }o--|| "CuadroCotizacion" : "cuadroCotizacion"
+    "OrdenCompra" }o--|o "CuadroComparativo" : "cuadroComparativo"
+    "OrdenCompra" }o--|| "Usuario" : "usuarioEmisor"
+    "OrdenCompraItem" }o--|o "CuadroItem" : "cuadroItem"
+    "OrdenCompraItem" }o--|| "OrdenCompra" : "ordenCompra"
 ```
