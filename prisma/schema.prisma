@@ -25,6 +25,11 @@ enum EstadoSolicitud {
   EJECUTADO
 }
 
+enum TipoSolicitud {
+  VIAJE
+  COMPRA_SERVICIO
+}
+
 enum EstadoPoa {
   ACTIVO
   BLOQUEADO
@@ -193,6 +198,11 @@ model Solicitud {
   montoTotalPresupuestado Decimal         @default(0) @db.Decimal(10, 2)
   estado                  EstadoSolicitud @default(PENDIENTE)
   observacion             String?
+  tipo                    TipoSolicitud   @default(VIAJE)
+  proyecto                String?         @db.VarChar(200)
+  chequeANombreDe         String?         @db.VarChar(200)
+  banco                   String?         @db.VarChar(100)
+  fechaDesembolso         DateTime?
   deletedAt               DateTime?
 
   usuarioEmisorId Int
@@ -214,6 +224,7 @@ model Solicitud {
   rendicion             Rendicion?
   viaticos              Viatico[]
   gastos                Gasto[]
+  gastosCompra          GastoCompra[]
   personasExternas      PersonaExterna[]
   hospedajes            Hospedaje[]
 }
@@ -347,8 +358,9 @@ model SolicitudPresupuesto {
   poaId Int
   poa   Poa @relation(fields: [poaId], references: [id])
 
-  viaticos Viatico[]
-  gastos   Gasto[]
+  viaticos        Viatico[]
+  gastos          Gasto[]
+  gastosCompra    GastoCompra[]
   gastosRendicion GastoRendicion[]
 
   @@unique([solicitudId, poaId])
@@ -434,6 +446,23 @@ model PersonaExterna {
   procedenciaInstitucion String
   solicitudId            Int
   solicitud              Solicitud @relation(fields: [solicitudId], references: [id])
+}
+
+model GastoCompra {
+  id            Int     @id @default(autoincrement())
+  cantidad      Decimal @db.Decimal(10, 2)
+  descripcion   String  @db.VarChar(500)
+  uso           String? @db.VarChar(100)
+  costoUnitario Decimal @db.Decimal(10, 2)
+  total         Decimal @db.Decimal(10, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  solicitudPresupuestoId Int
+  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id])
+
+  deletedAt DateTime?
 }
 
 model NominaTerceros {

@@ -17,6 +17,7 @@ export class SolicitudPresupuestoService {
       include: {
         viaticos: true,
         gastos: true,
+        gastosCompra: { where: { deletedAt: null } },
       },
     });
 
@@ -58,6 +59,12 @@ export class SolicitudPresupuestoService {
         new Prisma.Decimal(0),
       );
 
+      // 4b. Sumamos gastos de compra (COMPRA_SERVICIO)
+      const sumGastosCompra = p.gastosCompra.reduce(
+        (acc, gc) => acc.add(gc.total),
+        new Prisma.Decimal(0),
+      );
+
       // 5. Filtrar y sumar hospedajes del POA correspondiente
       const hospPoa = hospedajes.filter(
         (h) => Number(h.poaId) === Number(p.poaId),
@@ -77,9 +84,11 @@ export class SolicitudPresupuestoService {
 
       const subtotalP = sumViaticosPresupuestado
         .add(sumGastosPresupuestado)
+        .add(sumGastosCompra)
         .add(sumHospedajesPresupuestado);
       const subtotalN = sumViaticosNeto
         .add(sumGastosNeto)
+        .add(sumGastosCompra)
         .add(sumHospedajesNeto);
 
       // 6. Actualizamos el presupuesto
