@@ -21,6 +21,13 @@ EJECUTADO EJECUTADO
     
 
 
+        TipoSolicitud {
+            VIAJE VIAJE
+COMPRA_SERVICIO COMPRA_SERVICIO
+        }
+    
+
+
         EstadoPoa {
             ACTIVO ACTIVO
 BLOQUEADO BLOQUEADO
@@ -77,6 +84,13 @@ CUADRO_PENDIENTE_VALIDACION CUADRO_PENDIENTE_VALIDACION
 CUADRO_PENDIENTE_REVISION CUADRO_PENDIENTE_REVISION
 CUADRO_OBSERVADO CUADRO_OBSERVADO
 CUADRO_APROBADO CUADRO_APROBADO
+        }
+    
+
+
+        TipoCotizacion {
+            PROPIA PROPIA
+EXTERNA EXTERNA
         }
     
 
@@ -171,6 +185,11 @@ APROBADO APROBADO
     Decimal montoTotalPresupuestado 
     EstadoSolicitud estado 
     String observacion "❓"
+    TipoSolicitud tipo 
+    String proyecto "❓"
+    String chequeANombreDe "❓"
+    String banco "❓"
+    DateTime fechaDesembolso "❓"
     DateTime deletedAt "❓"
     }
   
@@ -314,6 +333,17 @@ APROBADO APROBADO
     }
   
 
+  "GastoCompra" {
+    Int id "🗝️"
+    Decimal cantidad 
+    String descripcion 
+    String uso "❓"
+    Decimal costoUnitario 
+    Decimal total 
+    DateTime deletedAt "❓"
+    }
+  
+
   "NominaTerceros" {
     Int id "🗝️"
     String nombreCompleto 
@@ -347,6 +377,7 @@ APROBADO APROBADO
     Int id "🗝️"
     String codigoCotizacion 
     DateTime fecha 
+    TipoCotizacion tipo 
     String proveedorNombre 
     String proveedorTelefono "❓"
     String proveedorDireccion "❓"
@@ -356,6 +387,7 @@ APROBADO APROBADO
     String duracionCotizacion "❓"
     Boolean emiteFactura 
     String observaciones "❓"
+    String adjuntoUrl "❓"
     Decimal total 
     DateTime createdAt 
     DateTime updatedAt 
@@ -452,6 +484,7 @@ APROBADO APROBADO
     "Poa" }o--|| "CodigoPresupuestario" : "codigoPresupuestario"
     "Poa" }o--|| "Actividad" : "actividad"
     "Solicitud" |o--|| "EstadoSolicitud" : "enum:estado"
+    "Solicitud" |o--|| "TipoSolicitud" : "enum:tipo"
     "Solicitud" }o--|| "Usuario" : "usuarioEmisor"
     "Solicitud" }o--|o "Usuario" : "aprobador"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
@@ -487,10 +520,13 @@ APROBADO APROBADO
     "Gasto" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
     "Gasto" }o--|| "TipoGasto" : "tipoGasto"
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
+    "GastoCompra" }o--|| "Solicitud" : "solicitud"
+    "GastoCompra" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
     "NominaTerceros" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" }o--|| "Poa" : "poa"
+    "Cotizacion" |o--|| "TipoCotizacion" : "enum:tipo"
     "Cotizacion" }o--|| "Usuario" : "usuarioEmisor"
     "LineaCotizacion" }o--|| "Cotizacion" : "cotizacion"
     "CuadroComparativo" |o--|| "EstadoCuadroComparativo" : "enum:estado"
