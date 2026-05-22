@@ -949,6 +949,9 @@ export class SolicitudesService {
       gastos,
       hospedajes,
       nominasTerceros,
+      gastosCompra,
+      proyecto,
+      chequeANombreDe,
     } = updateSolicitudDto;
 
     // VALIDACIÓN 2: Mandatory Approver on Subsanación
@@ -981,7 +984,8 @@ export class SolicitudesService {
       viaticos !== undefined ||
       gastos !== undefined ||
       hospedajes !== undefined ||
-      nominasTerceros !== undefined;
+      nominasTerceros !== undefined ||
+      gastosCompra !== undefined;
 
     const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
       let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
@@ -1008,6 +1012,7 @@ export class SolicitudesService {
           gastos: gastos ?? [],
           hospedajes: hospedajes ?? [],
           nominasTerceros: nominasTerceros ?? [],
+          gastosCompra: gastosCompra ?? [],
         };
 
         // B. Recalcular y re-insertar
@@ -1043,6 +1048,7 @@ export class SolicitudesService {
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
+        await tx.gastoCompra.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
         await tx.nominaTerceros.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
@@ -1102,6 +1108,9 @@ export class SolicitudesService {
           lugarViaje,
           motivoViaje,
           descripcion,
+          proyecto: proyecto !== undefined ? proyecto : undefined,
+          chequeANombreDe:
+            chequeANombreDe !== undefined ? chequeANombreDe : undefined,
           urlCuadroComparativo:
             urlCuadroComparativo !== undefined
               ? urlCuadroComparativo
