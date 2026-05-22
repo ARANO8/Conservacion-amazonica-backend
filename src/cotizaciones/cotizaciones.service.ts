@@ -89,6 +89,8 @@ export class CotizacionesService {
           duracionCotizacion: dto.duracionCotizacion?.trim() || null,
           emiteFactura: dto.emiteFactura ?? false,
           observaciones: dto.observaciones?.trim() || null,
+          tipo: dto.tipo ?? 'PROPIA',
+          adjuntoUrl: dto.adjuntoUrl?.trim() || null,
           total,
           usuarioEmisorId: usuarioId,
           lineas: { create: lineas },

@@ -11,8 +11,11 @@ import {
   ArrayMinSize,
   IsEmail,
   IsDateString,
+  IsEnum,
+  IsUrl,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { TipoCotizacion } from '@prisma/client';
 
 export class CreateLineaCotizacionDto {
   @ApiProperty({ example: 2, minimum: 0 })
@@ -89,6 +92,24 @@ export class CreateCotizacionDto {
   @IsOptional()
   @IsString()
   observaciones?: string;
+
+  @ApiPropertyOptional({
+    enum: TipoCotizacion,
+    default: TipoCotizacion.PROPIA,
+    description:
+      'PROPIA = formulario interno | EXTERNA = documento adjunto externo',
+  })
+  @IsOptional()
+  @IsEnum(TipoCotizacion)
+  tipo?: TipoCotizacion;
+
+  @ApiPropertyOptional({
+    example: 'https://drive.google.com/file/d/...',
+    description: 'URL del documento externo (obligatorio cuando tipo=EXTERNA)',
+  })
+  @IsOptional()
+  @IsUrl({}, { message: 'La URL del adjunto no es válida' })
+  adjuntoUrl?: string;
 
   @ApiProperty({ type: [CreateLineaCotizacionDto] })
   @IsArray()

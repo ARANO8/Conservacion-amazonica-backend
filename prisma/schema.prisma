@@ -480,9 +480,10 @@ model Hospedaje {
 // --- COMPRAS Y SERVICIOS ---
 
 model Cotizacion {
-  id                 Int       @id @default(autoincrement())
-  codigoCotizacion   String    @unique
-  fecha              DateTime  @default(now())
+  id                 Int              @id @default(autoincrement())
+  codigoCotizacion   String           @unique
+  fecha              DateTime         @default(now())
+  tipo               TipoCotizacion   @default(PROPIA)
   proveedorNombre    String
   proveedorTelefono  String?
   proveedorDireccion String?
@@ -490,11 +491,12 @@ model Cotizacion {
   garantia           String?
   disponibilidad     String?
   duracionCotizacion String?
-  emiteFactura       Boolean   @default(false)
+  emiteFactura       Boolean          @default(false)
   observaciones      String?
-  total              Decimal   @default(0) @db.Decimal(10, 2)
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  adjuntoUrl         String?
+  total              Decimal          @default(0) @db.Decimal(10, 2)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
   deletedAt          DateTime?
 
   usuarioEmisorId Int
@@ -502,6 +504,11 @@ model Cotizacion {
 
   lineas             LineaCotizacion[]
   cuadroCotizaciones CuadroCotizacion[]
+}
+
+enum TipoCotizacion {
+  PROPIA
+  EXTERNA
 }
 
 model LineaCotizacion {
