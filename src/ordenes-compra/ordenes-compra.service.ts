@@ -195,7 +195,7 @@ export class OrdenesCompraService {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, user?: UsuarioContexto) {
     const orden = await this.prisma.ordenCompra.findFirst({
       where: { id, deletedAt: null },
       include: ORDEN_INCLUDE,
@@ -205,7 +205,21 @@ export class OrdenesCompraService {
       throw new NotFoundException(`Orden de compra ${id} no encontrada`);
     }
 
+    if (user) {
+      this.asegurarAcceso(orden.usuarioEmisorId, user);
+    }
+
     return orden;
+  }
+
+  // Misma visibilidad que findAll: ADMIN/EJECUTIVO acceden a todo; el resto
+  // solo a sus propias órdenes. Sin usuario (uso interno) no se valida.
+  private asegurarAcceso(emisorId: number, user: UsuarioContexto): void {
+    if (!this.esVistaGlobal(user.rol) && emisorId !== user.id) {
+      throw new ForbiddenException(
+        'No tienes permiso para acceder a esta orden de compra',
+      );
+    }
   }
 
   async update(id: number, dto: CreateOrdenCompraDto, user: UsuarioContexto) {
@@ -282,8 +296,8 @@ export class OrdenesCompraService {
     return { message: 'Orden de compra eliminada correctamente' };
   }
 
-  async generatePdf(id: number): Promise<Buffer> {
-    const orden = await this.findOne(id);
+  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+    const orden = await this.findOne(id, user);
 
     const items = orden.items.map((it) => ({
       orden: it.orden,

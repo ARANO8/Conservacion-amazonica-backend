@@ -67,8 +67,8 @@ export class OrdenesCompraController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener detalle de una orden de compra' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.service.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.service.findOne(id, { id: req.user.userId, rol: req.user.rol });
   }
 
   @Patch(':id')
@@ -95,9 +95,13 @@ export class OrdenesCompraController {
   @ApiProduces('application/pdf')
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
     @Res() res: Response,
   ) {
-    const buffer = await this.service.generatePdf(id);
+    const buffer = await this.service.generatePdf(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="orden-compra.pdf"',
