@@ -71,8 +71,11 @@ export class CotizacionesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener detalle de una cotización' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.cotizacionesService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.cotizacionesService.findOne(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
   }
 
   @Patch(':id')
@@ -102,9 +105,13 @@ export class CotizacionesController {
   @ApiProduces('application/pdf')
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
     @Res() res: Response,
   ) {
-    const buffer = await this.cotizacionesService.generatePdf(id);
+    const buffer = await this.cotizacionesService.generatePdf(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="cotizacion.pdf"',

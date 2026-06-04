@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EstadoCuadroComparativo, Rol } from '@prisma/client';
 import { CuadrosComparativosService } from './cuadros-comparativos.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -135,6 +135,85 @@ describe('CuadrosComparativosService', () => {
       // Nunca se abre la transacción, por lo que la estructura existente queda intacta.
       expect(prismaMock.$transaction).not.toHaveBeenCalled();
       expect(mockTx.cuadroCotizacion.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findOne — autorización (IDOR) por estado', () => {
+    const buildCuadro = (
+      usuarioEmisorId: number,
+      estado: EstadoCuadroComparativo,
+    ) => ({ id: CUADRO_ID, usuarioEmisorId, estado });
+
+    it('niega a un USUARIO ajeno', async () => {
+      prismaMock.cuadroComparativo.findFirst.mockResolvedValue(
+        buildCuadro(500, EstadoCuadroComparativo.BORRADOR),
+      );
+
+      await expect(
+        service.findOne(CUADRO_ID, { id: 999, rol: Rol.USUARIO }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('permite al emisor ver el suyo', async () => {
+      prismaMock.cuadroComparativo.findFirst.mockResolvedValue(
+        buildCuadro(42, EstadoCuadroComparativo.BORRADOR),
+      );
+
+      await expect(
+        service.findOne(CUADRO_ID, { id: 42, rol: Rol.USUARIO }),
+      ).resolves.toMatchObject({ id: CUADRO_ID });
+    });
+
+    it('permite a ADMIN/EJECUTIVO ver cualquiera', async () => {
+      prismaMock.cuadroComparativo.findFirst.mockResolvedValue(
+        buildCuadro(500, EstadoCuadroComparativo.EN_APROBACION),
+      );
+
+      await expect(
+        service.findOne(CUADRO_ID, { id: 999, rol: Rol.EJECUTIVO }),
+      ).resolves.toMatchObject({ id: CUADRO_ID });
+    });
+
+    it('CONTADOR ve EN_REVISION ajenos pero no BORRADOR ajenos', async () => {
+      prismaMock.cuadroComparativo.findFirst.mockResolvedValue(
+        buildCuadro(500, EstadoCuadroComparativo.EN_REVISION),
+      );
+      await expect(
+        service.findOne(CUADRO_ID, { id: 999, rol: Rol.CONTADOR }),
+      ).resolves.toMatchObject({ id: CUADRO_ID });
+
+      prismaMock.cuadroComparativo.findFirst.mockResolvedValue(
+        buildCuadro(500, EstadoCuadroComparativo.BORRADOR),
+      );
+      await expect(
+        service.findOne(CUADRO_ID, { id: 999, rol: Rol.CONTADOR }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('VALIDADOR_COMPRAS ve EN_VALIDACION ajenos pero no EN_REVISION ajenos', async () => {
+      prismaMock.cuadroComparativo.findFirst.mockResolvedValue(
+        buildCuadro(500, EstadoCuadroComparativo.EN_VALIDACION),
+      );
+      await expect(
+        service.findOne(CUADRO_ID, { id: 999, rol: Rol.VALIDADOR_COMPRAS }),
+      ).resolves.toMatchObject({ id: CUADRO_ID });
+
+      prismaMock.cuadroComparativo.findFirst.mockResolvedValue(
+        buildCuadro(500, EstadoCuadroComparativo.EN_REVISION),
+      );
+      await expect(
+        service.findOne(CUADRO_ID, { id: 999, rol: Rol.VALIDADOR_COMPRAS }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('permite el acceso interno (sin usuario)', async () => {
+      prismaMock.cuadroComparativo.findFirst.mockResolvedValue(
+        buildCuadro(500, EstadoCuadroComparativo.BORRADOR),
+      );
+
+      await expect(service.findOne(CUADRO_ID)).resolves.toMatchObject({
+        id: CUADRO_ID,
+      });
     });
   });
 });

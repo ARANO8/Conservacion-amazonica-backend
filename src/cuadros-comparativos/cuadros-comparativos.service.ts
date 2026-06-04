@@ -232,7 +232,7 @@ export class CuadrosComparativosService {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, user?: UsuarioContexto) {
     const cuadro = await this.prisma.cuadroComparativo.findFirst({
       where: { id, deletedAt: null },
       include: CUADRO_INCLUDE,
@@ -242,7 +242,36 @@ export class CuadrosComparativosService {
       throw new NotFoundException(`Cuadro comparativo ${id} no encontrado`);
     }
 
+    if (user && !this.puedeVer(cuadro, user)) {
+      throw new ForbiddenException(
+        'No tienes permiso para acceder a este cuadro comparativo',
+      );
+    }
+
     return cuadro;
+  }
+
+  /**
+   * Visibilidad de lectura, alineada con findAll: ADMIN/EJECUTIVO ven todo; el
+   * emisor ve lo propio; VALIDADOR_COMPRAS ve los que están EN_VALIDACION;
+   * CONTADOR ve los EN_REVISION o REVISADO. Sin usuario (uso interno) no valida.
+   */
+  private puedeVer(
+    cuadro: { usuarioEmisorId: number; estado: EstadoCuadroComparativo },
+    user: UsuarioContexto,
+  ): boolean {
+    if (this.esVistaGlobal(user.rol)) return true;
+    if (cuadro.usuarioEmisorId === user.id) return true;
+    if (user.rol === Rol.VALIDADOR_COMPRAS) {
+      return cuadro.estado === EstadoCuadroComparativo.EN_VALIDACION;
+    }
+    if (user.rol === Rol.CONTADOR) {
+      return (
+        cuadro.estado === EstadoCuadroComparativo.EN_REVISION ||
+        cuadro.estado === EstadoCuadroComparativo.REVISADO
+      );
+    }
+    return false;
   }
 
   private asegurarPropietario(emisorId: number, user: UsuarioContexto): void {
@@ -787,8 +816,8 @@ export class CuadrosComparativosService {
     return this.findOne(id);
   }
 
-  async generatePdf(id: number): Promise<Buffer> {
-    const cuadro = await this.findOne(id);
+  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+    const cuadro = await this.findOne(id, user);
 
     const columnas = cuadro.cotizaciones.map((col) => ({
       id: col.id,

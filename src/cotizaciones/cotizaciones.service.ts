@@ -113,7 +113,7 @@ export class CotizacionesService {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, user?: UsuarioContexto) {
     const cotizacion = await this.prisma.cotizacion.findFirst({
       where: { id, deletedAt: null },
       include: COTIZACION_INCLUDE,
@@ -123,14 +123,20 @@ export class CotizacionesService {
       throw new NotFoundException(`Cotización ${id} no encontrada`);
     }
 
+    if (user) {
+      this.asegurarPropietario(cotizacion.usuarioEmisorId, user);
+    }
+
     return cotizacion;
   }
 
+  // Misma visibilidad que findAll: ADMIN/EJECUTIVO acceden a todo; el resto
+  // solo a sus propias cotizaciones. Sin usuario (uso interno) no se valida.
   private asegurarPropietario(emisorId: number, user: UsuarioContexto): void {
     const esVistaGlobal = ROLES_VISTA_GLOBAL.includes(user.rol);
     if (!esVistaGlobal && emisorId !== user.id) {
       throw new ForbiddenException(
-        'No tienes permiso para modificar esta cotización',
+        'No tienes permiso para acceder a esta cotización',
       );
     }
   }
@@ -200,8 +206,8 @@ export class CotizacionesService {
     return { message: 'Cotización eliminada correctamente' };
   }
 
-  async generatePdf(id: number): Promise<Buffer> {
-    const cotizacion = await this.findOne(id);
+  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+    const cotizacion = await this.findOne(id, user);
     const totalNumero = Number(cotizacion.total ?? 0);
 
     const lineas = cotizacion.lineas.map((linea) => ({
