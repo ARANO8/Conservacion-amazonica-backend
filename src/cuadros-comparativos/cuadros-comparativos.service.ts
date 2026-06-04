@@ -292,22 +292,6 @@ export class CuadrosComparativosService {
       );
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.cuadroComparativo.update({
-        where: { id },
-        data: {
-          cotizacionRecomendadaId: null,
-          totalRecomendado: null,
-        },
-      });
-      await tx.cuadroPrecio.deleteMany({
-        where: { cuadroItem: { cuadroId: id } },
-      });
-      await tx.cuadroItem.deleteMany({ where: { cuadroId: id } });
-      await tx.cuadroCotizacion.deleteMany({ where: { cuadroId: id } });
-    });
-
-    // Reusar la lógica de armado dentro de una nueva transacción.
     const dtoCompleto: CreateCuadroComparativoDto = {
       lugarFecha: dto.lugarFecha ?? cuadro.lugarFecha ?? undefined,
       observaciones: dto.observaciones ?? cuadro.observaciones ?? undefined,
@@ -316,116 +300,162 @@ export class CuadrosComparativosService {
       items: dto.items,
     };
 
-    return this.reconstruir(id, dtoCompleto);
-  }
-
-  private async reconstruir(cuadroId: number, dto: CreateCuadroComparativoDto) {
-    const cotizacionIds = dto.cotizaciones.map((c) => c.cotizacionId);
+    // Validar (solo lectura) que todas las cotizaciones existan ANTES de tocar
+    // la base de datos, para no abrir la transacción si la entrada es inválida.
+    const cotizacionIds = dtoCompleto.cotizaciones.map((c) => c.cotizacionId);
     const cotizaciones = await this.prisma.cotizacion.findMany({
       where: { id: { in: cotizacionIds }, deletedAt: null },
       select: { id: true, proveedorNombre: true },
     });
+
+    if (cotizaciones.length !== cotizacionIds.length) {
+      throw new BadRequestException(
+        'Una o más cotizaciones seleccionadas no existen o fueron eliminadas',
+      );
+    }
+
     const proveedorPorId = new Map(
       cotizaciones.map((c) => [c.id, c.proveedorNombre]),
     );
 
+    // Borrado + reconstrucción en UNA sola transacción: si la reconstrucción
+    // falla, el borrado se revierte y el cuadro nunca queda en estado vacío.
     return this.prisma.$transaction(async (tx) => {
+      // 1. Liberar la FK de cotización recomendada antes de borrar las columnas.
       await tx.cuadroComparativo.update({
-        where: { id: cuadroId },
+        where: { id },
         data: {
-          lugarFecha: dto.lugarFecha?.trim() || null,
-          observaciones: dto.observaciones?.trim() || null,
+          cotizacionRecomendadaId: null,
+          totalRecomendado: null,
         },
       });
 
-      const colIdPorIndex: number[] = [];
-      const totalPorIndex: Prisma.Decimal[] = dto.cotizaciones.map(
-        () => new Prisma.Decimal(0),
-      );
+      // 2. Borrar la estructura anterior (precios -> items -> columnas).
+      await tx.cuadroPrecio.deleteMany({
+        where: { cuadroItem: { cuadroId: id } },
+      });
+      await tx.cuadroItem.deleteMany({ where: { cuadroId: id } });
+      await tx.cuadroCotizacion.deleteMany({ where: { cuadroId: id } });
 
-      for (let i = 0; i < dto.cotizaciones.length; i++) {
-        const col = dto.cotizaciones[i];
-        const creada = await tx.cuadroCotizacion.create({
-          data: {
-            orden: col.orden,
-            proveedorNombre: proveedorPorId.get(col.cotizacionId) ?? 'N/D',
-            cuadroId,
-            cotizacionId: col.cotizacionId,
-          },
-        });
-        colIdPorIndex[i] = creada.id;
-      }
-
-      for (const item of dto.items) {
-        const cantidad = new Prisma.Decimal(item.cantidad);
-        const ganadoraColId =
-          item.ganadoraCotizacionIndex !== undefined
-            ? colIdPorIndex[item.ganadoraCotizacionIndex]
-            : null;
-
-        const itemCreado = await tx.cuadroItem.create({
-          data: {
-            orden: item.orden,
-            descripcion: item.descripcion.trim(),
-            cantidad,
-            unidad: item.unidad?.trim() || null,
-            cuadroId,
-            cotizacionGanadoraId: ganadoraColId,
-          },
-        });
-
-        for (const precio of item.precios) {
-          const colId = colIdPorIndex[precio.cotizacionIndex];
-          const noMenciona = precio.noMenciona === true;
-          const precioUnitario = noMenciona
-            ? null
-            : new Prisma.Decimal(precio.precioUnitario ?? 0);
-          const total = noMenciona
-            ? null
-            : (precioUnitario as Prisma.Decimal).times(cantidad);
-
-          if (total) {
-            totalPorIndex[precio.cotizacionIndex] =
-              totalPorIndex[precio.cotizacionIndex].plus(total);
-          }
-
-          await tx.cuadroPrecio.create({
-            data: {
-              precioUnitario,
-              total,
-              noMenciona,
-              cuadroItemId: itemCreado.id,
-              cuadroCotizacionId: colId,
-            },
-          });
-        }
-      }
-
-      for (let i = 0; i < colIdPorIndex.length; i++) {
-        await tx.cuadroCotizacion.update({
-          where: { id: colIdPorIndex[i] },
-          data: { total: totalPorIndex[i] },
-        });
-      }
-
-      if (dto.recomendadaCotizacionIndex !== undefined) {
-        const recId = colIdPorIndex[dto.recomendadaCotizacionIndex];
-        if (recId !== undefined) {
-          await tx.cuadroComparativo.update({
-            where: { id: cuadroId },
-            data: {
-              cotizacionRecomendadaId: recId,
-              totalRecomendado: totalPorIndex[dto.recomendadaCotizacionIndex],
-            },
-          });
-        }
-      }
+      // 3. Reconstruir dentro de la MISMA transacción.
+      await this.construirEstructura(tx, id, dtoCompleto, proveedorPorId);
 
       return tx.cuadroComparativo.findUniqueOrThrow({
-        where: { id: cuadroId },
+        where: { id },
         include: CUADRO_INCLUDE,
       });
     });
+  }
+
+  /**
+   * Construye columnas, ítems, precios, totales y la cotización recomendada del
+   * cuadro DENTRO de la transacción recibida. No abre su propia transacción ni
+   * realiza lecturas: el llamador debe proveer el cliente transaccional y el
+   * mapa de proveedores ya validado. Esto permite que el borrado previo y la
+   * reconstrucción ocurran de forma atómica.
+   */
+  private async construirEstructura(
+    tx: Prisma.TransactionClient,
+    cuadroId: number,
+    dto: CreateCuadroComparativoDto,
+    proveedorPorId: Map<number, string>,
+  ): Promise<void> {
+    await tx.cuadroComparativo.update({
+      where: { id: cuadroId },
+      data: {
+        lugarFecha: dto.lugarFecha?.trim() || null,
+        observaciones: dto.observaciones?.trim() || null,
+      },
+    });
+
+    const colIdPorIndex: number[] = [];
+    const totalPorIndex: Prisma.Decimal[] = dto.cotizaciones.map(
+      () => new Prisma.Decimal(0),
+    );
+
+    for (let i = 0; i < dto.cotizaciones.length; i++) {
+      const col = dto.cotizaciones[i];
+      const creada = await tx.cuadroCotizacion.create({
+        data: {
+          orden: col.orden,
+          proveedorNombre: proveedorPorId.get(col.cotizacionId) ?? 'N/D',
+          cuadroId,
+          cotizacionId: col.cotizacionId,
+        },
+      });
+      colIdPorIndex[i] = creada.id;
+    }
+
+    for (const item of dto.items) {
+      const cantidad = new Prisma.Decimal(item.cantidad);
+      const ganadoraColId =
+        item.ganadoraCotizacionIndex !== undefined
+          ? colIdPorIndex[item.ganadoraCotizacionIndex]
+          : null;
+
+      const itemCreado = await tx.cuadroItem.create({
+        data: {
+          orden: item.orden,
+          descripcion: item.descripcion.trim(),
+          cantidad,
+          unidad: item.unidad?.trim() || null,
+          cuadroId,
+          cotizacionGanadoraId: ganadoraColId,
+        },
+      });
+
+      for (const precio of item.precios) {
+        const colId = colIdPorIndex[precio.cotizacionIndex];
+        if (colId === undefined) {
+          throw new BadRequestException(
+            `Índice de cotización inválido en precios: ${precio.cotizacionIndex}`,
+          );
+        }
+
+        const noMenciona = precio.noMenciona === true;
+        const precioUnitario = noMenciona
+          ? null
+          : new Prisma.Decimal(precio.precioUnitario ?? 0);
+        const total = noMenciona
+          ? null
+          : (precioUnitario as Prisma.Decimal).times(cantidad);
+
+        if (total) {
+          totalPorIndex[precio.cotizacionIndex] =
+            totalPorIndex[precio.cotizacionIndex].plus(total);
+        }
+
+        await tx.cuadroPrecio.create({
+          data: {
+            precioUnitario,
+            total,
+            noMenciona,
+            cuadroItemId: itemCreado.id,
+            cuadroCotizacionId: colId,
+          },
+        });
+      }
+    }
+
+    for (let i = 0; i < colIdPorIndex.length; i++) {
+      await tx.cuadroCotizacion.update({
+        where: { id: colIdPorIndex[i] },
+        data: { total: totalPorIndex[i] },
+      });
+    }
+
+    if (dto.recomendadaCotizacionIndex !== undefined) {
+      const recId = colIdPorIndex[dto.recomendadaCotizacionIndex];
+      if (recId !== undefined) {
+        await tx.cuadroComparativo.update({
+          where: { id: cuadroId },
+          data: {
+            cotizacionRecomendadaId: recId,
+            totalRecomendado: totalPorIndex[dto.recomendadaCotizacionIndex],
+          },
+        });
+      }
+    }
   }
 
   async remove(id: number, user: UsuarioContexto) {
