@@ -764,7 +764,7 @@ export class SolicitudesService {
     return Promise.all(solicitudes.map((s) => this.enriquecerConSaldos(s)));
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, usuario?: { id: number; rol: Rol }) {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -777,11 +777,40 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
+    this.assertPuedeVerSolicitud(solicitud, usuario);
+
     return this.enriquecerConSaldos(solicitud);
   }
 
-  async generatePdf(id: number): Promise<Buffer> {
-    const solicitud = await this.findOne(id);
+  /**
+   * Verifica que el usuario pueda acceder a la solicitud. Refleja la misma
+   * visibilidad que findAll: los roles privilegiados ven todo; un USUARIO solo
+   * puede ver las solicitudes que emitió o en las que es el aprobador asignado.
+   * Si no se provee usuario (contexto interno de confianza) no se valida.
+   */
+  private assertPuedeVerSolicitud(
+    solicitud: { usuarioEmisorId: number; aprobadorId: number | null },
+    usuario?: { id: number; rol: Rol },
+  ): void {
+    if (!usuario || usuario.rol !== Rol.USUARIO) {
+      return;
+    }
+
+    const esEmisor = solicitud.usuarioEmisorId === usuario.id;
+    const esAprobador = solicitud.aprobadorId === usuario.id;
+
+    if (!esEmisor && !esAprobador) {
+      throw new ForbiddenException(
+        'No tienes permiso para acceder a esta solicitud',
+      );
+    }
+  }
+
+  async generatePdf(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<Buffer> {
+    const solicitud = await this.findOne(id, usuario);
     const cuentaBancaria =
       solicitud.presupuestos?.[0]?.poa?.estructura?.proyecto?.cuentaBancaria;
 

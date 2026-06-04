@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { EstadoRendicion, EstadoSolicitud, Prisma, Rol } from '@prisma/client';
 import { RendicionesService } from './rendiciones.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,7 +26,10 @@ type MockTx = {
 describe('RendicionesService', () => {
   let service: RendicionesService;
   let mockTx: MockTx;
-  let prismaMock: { $transaction: jest.Mock };
+  let prismaMock: {
+    $transaction: jest.Mock;
+    rendicion: { findUnique: jest.Mock };
+  };
 
   const PARTIDA_ID = 10;
   const POA_ID = 100;
@@ -83,6 +86,7 @@ describe('RendicionesService', () => {
       $transaction: jest
         .fn()
         .mockImplementation((cb: (tx: MockTx) => unknown) => cb(mockTx)),
+      rendicion: { findUnique: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -169,6 +173,67 @@ describe('RendicionesService', () => {
       );
 
       expect(mockTx.poa.update).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('findOne — autorización (IDOR)', () => {
+    const buildRendicionDe = (
+      usuarioEmisorId: number,
+      aprobadorActualId: number | null,
+    ) => ({
+      id: RENDICION_ID,
+      aprobadorActualId,
+      solicitud: { usuarioEmisorId },
+    });
+
+    it('niega a un USUARIO que no es emisor ni aprobador actual', async () => {
+      prismaMock.rendicion.findUnique.mockResolvedValue(
+        buildRendicionDe(500, 600),
+      );
+
+      await expect(
+        service.findOne(RENDICION_ID, { id: 999, rol: Rol.USUARIO }),
+      ).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('permite al USUARIO emisor de la solicitud', async () => {
+      prismaMock.rendicion.findUnique.mockResolvedValue(
+        buildRendicionDe(42, 600),
+      );
+
+      await expect(
+        service.findOne(RENDICION_ID, { id: 42, rol: Rol.USUARIO }),
+      ).resolves.toMatchObject({ id: RENDICION_ID });
+    });
+
+    it('permite al USUARIO que es el aprobador actual', async () => {
+      prismaMock.rendicion.findUnique.mockResolvedValue(
+        buildRendicionDe(500, 42),
+      );
+
+      await expect(
+        service.findOne(RENDICION_ID, { id: 42, rol: Rol.USUARIO }),
+      ).resolves.toMatchObject({ id: RENDICION_ID });
+    });
+
+    it('permite a un rol privilegiado aunque no sea dueño', async () => {
+      prismaMock.rendicion.findUnique.mockResolvedValue(
+        buildRendicionDe(500, 600),
+      );
+
+      await expect(
+        service.findOne(RENDICION_ID, { id: 999, rol: Rol.CONTADOR }),
+      ).resolves.toMatchObject({ id: RENDICION_ID });
+    });
+
+    it('permite el acceso interno (sin usuario)', async () => {
+      prismaMock.rendicion.findUnique.mockResolvedValue(
+        buildRendicionDe(500, 600),
+      );
+
+      await expect(service.findOne(RENDICION_ID)).resolves.toMatchObject({
+        id: RENDICION_ID,
+      });
     });
   });
 });
