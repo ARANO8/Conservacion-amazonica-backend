@@ -5,6 +5,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { UsuariosModule } from '../usuarios/usuarios.module';
 import { JwtStrategy } from './jwt.strategy';
+import { getJwtSecret } from './jwt-secret.util';
 
 const DEFAULT_JWT_EXPIRES_IN = '24h';
 
@@ -13,18 +14,13 @@ const DEFAULT_JWT_EXPIRES_IN = '24h';
     UsuariosModule,
     PassportModule,
     JwtModule.registerAsync({
-      useFactory: () => {
-        if (!process.env.JWT_SECRET) {
-          throw new Error('JWT_SECRET is not defined in environment variables');
-        }
-        return {
-          secret: process.env.JWT_SECRET,
-          signOptions: {
-            expiresIn: (process.env.JWT_EXPIRES_IN ??
-              DEFAULT_JWT_EXPIRES_IN) as `${number}${'h' | 'm' | 's' | 'd'}`,
-          },
-        };
-      },
+      useFactory: () => ({
+        secret: getJwtSecret(),
+        signOptions: {
+          expiresIn: (process.env.JWT_EXPIRES_IN ??
+            DEFAULT_JWT_EXPIRES_IN) as `${number}${'h' | 'm' | 's' | 'd'}`,
+        },
+      }),
     }),
   ],
   controllers: [AuthController],
