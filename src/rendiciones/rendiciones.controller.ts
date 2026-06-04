@@ -63,7 +63,10 @@ export class RendicionesController {
     status: 200,
     description: 'Listado de rendiciones obtenido correctamente',
   })
-  findAll(@Query('solicitudId') solicitudId?: string) {
+  findAll(
+    @Req() req: RequestWithUser,
+    @Query('solicitudId') solicitudId?: string,
+  ) {
     const solicitudIdNumber =
       solicitudId && solicitudId.trim() !== ''
         ? Number(solicitudId)
@@ -75,7 +78,10 @@ export class RendicionesController {
       );
     }
 
-    return this.rendicionesService.findAll(solicitudIdNumber);
+    return this.rendicionesService.findAll(solicitudIdNumber, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
   }
 
   @Get('mis-rendiciones')
@@ -100,8 +106,14 @@ export class RendicionesController {
     status: 404,
     description: 'No se encontró rendición para la solicitud indicada',
   })
-  findBySolicitudId(@Param('solicitudId', ParseIntPipe) solicitudId: number) {
-    return this.rendicionesService.findBySolicitudId(solicitudId);
+  findBySolicitudId(
+    @Param('solicitudId', ParseIntPipe) solicitudId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.rendicionesService.findBySolicitudId(solicitudId, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
   }
 
   @Get(':id')
@@ -114,8 +126,11 @@ export class RendicionesController {
     status: 404,
     description: 'No se encontró la rendición indicada',
   })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.rendicionesService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.rendicionesService.findOne(id, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
   }
 
   @Get(':id/pdf')
@@ -134,9 +149,13 @@ export class RendicionesController {
   })
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.rendicionesService.generatePdf(id);
+    const buffer = await this.rendicionesService.generatePdf(id, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
 
     res.set({
       'Content-Type': 'application/pdf',

@@ -93,8 +93,11 @@ export class SolicitudesController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Obtener detalle de una solicitud' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.solicitudesService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.solicitudesService.findOne(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
   }
 
   @Patch(':id')
@@ -183,9 +186,13 @@ export class SolicitudesController {
   })
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.solicitudesService.generatePdf(id);
+    const buffer = await this.solicitudesService.generatePdf(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
 
     res.set({
       'Content-Type': 'application/pdf',

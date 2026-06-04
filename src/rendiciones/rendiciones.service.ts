@@ -113,7 +113,7 @@ export class RendicionesService {
    * Devuelve todas las rendiciones del sistema (para monitores, auditoría, etc.).
    * Solo filtra por deletedAt de la solicitud.
    */
-  async findAll(solicitudId?: number) {
+  async findAll(solicitudId?: number, usuario?: { id: number; rol: Rol }) {
     const where: Prisma.RendicionWhereInput = {
       solicitud: {
         deletedAt: null,
@@ -122,6 +122,15 @@ export class RendicionesService {
 
     if (solicitudId !== undefined) {
       where.solicitudId = solicitudId;
+    }
+
+    // Un USUARIO solo ve rendiciones de solicitudes propias o donde es el
+    // aprobador actual. Los roles privilegiados (monitores/auditoría) ven todo.
+    if (usuario && usuario.rol === Rol.USUARIO) {
+      where.OR = [
+        { solicitud: { usuarioEmisorId: usuario.id } },
+        { aprobadorActualId: usuario.id },
+      ];
     }
 
     return this.prisma.rendicion.findMany({
@@ -148,7 +157,7 @@ export class RendicionesService {
     });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, usuario?: { id: number; rol: Rol }) {
     const rendicion = await this.prisma.rendicion.findUnique({
       where: { id },
       include: RENDICION_INCLUDE,
@@ -158,10 +167,42 @@ export class RendicionesService {
       throw new NotFoundException('Rendición no encontrada');
     }
 
+    this.assertPuedeVerRendicion(rendicion, usuario);
+
     return rendicion;
   }
 
-  async findBySolicitudId(solicitudId: number) {
+  /**
+   * Verifica que el usuario pueda acceder a la rendición. Los roles
+   * privilegiados ven todo; un USUARIO solo puede ver las rendiciones de las
+   * solicitudes que emitió o en las que es el aprobador actual. Sin usuario
+   * (contexto interno de confianza) no se valida.
+   */
+  private assertPuedeVerRendicion(
+    rendicion: {
+      aprobadorActualId: number | null;
+      solicitud: { usuarioEmisorId: number };
+    },
+    usuario?: { id: number; rol: Rol },
+  ): void {
+    if (!usuario || usuario.rol !== Rol.USUARIO) {
+      return;
+    }
+
+    const esEmisor = rendicion.solicitud.usuarioEmisorId === usuario.id;
+    const esAprobador = rendicion.aprobadorActualId === usuario.id;
+
+    if (!esEmisor && !esAprobador) {
+      throw new ForbiddenException(
+        'No tienes permiso para acceder a esta rendición',
+      );
+    }
+  }
+
+  async findBySolicitudId(
+    solicitudId: number,
+    usuario?: { id: number; rol: Rol },
+  ) {
     const rendicion = await this.prisma.rendicion.findUnique({
       where: { solicitudId },
       include: RENDICION_INCLUDE,
@@ -173,11 +214,16 @@ export class RendicionesService {
       );
     }
 
+    this.assertPuedeVerRendicion(rendicion, usuario);
+
     return rendicion;
   }
 
-  async generatePdf(id: number): Promise<Buffer> {
-    const rendicion = await this.findOne(id);
+  async generatePdf(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<Buffer> {
+    const rendicion = await this.findOne(id, usuario);
 
     const totalEfectivoPagado = Number(
       (rendicion.gastosRendicion ?? [])
