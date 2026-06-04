@@ -2,6 +2,8 @@ import { PrismaClient, Rol, EstadoPoa } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -80,8 +82,12 @@ async function processCSV(
 
 async function main() {
   const STICKY_PLACEHOLDER = 'SIN_CLASIFICAR_REQUIERE_REVISION';
-  const passwordHash =
-    '$2a$12$wbhVNc2q5wLlKnryn3F8SOjhR2YYregnGlRB.R2VmhNNhnrhMpYBe';
+
+  // Contraseñas del seed: distintas por usuario. Cada usuario nuevo recibe una
+  // contraseña aleatoria que se imprime UNA sola vez al final. Para fijar una
+  // contraseña conocida en desarrollo, exporta SEED_PASSWORD antes de sembrar.
+  const seedPasswordOverride = process.env.SEED_PASSWORD;
+  const credencialesGeneradas: { email: string; password: string }[] = [];
 
   // Mapas para cach en memoria (Cach Agresivo)
   const proyectoMap = new Map<string, number>();
@@ -99,17 +105,29 @@ async function main() {
     const [nombre, email, cargo, rolStr] = row;
     const rol = (Rol[rolStr as keyof typeof Rol] || Rol.USUARIO) as Rol;
 
-    await prisma.usuario.upsert({
-      where: { email },
-      update: { nombreCompleto: nombre, cargo, rol },
-      create: {
-        email,
-        nombreCompleto: nombre,
-        cargo,
-        rol,
-        password: passwordHash,
-      },
-    });
+    const existente = await prisma.usuario.findUnique({ where: { email } });
+
+    if (existente) {
+      // No se reescribe la contraseña de usuarios ya existentes.
+      await prisma.usuario.update({
+        where: { email },
+        data: { nombreCompleto: nombre, cargo, rol },
+      });
+    } else {
+      const plainPassword =
+        seedPasswordOverride ?? crypto.randomBytes(9).toString('base64url');
+      const passwordHash = await bcrypt.hash(plainPassword, 12);
+      await prisma.usuario.create({
+        data: {
+          email,
+          nombreCompleto: nombre,
+          cargo,
+          rol,
+          password: passwordHash,
+        },
+      });
+      credencialesGeneradas.push({ email, password: plainPassword });
+    }
     userCount++;
   });
 
@@ -298,6 +316,18 @@ async function main() {
   console.log(`Usuarios: ${userCount}`);
   console.log(`Estructuras: ${estructuraMap.size}`);
   console.log(`Filas POA: ${poaCount}`);
+
+  if (credencialesGeneradas.length > 0) {
+    console.log(
+      '\n--- Credenciales generadas (guardalas; no se vuelven a mostrar) ---',
+    );
+    if (seedPasswordOverride) {
+      console.log('(Se uso SEED_PASSWORD para todos los usuarios nuevos)');
+    }
+    for (const cred of credencialesGeneradas) {
+      console.log(`${cred.email} -> ${cred.password}`);
+    }
+  }
 }
 
 main()
