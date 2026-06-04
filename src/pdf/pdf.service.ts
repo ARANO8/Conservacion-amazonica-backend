@@ -12,7 +12,11 @@ import puppeteer, { Browser } from 'puppeteer';
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
 
-  async generatePdf(templateName: string, data: any): Promise<Buffer> {
+  async generatePdf(
+    templateName: string,
+    data: any,
+    options?: { landscape?: boolean },
+  ): Promise<Buffer> {
     const templateFile = this.readTemplate(templateName);
     const template = Handlebars.compile(templateFile);
     const logoBase64 = this.readLogoBase64();
@@ -46,6 +50,7 @@ export class PdfService {
 
       const pdf = await page.pdf({
         format: 'A4',
+        landscape: options?.landscape ?? false,
         printBackground: true,
         margin: {
           top: '20mm',

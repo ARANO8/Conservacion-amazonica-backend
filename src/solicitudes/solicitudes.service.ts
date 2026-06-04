@@ -22,6 +22,7 @@ import {
   Solicitud,
   Prisma,
   TipoAccionHistorial,
+  TipoSolicitud,
 } from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
@@ -50,6 +51,13 @@ type DetalleSolicitud = {
   gastosData: {
     data: Omit<
       Prisma.GastoUncheckedCreateInput,
+      'solicitudId' | 'solicitudPresupuestoId'
+    >;
+    poaId: number;
+  }[];
+  gastosCompraData: {
+    data: Omit<
+      Prisma.GastoCompraUncheckedCreateInput,
       'solicitudId' | 'solicitudPresupuestoId'
     >;
     poaId: number;
@@ -105,6 +113,7 @@ export class SolicitudesService {
       planificaciones = [],
       viaticos = [],
       gastos = [],
+      gastosCompra = [],
       nominasTerceros = [],
       hospedajes = [],
     } = dto;
@@ -295,11 +304,35 @@ export class SolicitudesService {
       });
     }
 
+    // --- Procesar GastosCompra ---
+    const gastosCompraData: DetalleSolicitud['gastosCompraData'] = [];
+
+    for (const gcDto of gastosCompra) {
+      const cantidad = new Prisma.Decimal(gcDto.cantidad);
+      const costoUnitario = new Prisma.Decimal(gcDto.costoUnitario);
+      const total = cantidad.mul(costoUnitario);
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(total);
+      montoTotalNeto = montoTotalNeto.add(total);
+
+      gastosCompraData.push({
+        poaId: gcDto.poaId,
+        data: {
+          cantidad,
+          descripcion: gcDto.descripcion.trim(),
+          uso: gcDto.uso?.trim() || null,
+          costoUnitario,
+          total,
+        },
+      });
+    }
+
     return {
       montoTotalPresupuestado,
       montoTotalNeto,
       viaticosData,
       gastosData,
+      gastosCompraData,
       planificaciones,
       nominasTerceros,
       hospedajes: hospedajesData,
@@ -398,7 +431,25 @@ export class SolicitudesService {
       this.logger.log(`[insertarRelaciones] Gasto ${idx} creado OK`);
     }
 
-    // F. Crear PersonaExterna (viene de nominasTerceros)
+    // F. Crear GastosCompra (COMPRA_SERVICIO)
+    for (let idx = 0; idx < detalles.gastosCompraData.length; idx++) {
+      const gcRecord = detalles.gastosCompraData[idx];
+      const spId = presupuestosMap.get(gcRecord.poaId);
+      if (!spId) {
+        throw new BadRequestException(
+          `GastoCompra referencia la partida POA ${gcRecord.poaId} que no está incluida en poaIds`,
+        );
+      }
+      await tx.gastoCompra.create({
+        data: {
+          ...gcRecord.data,
+          solicitudId,
+          solicitudPresupuestoId: spId,
+        },
+      });
+    }
+
+    // G. Crear PersonaExterna (viene de nominasTerceros)
     for (const n of detalles.nominasTerceros) {
       this.logger.log(
         `[insertarRelaciones] Creando PersonaExterna: ${n.nombreCompleto}`,
@@ -423,6 +474,9 @@ export class SolicitudesService {
       aprobadorId,
       lugarViaje,
       motivoViaje,
+      proyecto,
+      chequeANombreDe,
+      tipo,
       urlCuadroComparativo,
       urlCotizaciones,
     } = createSolicitudDto;
@@ -512,6 +566,13 @@ export class SolicitudesService {
         );
       }
     }
+    for (const gc of detalles.gastosCompraData) {
+      if (!poaIdSet.has(gc.poaId)) {
+        throw new BadRequestException(
+          `El gasto de compra referencia la partida POA ${gc.poaId} que no está incluida en poaIds`,
+        );
+      }
+    }
 
     // Calcular monto solicitado por POA (viáticos + gastos + hospedajes)
     const montosByPoa = new Map<number, Prisma.Decimal>();
@@ -535,6 +596,10 @@ export class SolicitudesService {
         .add(new Prisma.Decimal(h.iva))
         .add(new Prisma.Decimal(h.it));
       montosByPoa.set(h.poaId, prev.add(hospPresupuestado));
+    }
+    for (const gc of detalles.gastosCompraData) {
+      const prev = montosByPoa.get(gc.poaId) ?? new Prisma.Decimal(0);
+      montosByPoa.set(gc.poaId, prev.add(gc.data.total as Prisma.Decimal));
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -581,11 +646,14 @@ export class SolicitudesService {
       const solicitud = await tx.solicitud.create({
         data: {
           codigoSolicitud,
+          tipo: tipo ?? TipoSolicitud.VIAJE,
           descripcion,
+          proyecto: proyecto?.trim() || null,
+          chequeANombreDe: chequeANombreDe?.trim() || null,
           montoTotalPresupuestado: detalles.montoTotalPresupuestado,
           montoTotalNeto: detalles.montoTotalNeto,
-          lugarViaje,
-          motivoViaje,
+          lugarViaje: lugarViaje ?? null,
+          motivoViaje: motivoViaje ?? null,
           urlCuadroComparativo,
           urlCotizaciones: urlCotizaciones ?? [],
           fechaInicio: minDate,
@@ -881,6 +949,9 @@ export class SolicitudesService {
       gastos,
       hospedajes,
       nominasTerceros,
+      gastosCompra,
+      proyecto,
+      chequeANombreDe,
     } = updateSolicitudDto;
 
     // VALIDACIÓN 2: Mandatory Approver on Subsanación
@@ -913,7 +984,8 @@ export class SolicitudesService {
       viaticos !== undefined ||
       gastos !== undefined ||
       hospedajes !== undefined ||
-      nominasTerceros !== undefined;
+      nominasTerceros !== undefined ||
+      gastosCompra !== undefined;
 
     const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
       let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
@@ -940,6 +1012,7 @@ export class SolicitudesService {
           gastos: gastos ?? [],
           hospedajes: hospedajes ?? [],
           nominasTerceros: nominasTerceros ?? [],
+          gastosCompra: gastosCompra ?? [],
         };
 
         // B. Recalcular y re-insertar
@@ -975,6 +1048,7 @@ export class SolicitudesService {
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
+        await tx.gastoCompra.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
         await tx.nominaTerceros.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
@@ -1034,6 +1108,9 @@ export class SolicitudesService {
           lugarViaje,
           motivoViaje,
           descripcion,
+          proyecto: proyecto !== undefined ? proyecto : undefined,
+          chequeANombreDe:
+            chequeANombreDe !== undefined ? chequeANombreDe : undefined,
           urlCuadroComparativo:
             urlCuadroComparativo !== undefined
               ? urlCuadroComparativo
@@ -1279,6 +1356,10 @@ export class SolicitudesService {
           estado: EstadoSolicitud.DESEMBOLSADO,
           codigoDesembolso: desembolsarDto.codigoDesembolso,
           urlComprobante: desembolsarDto.urlComprobante ?? null,
+          banco: desembolsarDto.banco?.trim() || null,
+          fechaDesembolso: desembolsarDto.fechaDesembolso
+            ? new Date(desembolsarDto.fechaDesembolso)
+            : null,
           aprobadorId: null, // Finalizado
         },
         include: SOLICITUD_INCLUDE,

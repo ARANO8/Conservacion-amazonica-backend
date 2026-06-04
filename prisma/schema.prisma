@@ -15,6 +15,7 @@ enum Rol {
   CONTADOR
   TESORERO
   USUARIO
+  VALIDADOR_COMPRAS
 }
 
 enum EstadoSolicitud {
@@ -22,6 +23,11 @@ enum EstadoSolicitud {
   OBSERVADO
   DESEMBOLSADO
   EJECUTADO
+}
+
+enum TipoSolicitud {
+  VIAJE
+  COMPRA_SERVICIO
 }
 
 enum EstadoPoa {
@@ -35,6 +41,8 @@ enum TipoAccionHistorial {
   OBSERVADO
   DERIVADO
   RECHAZADO
+  ENVIADO
+  VALIDADO
 }
 
 enum TipoDestino {
@@ -64,6 +72,10 @@ enum TipoNotificacion {
    SOLICITUD_OBSERVADA
    RENDICION_PENDIENTE
    RENDICION_OBSERVADA
+   CUADRO_PENDIENTE_VALIDACION
+   CUADRO_PENDIENTE_REVISION
+   CUADRO_OBSERVADO
+   CUADRO_APROBADO
 }
 
 // --- MODELOS ---
@@ -86,6 +98,9 @@ model Usuario {
   historialesRecibidos    HistorialAprobacion[] @relation("DestinatarioHistorial")
   rendicionesPorAprobar   Rendicion[]           @relation("RendicionAprobador")
   notificaciones          Notificacion[]
+  cotizacionesEmitidas    Cotizacion[]          @relation("CotizacionesEmitidas")
+  cuadrosEmitidos         CuadroComparativo[]   @relation("CuadrosEmitidos")
+  ordenesEmitidas         OrdenCompra[]         @relation("OrdenesEmitidas")
 }
 
 model Proyecto {
@@ -183,6 +198,11 @@ model Solicitud {
   montoTotalPresupuestado Decimal         @default(0) @db.Decimal(10, 2)
   estado                  EstadoSolicitud @default(PENDIENTE)
   observacion             String?
+  tipo                    TipoSolicitud   @default(VIAJE)
+  proyecto                String?         @db.VarChar(200)
+  chequeANombreDe         String?         @db.VarChar(200)
+  banco                   String?         @db.VarChar(100)
+  fechaDesembolso         DateTime?
   deletedAt               DateTime?
 
   usuarioEmisorId Int
@@ -204,6 +224,7 @@ model Solicitud {
   rendicion             Rendicion?
   viaticos              Viatico[]
   gastos                Gasto[]
+  gastosCompra          GastoCompra[]
   personasExternas      PersonaExterna[]
   hospedajes            Hospedaje[]
 }
@@ -225,6 +246,9 @@ model HistorialAprobacion {
 
   rendicionId Int?
   rendicion   Rendicion? @relation("RendicionHistorial", fields: [rendicionId], references: [id])
+
+  cuadroComparativoId Int?
+  cuadroComparativo   CuadroComparativo? @relation("CuadroHistorial", fields: [cuadroComparativoId], references: [id])
 }
 
 model Notificacion {
@@ -242,6 +266,9 @@ model Notificacion {
 
    solicitudId Int?
    solicitud   Solicitud? @relation(fields: [solicitudId], references: [id], onDelete: SetNull)
+
+   cuadroComparativoId Int?
+   cuadroComparativo   CuadroComparativo? @relation(fields: [cuadroComparativoId], references: [id], onDelete: SetNull)
 }
 
 model Rendicion {
@@ -331,8 +358,9 @@ model SolicitudPresupuesto {
   poaId Int
   poa   Poa @relation(fields: [poaId], references: [id])
 
-  viaticos Viatico[]
-  gastos   Gasto[]
+  viaticos        Viatico[]
+  gastos          Gasto[]
+  gastosCompra    GastoCompra[]
   gastosRendicion GastoRendicion[]
 
   @@unique([solicitudId, poaId])
@@ -420,6 +448,23 @@ model PersonaExterna {
   solicitud              Solicitud @relation(fields: [solicitudId], references: [id])
 }
 
+model GastoCompra {
+  id            Int     @id @default(autoincrement())
+  cantidad      Decimal @db.Decimal(10, 2)
+  descripcion   String  @db.VarChar(500)
+  uso           String? @db.VarChar(100)
+  costoUnitario Decimal @db.Decimal(10, 2)
+  total         Decimal @db.Decimal(10, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id])
+
+  solicitudPresupuestoId Int
+  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id])
+
+  deletedAt DateTime?
+}
+
 model NominaTerceros {
   id             Int       @id @default(autoincrement())
   nombreCompleto String
@@ -459,4 +504,177 @@ model Hospedaje {
 
   poaId Int
   poa   Poa @relation(fields: [poaId], references: [id])
+}
+
+// --- COMPRAS Y SERVICIOS ---
+
+model Cotizacion {
+  id                 Int              @id @default(autoincrement())
+  codigoCotizacion   String           @unique
+  fecha              DateTime         @default(now())
+  tipo               TipoCotizacion   @default(PROPIA)
+  proveedorNombre    String
+  proveedorTelefono  String?
+  proveedorDireccion String?
+  proveedorCorreo    String?
+  garantia           String?
+  disponibilidad     String?
+  duracionCotizacion String?
+  emiteFactura       Boolean          @default(false)
+  observaciones      String?
+  adjuntoUrl         String?
+  total              Decimal          @default(0) @db.Decimal(10, 2)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("CotizacionesEmitidas", fields: [usuarioEmisorId], references: [id])
+
+  lineas             LineaCotizacion[]
+  cuadroCotizaciones CuadroCotizacion[]
+}
+
+enum TipoCotizacion {
+  PROPIA
+  EXTERNA
+}
+
+model LineaCotizacion {
+  id             Int     @id @default(autoincrement())
+  cantidad       Decimal @db.Decimal(10, 2)
+  unidad         String?
+  detalle        String
+  precioUnitario Decimal @db.Decimal(10, 2)
+  total          Decimal @db.Decimal(10, 2)
+
+  cotizacionId Int
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+}
+
+enum EstadoCuadroComparativo {
+  BORRADOR
+  EN_REVISION
+  EN_VALIDACION
+  REVISADO
+  EN_APROBACION
+  OBSERVADO
+  APROBADO
+}
+
+model CuadroComparativo {
+  id               Int                     @id @default(autoincrement())
+  codigoCuadro     String                  @unique
+  lugarFecha       String?
+  observaciones     String?
+  estado            EstadoCuadroComparativo @default(BORRADOR)
+  totalRecomendado  Decimal?                @db.Decimal(12, 2)
+  motivoObservacion String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  deletedAt         DateTime?
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("CuadrosEmitidos", fields: [usuarioEmisorId], references: [id])
+
+  cotizacionRecomendadaId Int?
+  cotizacionRecomendada   CuadroCotizacion? @relation("CuadroRecomendada", fields: [cotizacionRecomendadaId], references: [id])
+
+  cotizaciones          CuadroCotizacion[]    @relation("CuadroCotizaciones")
+  items                 CuadroItem[]
+  historialAprobaciones HistorialAprobacion[] @relation("CuadroHistorial")
+  notificaciones        Notificacion[]
+  ordenesCompra         OrdenCompra[]
+}
+
+model CuadroCotizacion {
+  id              Int     @id @default(autoincrement())
+  orden           Int
+  proveedorNombre String
+  total           Decimal @default(0) @db.Decimal(12, 2)
+
+  cuadroId Int
+  cuadro   CuadroComparativo @relation("CuadroCotizaciones", fields: [cuadroId], references: [id], onDelete: Cascade)
+
+  cotizacionId Int
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id])
+
+  precios       CuadroPrecio[]
+  itemsGanados  CuadroItem[]        @relation("ItemGanadora")
+  recomendadaEn CuadroComparativo[] @relation("CuadroRecomendada")
+}
+
+model CuadroItem {
+  id          Int     @id @default(autoincrement())
+  orden       Int
+  descripcion String
+  cantidad    Decimal @db.Decimal(10, 2)
+  unidad      String?
+
+  cuadroId Int
+  cuadro   CuadroComparativo @relation(fields: [cuadroId], references: [id], onDelete: Cascade)
+
+  cotizacionGanadoraId Int?
+  cotizacionGanadora   CuadroCotizacion? @relation("ItemGanadora", fields: [cotizacionGanadoraId], references: [id])
+
+  precios          CuadroPrecio[]
+  ordenCompraItems OrdenCompraItem[]
+}
+
+model CuadroPrecio {
+  id             Int      @id @default(autoincrement())
+  precioUnitario Decimal? @db.Decimal(12, 2)
+  total          Decimal? @db.Decimal(12, 2)
+  noMenciona     Boolean  @default(false)
+
+  cuadroItemId Int
+  cuadroItem   CuadroItem @relation(fields: [cuadroItemId], references: [id], onDelete: Cascade)
+
+  cuadroCotizacionId Int
+  cuadroCotizacion   CuadroCotizacion @relation(fields: [cuadroCotizacionId], references: [id], onDelete: Cascade)
+
+  @@unique([cuadroItemId, cuadroCotizacionId])
+}
+
+model OrdenCompra {
+  id                  Int       @id @default(autoincrement())
+  codigoOrden         String    @unique
+  fecha               DateTime  @default(now())
+  proveedorNombre     String
+  proveedorDireccion  String?
+  proveedorTelefono   String?
+  lugarEntrega        String?
+  formaPago           String    @default("Transferencia bancaria")
+  garantia            String    @default("N/A")
+  observaciones       String?
+  total               Decimal   @default(0) @db.Decimal(12, 2)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  cuadroComparativoId Int?
+  cuadroComparativo   CuadroComparativo? @relation(fields: [cuadroComparativoId], references: [id])
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("OrdenesEmitidas", fields: [usuarioEmisorId], references: [id])
+
+  items OrdenCompraItem[]
+}
+
+model OrdenCompraItem {
+  id             Int     @id @default(autoincrement())
+  orden          Int
+  item           String
+  cantidad       Decimal @db.Decimal(10, 2)
+  unidad         String?
+  detalle        String?
+  precioUnitario Decimal @default(0) @db.Decimal(10, 2)
+  total          Decimal @default(0) @db.Decimal(12, 2)
+  sinCuadro      Boolean @default(false)
+
+  cuadroItemId Int?
+  cuadroItem   CuadroItem? @relation(fields: [cuadroItemId], references: [id])
+
+  ordenCompraId Int
+  ordenCompra   OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
 }
