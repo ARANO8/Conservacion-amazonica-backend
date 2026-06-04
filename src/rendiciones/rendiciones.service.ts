@@ -746,6 +746,46 @@ export class RendicionesService {
           montoPorPartida,
         );
 
+        // Validar que la ejecución no supere el techo presupuestario
+        // (costoTotal) de cada POA ANTES de aplicar cualquier incremento.
+        // Sin esta guarda el montoEjecutado podía exceder el costoTotal y dejar
+        // el saldo disponible negativo de forma permanente, ya que no existe una
+        // ruta de reversión para una rendición aprobada.
+        const poaIds = Array.from(montosPorPoa.keys());
+        const poasAfectados = await tx.poa.findMany({
+          where: { id: { in: poaIds } },
+          select: {
+            id: true,
+            codigoPoa: true,
+            costoTotal: true,
+            montoEjecutado: true,
+          },
+        });
+        const poaPorId = new Map(poasAfectados.map((poa) => [poa.id, poa]));
+
+        for (const [poaId, montoEjecutar] of montosPorPoa) {
+          const poa = poaPorId.get(poaId);
+
+          if (!poa) {
+            throw new NotFoundException(
+              `No se encontró el POA ${poaId} para ejecutar la rendición`,
+            );
+          }
+
+          const nuevoEjecutado = poa.montoEjecutado.plus(montoEjecutar);
+
+          if (nuevoEjecutado.greaterThan(poa.costoTotal)) {
+            const disponible = poa.costoTotal.minus(poa.montoEjecutado);
+            throw new BadRequestException(
+              `La aprobación excede el presupuesto del POA ${poa.codigoPoa}: ` +
+                `se intenta ejecutar ${this.formatCurrency(montoEjecutar.toNumber())} ` +
+                `pero solo restan ${this.formatCurrency(disponible.toNumber())} ` +
+                `del costo total (${this.formatCurrency(poa.costoTotal.toNumber())}).`,
+            );
+          }
+        }
+
+        // Todas las validaciones pasaron: aplicar los incrementos.
         for (const [poaId, montoEjecutar] of montosPorPoa) {
           await tx.poa.update({
             where: { id: poaId },
