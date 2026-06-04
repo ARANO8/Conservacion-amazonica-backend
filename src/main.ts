@@ -3,6 +3,7 @@ import { HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exception.filter';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -13,6 +14,16 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const frontendUrl = process.env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL;
   const port = Number(process.env.PORT ?? DEFAULT_PORT);
+
+  // Headers de seguridad HTTP. CSP deshabilitado: la API no sirve HTML de la
+  // aplicación y así no se rompe Swagger UI. CORP en cross-origin para que el
+  // frontend (otro origen) pueda consumir recursos como los PDFs.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
 
   // CORS: permitir solo el origen del frontend (configurable por variable de entorno)
   app.enableCors({
