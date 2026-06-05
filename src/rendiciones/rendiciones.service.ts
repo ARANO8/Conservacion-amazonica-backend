@@ -516,10 +516,7 @@ export class RendicionesService {
       }
 
       // 3. Verificar que el estado es OBSERVADO
-      if (
-        rendicion.estado !== EstadoRendicion.OBSERVADO &&
-        rendicion.estado !== EstadoRendicion.OBSERVADA
-      ) {
+      if (rendicion.estado !== EstadoRendicion.OBSERVADO) {
         throw new BadRequestException(
           'Solo se pueden editar rendiciones en estado OBSERVADO',
         );
@@ -754,10 +751,7 @@ export class RendicionesService {
         );
       }
 
-      if (
-        rendicion.estado === EstadoRendicion.APROBADO ||
-        rendicion.estado === EstadoRendicion.APROBADA
-      ) {
+      if (rendicion.estado === EstadoRendicion.APROBADO) {
         throw new BadRequestException('La rendición ya fue aprobada');
       }
 
