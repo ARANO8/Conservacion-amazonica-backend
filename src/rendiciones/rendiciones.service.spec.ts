@@ -28,7 +28,7 @@ describe('RendicionesService', () => {
   let mockTx: MockTx;
   let prismaMock: {
     $transaction: jest.Mock;
-    rendicion: { findUnique: jest.Mock };
+    rendicion: { findFirst: jest.Mock };
   };
 
   const PARTIDA_ID = 10;
@@ -86,7 +86,7 @@ describe('RendicionesService', () => {
       $transaction: jest
         .fn()
         .mockImplementation((cb: (tx: MockTx) => unknown) => cb(mockTx)),
-      rendicion: { findUnique: jest.fn() },
+      rendicion: { findFirst: jest.fn() },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -187,7 +187,7 @@ describe('RendicionesService', () => {
     });
 
     it('niega a un USUARIO que no es emisor ni aprobador actual', async () => {
-      prismaMock.rendicion.findUnique.mockResolvedValue(
+      prismaMock.rendicion.findFirst.mockResolvedValue(
         buildRendicionDe(500, 600),
       );
 
@@ -197,7 +197,7 @@ describe('RendicionesService', () => {
     });
 
     it('permite al USUARIO emisor de la solicitud', async () => {
-      prismaMock.rendicion.findUnique.mockResolvedValue(
+      prismaMock.rendicion.findFirst.mockResolvedValue(
         buildRendicionDe(42, 600),
       );
 
@@ -207,7 +207,7 @@ describe('RendicionesService', () => {
     });
 
     it('permite al USUARIO que es el aprobador actual', async () => {
-      prismaMock.rendicion.findUnique.mockResolvedValue(
+      prismaMock.rendicion.findFirst.mockResolvedValue(
         buildRendicionDe(500, 42),
       );
 
@@ -217,7 +217,7 @@ describe('RendicionesService', () => {
     });
 
     it('permite a un rol privilegiado aunque no sea dueño', async () => {
-      prismaMock.rendicion.findUnique.mockResolvedValue(
+      prismaMock.rendicion.findFirst.mockResolvedValue(
         buildRendicionDe(500, 600),
       );
 
@@ -227,7 +227,7 @@ describe('RendicionesService', () => {
     });
 
     it('permite el acceso interno (sin usuario)', async () => {
-      prismaMock.rendicion.findUnique.mockResolvedValue(
+      prismaMock.rendicion.findFirst.mockResolvedValue(
         buildRendicionDe(500, 600),
       );
 
