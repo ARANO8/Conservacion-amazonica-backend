@@ -158,8 +158,8 @@ export class RendicionesService {
   }
 
   async findOne(id: number, usuario?: { id: number; rol: Rol }) {
-    const rendicion = await this.prisma.rendicion.findUnique({
-      where: { id },
+    const rendicion = await this.prisma.rendicion.findFirst({
+      where: { id, solicitud: { deletedAt: null } },
       include: RENDICION_INCLUDE,
     });
 
@@ -203,8 +203,8 @@ export class RendicionesService {
     solicitudId: number,
     usuario?: { id: number; rol: Rol },
   ) {
-    const rendicion = await this.prisma.rendicion.findUnique({
-      where: { solicitudId },
+    const rendicion = await this.prisma.rendicion.findFirst({
+      where: { solicitudId, solicitud: { deletedAt: null } },
       include: RENDICION_INCLUDE,
     });
 

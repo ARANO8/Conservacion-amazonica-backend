@@ -7,10 +7,12 @@ export class PartidasService {
 
   findAll() {
     return this.prisma.partida.findMany({
+      where: { deletedAt: null },
       select: {
         id: true,
         nombre: true,
       },
+      orderBy: { nombre: 'asc' },
     });
   }
 

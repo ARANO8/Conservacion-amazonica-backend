@@ -8,6 +8,7 @@ export class GruposService {
 
   findAll() {
     return this.prisma.grupo.findMany({
+      where: { deletedAt: null },
       select: {
         id: true,
         nombre: true,
