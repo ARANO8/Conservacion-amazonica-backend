@@ -60,9 +60,6 @@ enum EstadoRendicion {
    APROBADO
    OBSERVADO
    RECHAZADO
-   APROBADA
-   OBSERVADA
-   RECHAZADA
 }
 
 enum TipoNotificacion {
