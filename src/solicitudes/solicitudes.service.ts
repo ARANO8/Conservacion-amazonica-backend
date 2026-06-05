@@ -33,6 +33,7 @@ import {
   validarLimitesViatico,
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
+import { ESTADOS_COMPROMISO_ACTIVO } from '../common/constants/financial.constants';
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PdfService } from '../pdf/pdf.service';
@@ -70,13 +71,6 @@ type DetalleSolicitud = {
 type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
 }>;
-
-const ESTADOS_COMPROMISO_ACTIVO: EstadoSolicitud[] = [
-  // En este dominio no existe EstadoSolicitud.APROBADO explícito.
-  // PENDIENTE representa solicitudes activas previas al desembolso.
-  EstadoSolicitud.PENDIENTE,
-  EstadoSolicitud.DESEMBOLSADO,
-];
 
 @Injectable()
 export class SolicitudesService {
