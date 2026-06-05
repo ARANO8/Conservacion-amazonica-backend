@@ -131,9 +131,15 @@ export class OrdenesCompraService {
     return this.prisma.$transaction(async (tx) => {
       const codigoOrden = await this.generarCodigo(tx);
 
-      const total = dto.items.reduce((acc, it) => {
-        return acc + Number(it.precioUnitario) * Number(it.cantidad);
-      }, 0);
+      const total = dto.items.reduce(
+        (acc, it) =>
+          acc.plus(
+            new Prisma.Decimal(it.precioUnitario).times(
+              new Prisma.Decimal(it.cantidad),
+            ),
+          ),
+        new Prisma.Decimal(0),
+      );
 
       const orden = await tx.ordenCompra.create({
         data: {
@@ -145,7 +151,7 @@ export class OrdenesCompraService {
           formaPago: dto.formaPago?.trim() || 'Transferencia bancaria',
           garantia: dto.garantia?.trim() || 'N/A',
           observaciones: dto.observaciones?.trim() || null,
-          total: new Prisma.Decimal(total),
+          total,
           cuadroComparativoId: dto.cuadroComparativoId ?? null,
           usuarioEmisorId: usuarioId,
         },
@@ -173,7 +179,7 @@ export class OrdenesCompraService {
       }
 
       this.logger.log(
-        `[create] usuarioId=${usuarioId} | codigo=${codigoOrden} | items=${dto.items.length} | total=${total}`,
+        `[create] usuarioId=${usuarioId} | codigo=${codigoOrden} | items=${dto.items.length} | total=${total.toFixed(2)}`,
       );
 
       return tx.ordenCompra.findUniqueOrThrow({
@@ -234,9 +240,15 @@ export class OrdenesCompraService {
     return this.prisma.$transaction(async (tx) => {
       await tx.ordenCompraItem.deleteMany({ where: { ordenCompraId: id } });
 
-      const total = dto.items.reduce((acc, it) => {
-        return acc + Number(it.precioUnitario) * Number(it.cantidad);
-      }, 0);
+      const total = dto.items.reduce(
+        (acc, it) =>
+          acc.plus(
+            new Prisma.Decimal(it.precioUnitario).times(
+              new Prisma.Decimal(it.cantidad),
+            ),
+          ),
+        new Prisma.Decimal(0),
+      );
 
       await tx.ordenCompra.update({
         where: { id },
@@ -248,7 +260,7 @@ export class OrdenesCompraService {
           formaPago: dto.formaPago?.trim() || 'Transferencia bancaria',
           garantia: dto.garantia?.trim() || 'N/A',
           observaciones: dto.observaciones?.trim() || null,
-          total: new Prisma.Decimal(total),
+          total,
           cuadroComparativoId: dto.cuadroComparativoId ?? null,
         },
       });
