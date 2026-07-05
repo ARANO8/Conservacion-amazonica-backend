@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from '../pdf/pdf.service';
 import { CreateOrdenCompraDto } from './dto/create-orden-compra.dto';
 import { Rol, Prisma } from '@prisma/client';
+import { montoEnLetrasBolivianos } from '../shared/utils/letras.util';
 import {
   ORDEN_INCLUDE,
   DIRECTOR_FINANCIERO,
@@ -338,7 +339,7 @@ export class OrdenesCompraService {
       tc: ACEAA_TC,
       items,
       total: this.fmtMoney(totalNum),
-      totalLetras: this.numeroALetras(totalNum),
+      totalLetras: montoEnLetrasBolivianos(totalNum),
       directorFinanciero: DIRECTOR_FINANCIERO.nombre,
       cargoDirectorFinanciero: DIRECTOR_FINANCIERO.cargo,
       directorEjecutivo: DIRECTOR_EJECUTIVO.nombre,
@@ -368,103 +369,5 @@ export class OrdenesCompraService {
       month: 'long',
       year: 'numeric',
     }).format(date);
-  }
-
-  private numeroALetras(num: number): string {
-    const entero = Math.floor(num);
-    const centavos = Math.round((num - entero) * 100);
-
-    const letras = this.enterALetras(entero);
-    const fraccion =
-      centavos > 0
-        ? ` con ${centavos.toString().padStart(2, '0')}/100`
-        : ' con 00/100';
-
-    return `${letras.toUpperCase()} BOLIVIANOS${fraccion}`;
-  }
-
-  private enterALetras(n: number): string {
-    if (n === 0) return 'cero';
-    if (n < 0) return `menos ${this.enterALetras(-n)}`;
-
-    const unidades = [
-      '',
-      'uno',
-      'dos',
-      'tres',
-      'cuatro',
-      'cinco',
-      'seis',
-      'siete',
-      'ocho',
-      'nueve',
-    ];
-    const especiales = [
-      'diez',
-      'once',
-      'doce',
-      'trece',
-      'catorce',
-      'quince',
-      'dieciséis',
-      'diecisiete',
-      'dieciocho',
-      'diecinueve',
-    ];
-    const decenas = [
-      '',
-      '',
-      'veinte',
-      'treinta',
-      'cuarenta',
-      'cincuenta',
-      'sesenta',
-      'setenta',
-      'ochenta',
-      'noventa',
-    ];
-    const centenas = [
-      '',
-      'ciento',
-      'doscientos',
-      'trescientos',
-      'cuatrocientos',
-      'quinientos',
-      'seiscientos',
-      'setecientos',
-      'ochocientos',
-      'novecientos',
-    ];
-
-    if (n === 100) return 'cien';
-    if (n < 10) return unidades[n];
-    if (n < 20) return especiales[n - 10];
-    if (n < 30) {
-      return n === 20 ? 'veinte' : `veinti${unidades[n - 20]}`;
-    }
-    if (n < 100) {
-      const d = Math.floor(n / 10);
-      const u = n % 10;
-      return u === 0 ? decenas[d] : `${decenas[d]} y ${unidades[u]}`;
-    }
-    if (n < 1000) {
-      const c = Math.floor(n / 100);
-      const resto = n % 100;
-      return resto === 0
-        ? centenas[c]
-        : `${centenas[c]} ${this.enterALetras(resto)}`;
-    }
-    if (n < 2000) {
-      const resto = n % 1000;
-      return resto === 0 ? 'mil' : `mil ${this.enterALetras(resto)}`;
-    }
-    if (n < 1000000) {
-      const miles = Math.floor(n / 1000);
-      const resto = n % 1000;
-      return resto === 0
-        ? `${this.enterALetras(miles)} mil`
-        : `${this.enterALetras(miles)} mil ${this.enterALetras(resto)}`;
-    }
-    return n.toString();
   }
 }

@@ -57,6 +57,12 @@ TERCEROS TERCEROS
         TipoDocumento {
             FACTURA FACTURA
 RECIBO RECIBO
+BOLETA BOLETA
+LV LV
+DJ DJ
+PPT PPT
+PAT PAT
+PVT PVT
         }
     
 
@@ -66,9 +72,6 @@ RECIBO RECIBO
 APROBADO APROBADO
 OBSERVADO OBSERVADO
 RECHAZADO RECHAZADO
-APROBADA APROBADA
-OBSERVADA OBSERVADA
-RECHAZADA RECHAZADA
         }
     
 
@@ -139,6 +142,14 @@ APROBADO APROBADO
     }
   
 
+  "PartidaContable" {
+    Int id "🗝️"
+    String codigo 
+    String nombre 
+    DateTime deletedAt "❓"
+    }
+  
+
   "CodigoPresupuestario" {
     Int id "🗝️"
     String codigoCompleto 
@@ -165,6 +176,8 @@ APROBADO APROBADO
     Decimal montoEjecutado 
     EstadoPoa estado 
     DateTime deletedAt "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
     }
   
 
@@ -191,6 +204,8 @@ APROBADO APROBADO
     String banco "❓"
     DateTime fechaDesembolso "❓"
     DateTime deletedAt "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
     }
   
 
@@ -221,6 +236,9 @@ APROBADO APROBADO
     Decimal saldoLiquido 
     EstadoRendicion estado 
     String observaciones "❓"
+    DateTime deletedAt "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
     }
   
 
@@ -245,6 +263,7 @@ APROBADO APROBADO
   "GastoRendicion" {
     Int id "🗝️"
     TipoDocumento tipoDocumento 
+    String tipoRetencion "❓"
     String nroDocumento 
     DateTime fecha 
     String concepto 
@@ -341,13 +360,6 @@ APROBADO APROBADO
     Decimal costoUnitario 
     Decimal total 
     DateTime deletedAt "❓"
-    }
-  
-
-  "NominaTerceros" {
-    Int id "🗝️"
-    String nombreCompleto 
-    String ci 
     }
   
 
@@ -506,6 +518,7 @@ APROBADO APROBADO
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoRendicion" }o--|| "Rendicion" : "rendicion"
     "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"
+    "GastoRendicion" }o--|o "PartidaContable" : "partidaContable"
     "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
@@ -522,7 +535,6 @@ APROBADO APROBADO
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
     "GastoCompra" }o--|| "Solicitud" : "solicitud"
     "GastoCompra" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
-    "NominaTerceros" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" }o--|| "Poa" : "poa"

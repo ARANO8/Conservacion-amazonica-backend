@@ -14,7 +14,8 @@ import { GruposModule } from './catalogos/grupos/grupos.module';
 import { PartidasModule } from './catalogos/partidas/partidas.module';
 import { ProyectosModule } from './catalogos/proyectos/proyectos.module';
 import { CodigosPresupuestariosModule } from './catalogos/codigos-presupuestarios/codigos-presupuestarios.module';
-import { ReportsModule } from './reports/reports.module';
+import { PartidasContablesModule } from './catalogos/partidas-contables/partidas-contables.module';
+
 import { SolicitudPresupuestoModule } from './solicitudes-presupuestos/solicitudes-presupuestos.module';
 import { CuentasBancariasModule } from './catalogos/cuentas-bancarias/cuentas-bancarias.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
@@ -71,7 +72,8 @@ function getPositiveIntFromEnv(
     PartidasModule,
     ProyectosModule,
     CodigosPresupuestariosModule,
-    ReportsModule,
+    PartidasContablesModule,
+
     SolicitudPresupuestoModule,
     CuentasBancariasModule,
     NotificacionesModule,

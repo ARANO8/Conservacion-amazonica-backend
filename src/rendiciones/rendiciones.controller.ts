@@ -246,4 +246,22 @@ export class RendicionesController {
       req.user!.rol,
     );
   }
+
+  @Patch('gastos/:gastoId/partida-contable')
+  @ApiOperation({
+    summary: 'Asociar una partida contable a un gasto de rendición',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Partida contable asociada correctamente',
+  })
+  async updateGastoPartidaContable(
+    @Param('gastoId', ParseIntPipe) gastoId: number,
+    @Body('partidaContableId') partidaContableId: number | null,
+  ) {
+    return this.rendicionesService.updateGastoPartidaContable(
+      gastoId,
+      partidaContableId,
+    );
+  }
 }

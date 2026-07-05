@@ -53,6 +53,7 @@ const RENDICION_INCLUDE = {
   },
   gastosRendicion: {
     include: {
+      partidaContable: true,
       partida: {
         include: {
           poa: {
@@ -225,16 +226,117 @@ export class RendicionesService {
   ): Promise<Buffer> {
     const rendicion = await this.findOne(id, usuario);
 
-    const totalEfectivoPagado = Number(
-      (rendicion.gastosRendicion ?? [])
-        .reduce((acc, gasto) => acc + Number(gasto.montoNeto ?? 0), 0)
-        .toFixed(2),
+    const montoRecibido = Number(rendicion.solicitud.montoTotalNeto ?? 0);
+    const transacciones: any[] = [];
+    let runningBalance = montoRecibido;
+
+    // Fila 0: Anticipo Recibido
+    transacciones.push({
+      fecha: this.formatDate(rendicion.solicitud.fechaDesembolso ?? rendicion.solicitud.fechaSolicitud ?? rendicion.createdAt),
+      comprobante: rendicion.solicitud.codigoDesembolso ? `COMPROBANTE ${rendicion.solicitud.codigoDesembolso}` : `SOLICITUD ${rendicion.solicitud.codigoSolicitud}`,
+      partida: '—',
+      concepto: `Anticipo recibido para: ${rendicion.solicitud.motivoViaje ?? 'Actividades de viaje'}`,
+      proveedor: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
+      ingreso: this.formatCurrency(montoRecibido),
+      egreso: '—',
+      saldo: this.formatCurrency(runningBalance),
+    });
+
+    // Unificar egresos (gastos con respaldo y declaraciones juradas)
+    const rawGastos = (rendicion.gastosRendicion ?? []).map((g) => {
+      const partidaCod = g.partida?.poa?.estructura?.partida?.nombre ?? g.partida?.poa?.codigoPoa ?? 'S/P';
+      return {
+        date: g.fecha ? new Date(g.fecha) : new Date(rendicion.fechaRendicion),
+        fechaStr: this.formatDate(g.fecha),
+        comprobante: `${g.tipoDocumento} ${g.nroDocumento}`,
+        partida: partidaCod,
+        concepto: g.concepto || g.detalle || 'Gasto con respaldo',
+        proveedor: g.proveedor || 'S/P',
+        montoBruto: Number(g.montoBruto ?? g.monto ?? 0),
+        montoImpuestos: Number(g.montoImpuestos ?? 0),
+        montoNeto: Number(g.montoNeto ?? 0),
+      };
+    });
+
+    const rawDeclaraciones = (rendicion.declaracionesJuradas ?? []).map((dj) => {
+      return {
+        date: dj.fecha ? new Date(dj.fecha) : new Date(rendicion.fechaRendicion),
+        fechaStr: this.formatDate(dj.fecha),
+        comprobante: 'DECLARACIÓN JURADA (DJ)',
+        partida: 'S/P',
+        concepto: dj.detalle || 'Gasto sin respaldo',
+        proveedor: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
+        montoBruto: Number(dj.monto ?? 0),
+        montoImpuestos: 0,
+        montoNeto: Number(dj.monto ?? 0),
+      };
+    });
+
+    // Ordenar cronológicamente
+    const sortedGastos = [...rawGastos, ...rawDeclaraciones].sort(
+      (a, b) => a.date.getTime() - b.date.getTime()
     );
 
-    const montoRecibido = Number(rendicion.solicitud.montoTotalNeto ?? 0);
-    const saldoLiquido = Number(
-      (montoRecibido - totalEfectivoPagado).toFixed(2),
-    );
+    let totalEfectivoPagado = 0;
+    let totalImpuestosRetenidos = 0;
+    let totalPresupuestado = 0;
+
+    for (const g of sortedGastos) {
+      const outflow = g.montoBruto; // Se descuenta el bruto (total afectado al presupuesto)
+      runningBalance -= outflow;
+
+      totalEfectivoPagado += g.montoNeto;
+      totalImpuestosRetenidos += g.montoImpuestos;
+      totalPresupuestado += g.montoBruto;
+
+      transacciones.push({
+        fecha: g.fechaStr,
+        comprobante: g.comprobante,
+        partida: g.partida,
+        concepto: g.concepto,
+        proveedor: g.proveedor,
+        ingreso: '—',
+        egreso: this.formatCurrency(outflow),
+        saldo: this.formatCurrency(runningBalance),
+      });
+    }
+
+    const finalSaldoLiquido = Number((montoRecibido - totalPresupuestado).toFixed(2));
+
+    // Resumen Contable por Partida
+    const agrupadoPartidasMap = new Map<string, {
+      codigo: string;
+      concepto: string;
+      montoNeto: number;
+      montoImpuestos: number;
+      montoBruto: number;
+    }>();
+
+    for (const g of sortedGastos) {
+      const cod = g.partida;
+      const exist = agrupadoPartidasMap.get(cod);
+      if (exist) {
+        exist.montoNeto += g.montoNeto;
+        exist.montoImpuestos += g.montoImpuestos;
+        exist.montoBruto += g.montoBruto;
+      } else {
+        agrupadoPartidasMap.set(cod, {
+          codigo: cod,
+          concepto: g.concepto,
+          montoNeto: g.montoNeto,
+          montoImpuestos: g.montoImpuestos,
+          montoBruto: g.montoBruto,
+        });
+      }
+    }
+
+    const resumenContable = Array.from(agrupadoPartidasMap.values()).map(r => ({
+      codigo: r.codigo,
+      concepto: r.concepto,
+      montoNeto: this.formatCurrency(r.montoNeto),
+      montoImpuestos: this.formatCurrency(r.montoImpuestos),
+      montoBruto: this.formatCurrency(r.montoBruto),
+    }));
 
     const emisor = {
       nombre: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
@@ -256,34 +358,32 @@ export class RendicionesService {
     return this.pdfService.generatePdf('rendicion.hbs', {
       ...rendicion,
       usuario: {
-        nombre: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
-        cargo: rendicion.solicitud.usuarioEmisor?.cargo ?? 'N/A',
+        nombre: emisor.nombre,
+        cargo: emisor.cargo,
       },
       solicitud: {
         ...rendicion.solicitud,
+        proyecto: rendicion.solicitud.proyecto || 'Proyecto General',
         montoTotalNeto: this.formatCurrency(montoRecibido),
       },
       aprobadorActualNombre:
         rendicion.aprobadorActual?.nombreCompleto ?? 'Sin asignar',
       fechaRendicion: this.formatDate(rendicion.fechaRendicion),
-      totalEfectivoPagado,
-      saldoLiquido,
-      totalEfectivoPagadoFormat: this.formatCurrency(totalEfectivoPagado),
-      saldoLiquidoFormat: this.formatCurrency(saldoLiquido),
+      montoRecibido: this.formatCurrency(montoRecibido),
+      totalEfectivoPagado: this.formatCurrency(totalEfectivoPagado),
+      totalImpuestosRetenidos: this.formatCurrency(totalImpuestosRetenidos),
+      totalPresupuestado: this.formatCurrency(totalPresupuestado),
+      saldoLiquido: Math.abs(finalSaldoLiquido),
+      saldoLiquidoFormat: this.formatCurrency(Math.abs(finalSaldoLiquido)),
+      saldoEsDevolucion: finalSaldoLiquido >= 0,
+      saldoStatus: finalSaldoLiquido >= 0 ? 'A Devolver (Caja Chica / Banco)' : 'A Reembolsar (Reembolso al Beneficiario)',
       firmas: {
         emitidoPor: emisor,
         directorProyecto,
         aprobadoPor: aprobadorFinal,
       },
-      gastos: (rendicion.gastosRendicion ?? []).map((gasto) => ({
-        ...gasto,
-        fecha: this.formatDate(gasto.fecha),
-        proveedor: gasto.proveedor ?? 'N/A',
-        concepto: gasto.concepto ?? gasto.detalle ?? 'N/A',
-        montoBruto: this.formatCurrency(Number(gasto.montoBruto ?? 0)),
-        montoImpuestos: this.formatCurrency(Number(gasto.montoImpuestos ?? 0)),
-        montoNeto: this.formatCurrency(Number(gasto.montoNeto ?? 0)),
-      })),
+      transacciones,
+      resumenContable,
       informeGastos: this.buildInformeTexto(rendicion.informeGastos),
       generatedAt: this.formatDate(new Date()),
     });
@@ -380,6 +480,7 @@ export class RendicionesService {
           gastosRendicion: {
             create: (dto.gastos ?? []).map((gasto) => ({
               tipoDocumento: this.toTipoDocumento(gasto.tipoDocumento),
+              tipoRetencion: gasto.tipoRetencion,
               nroDocumento: gasto.numeroDocumento ?? 'S/N',
               fecha: gasto.fechaDocumento ?? dto.fechaRendicion,
               concepto: gasto.concepto,
@@ -628,6 +729,7 @@ export class RendicionesService {
           gastosRendicion: {
             create: gastos.map((gasto) => ({
               tipoDocumento: this.toTipoDocumento(gasto.tipoDocumento),
+              tipoRetencion: gasto.tipoRetencion,
               nroDocumento: gasto.numeroDocumento ?? 'S/N',
               fecha: gasto.fechaDocumento ?? fechaRendicion,
               concepto: gasto.concepto,
@@ -716,7 +818,7 @@ export class RendicionesService {
     usuarioId: number,
     rolUsuario: Rol,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const rendicion = await tx.rendicion.findUnique({
         where: { id },
         include: {
@@ -914,6 +1016,38 @@ export class RendicionesService {
 
       return rendicionDerivada;
     });
+
+    if (dto.derivadoAId) {
+      try {
+        const emisor = await this.prisma.usuario.findUnique({
+          where: { id: usuarioId },
+          select: { nombreCompleto: true },
+        });
+
+        const rendicion = await this.prisma.rendicion.findUnique({
+          where: { id },
+          include: { solicitud: true },
+        });
+
+        await this.notificacionesService.crearNotificacion({
+          titulo: 'Rendición derivada',
+          mensaje: `Tienes una rendición pendiente de revisión para la solicitud ${rendicion?.solicitud?.codigoSolicitud ?? ''} derivada por ${emisor?.nombreCompleto || 'un usuario'}.`,
+          tipo: 'RENDICION_PENDIENTE',
+          usuarioId: dto.derivadoAId,
+          solicitudId: rendicion?.solicitudId,
+          urlDestino: `/app/aprobaciones`,
+        });
+      } catch (error) {
+        const normalizedError =
+          error instanceof Error ? error : new Error(String(error));
+        this.logger.error(
+          `[RendicionesService] Error al crear notificación (derivar) para rendición ${id}: ${normalizedError.message}`,
+          normalizedError.stack,
+        );
+      }
+    }
+
+    return result;
   }
 
   async observar(
@@ -1004,7 +1138,8 @@ export class RendicionesService {
   }
 
   private toTipoDocumento(tipoDocumento: string): TipoDocumento {
-    if (tipoDocumento === TipoDocumento.FACTURA) return TipoDocumento.FACTURA;
+    const doc = TipoDocumento[tipoDocumento as keyof typeof TipoDocumento];
+    if (doc) return doc;
     return TipoDocumento.RECIBO;
   }
 
@@ -1148,5 +1283,34 @@ export class RendicionesService {
     );
 
     return [encabezado, ...actividades].join('\n\n');
+  }
+
+  async updateGastoPartidaContable(gastoId: number, partidaContableId: number | null) {
+    const gasto = await this.prisma.gastoRendicion.findUnique({
+      where: { id: gastoId },
+    });
+
+    if (!gasto) {
+      throw new NotFoundException('Gasto no encontrado');
+    }
+
+    if (partidaContableId !== null) {
+      const pc = await this.prisma.partidaContable.findUnique({
+        where: { id: partidaContableId },
+      });
+      if (!pc) {
+        throw new NotFoundException('Partida contable no encontrada');
+      }
+    }
+
+    return this.prisma.gastoRendicion.update({
+      where: { id: gastoId },
+      data: {
+        partidaContableId,
+      },
+      include: {
+        partidaContable: true,
+      },
+    });
   }
 }
