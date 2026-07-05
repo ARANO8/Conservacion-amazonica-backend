@@ -20,6 +20,11 @@ export enum TipoDocumentoRendicionDto {
   FACTURA = 'FACTURA',
   RECIBO = 'RECIBO',
   BOLETA = 'BOLETA',
+  LV = 'LV',
+  DJ = 'DJ',
+  PPT = 'PPT',
+  PAT = 'PAT',
+  PVT = 'PVT',
 }
 
 export enum EstadoGastoRendicionDto {

@@ -229,7 +229,7 @@ export class SolicitudesService {
       const costoTotal = new Prisma.Decimal(hDto.costoTotal);
       const { iva, it, montoPresupuestado } = calcularMontosHospedaje(
         costoTotal,
-        tipoDocumento,
+        tipoDocumento === 'FACTURA' ? 'FACTURA' : 'RECIBO',
       );
 
       montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
@@ -1073,7 +1073,6 @@ export class SolicitudesService {
         await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
         await tx.gastoCompra.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
-        await tx.nominaTerceros.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
         await tx.solicitudPresupuesto.deleteMany({
           where: { solicitudId: id },

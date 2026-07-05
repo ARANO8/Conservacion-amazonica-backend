@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { EstadoRendicion, EstadoSolicitud, Prisma, Rol } from '@prisma/client';
+import { EstadoRendicion, EstadoSolicitud, Prisma, Rol, TipoDocumento } from '@prisma/client';
 import { RendicionesService } from './rendiciones.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from '../pdf/pdf.service';
@@ -29,6 +29,9 @@ describe('RendicionesService', () => {
   let prismaMock: {
     $transaction: jest.Mock;
     rendicion: { findFirst: jest.Mock };
+  };
+  let pdfServiceMock: {
+    generatePdf: jest.Mock;
   };
 
   const PARTIDA_ID = 10;
@@ -89,11 +92,15 @@ describe('RendicionesService', () => {
       rendicion: { findFirst: jest.fn() },
     };
 
+    pdfServiceMock = {
+      generatePdf: jest.fn().mockResolvedValue(Buffer.from('pdf-data')),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         RendicionesService,
         { provide: PrismaService, useValue: prismaMock },
-        { provide: PdfService, useValue: {} },
+        { provide: PdfService, useValue: pdfServiceMock },
         {
           provide: NotificacionesService,
           useValue: { crearNotificacion: jest.fn() },
@@ -234,6 +241,133 @@ describe('RendicionesService', () => {
       await expect(service.findOne(RENDICION_ID)).resolves.toMatchObject({
         id: RENDICION_ID,
       });
+    });
+  });
+
+  describe('generatePdf — cálculos de Anexo 4', () => {
+    it('genera un ledger cronológico y agrupa los gastos por partida', async () => {
+      const mockFullRendicion = {
+        id: RENDICION_ID,
+        fechaRendicion: new Date('2026-06-25'),
+        montoRespaldado: new Prisma.Decimal(128.81),
+        saldoLiquido: new Prisma.Decimal(871.19),
+        estado: EstadoRendicion.PENDIENTE,
+        aprobadorActualId: 2,
+        observaciones: 'Ninguna',
+        createdAt: new Date('2026-06-25'),
+        solicitud: {
+          id: SOLICITUD_ID,
+          codigoSolicitud: 'SOL-2026-001',
+          motivoViaje: 'Monitoreo de bosques',
+          montoTotalNeto: new Prisma.Decimal(1000),
+          fechaSolicitud: new Date('2026-06-20'),
+          fechaDesembolso: new Date('2026-06-21'),
+          codigoDesembolso: 'DES-445',
+          proyecto: 'Especies de Amazonía',
+          usuarioEmisor: {
+            id: 1,
+            nombreCompleto: 'Alan García',
+            cargo: 'Técnico de Campo',
+            rol: Rol.USUARIO,
+          },
+        },
+        gastosRendicion: [
+          {
+            id: 101,
+            tipoDocumento: TipoDocumento.FACTURA,
+            nroDocumento: '10022',
+            fecha: new Date('2026-06-22'),
+            concepto: 'Gasolina',
+            detalle: 'Gasolina para camioneta',
+            proveedor: 'Surtidor Sur',
+            montoBruto: new Prisma.Decimal(100),
+            montoImpuestos: new Prisma.Decimal(0),
+            montoNeto: new Prisma.Decimal(100),
+            partida: {
+              id: PARTIDA_ID,
+              poa: {
+                codigoPoa: 'POA-001',
+                estructura: {
+                  partida: {
+                    id: PARTIDA_ID,
+                    nombre: 'Combustibles',
+                  },
+                },
+              },
+            },
+          },
+          {
+            id: 102,
+            tipoDocumento: TipoDocumento.RECIBO,
+            nroDocumento: '045',
+            fecha: new Date('2026-06-23'),
+            concepto: 'Almuerzo Terceros',
+            detalle: 'Servicio de comida',
+            proveedor: 'Doña Flora',
+            montoBruto: new Prisma.Decimal(23.81),
+            montoImpuestos: new Prisma.Decimal(3.81),
+            montoNeto: new Prisma.Decimal(20),
+            partida: {
+              id: PARTIDA_ID,
+              poa: {
+                codigoPoa: 'POA-001',
+                estructura: {
+                  partida: {
+                    id: PARTIDA_ID,
+                    nombre: 'Combustibles',
+                  },
+                },
+              },
+            },
+          },
+        ],
+        declaracionesJuradas: [
+          {
+            id: 201,
+            fecha: new Date('2026-06-24'),
+            detalle: 'Peaje local',
+            monto: new Prisma.Decimal(5),
+          },
+        ],
+        informeGastos: {
+          fechaInicio: new Date('2026-06-21'),
+          fechaFin: new Date('2026-06-24'),
+          actividades: [],
+        },
+        historialAprobaciones: [],
+      };
+
+      prismaMock.rendicion.findFirst.mockResolvedValue(mockFullRendicion);
+
+      const buffer = await service.generatePdf(RENDICION_ID);
+
+      expect(buffer).toBeDefined();
+      expect(pdfServiceMock.generatePdf).toHaveBeenCalledTimes(1);
+
+      const [templateName, params] = pdfServiceMock.generatePdf.mock.calls[0];
+      expect(templateName).toBe('rendicion.hbs');
+      
+      // Debe registrar 4 movimientos: Anticipo, Factura, Recibo, DJ
+      expect(params.transacciones).toHaveLength(4);
+      
+      // Primera transacción es el anticipo de 1000 Bs
+      expect(params.transacciones[0]).toMatchObject({
+        concepto: expect.stringContaining('Anticipo recibido'),
+        ingreso: expect.stringContaining('1.000,00'),
+        saldo: expect.stringContaining('1.000,00'),
+      });
+
+      // El total presupuestado restando brutos (100 + 23.81 + 5 = 128.81)
+      expect(params.totalPresupuestado).toContain('128,81');
+      expect(params.totalEfectivoPagado).toContain('125,00'); // (100 + 20 + 5)
+      expect(params.totalImpuestosRetenidos).toContain('3,81');
+
+      // Saldo líquido final (1000 - 128.81 = 871.19)
+      expect(params.saldoLiquidoFormat).toContain('871,19');
+      expect(params.saldoEsDevolucion).toBe(true);
+
+      // Resumen contable agrupado por partida (Combustibles/POA-001 y S/P)
+      expect(params.resumenContable).toHaveLength(2);
     });
   });
 });

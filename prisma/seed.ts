@@ -310,6 +310,29 @@ async function main() {
     }
   }
 
+  console.log('Seeding Partidas Contables mock...');
+  const partidasContablesMock = [
+    { codigo: '1101', nombre: 'Caja General' },
+    { codigo: '1102', nombre: 'Banco Unión' },
+    { codigo: '5101', nombre: 'Gastos de Viaje y Representación' },
+    { codigo: '5102', nombre: 'Combustibles y Lubricantes' },
+    { codigo: '5103', nombre: 'Material de Escritorio' },
+    { codigo: '5104', nombre: 'Alquileres' },
+    { codigo: '5105', nombre: 'Servicios Básicos' },
+    { codigo: '5106', nombre: 'Consultorías y Servicios de Terceros' },
+    { codigo: '5107', nombre: 'Alimentación y Hospedaje' },
+    { codigo: '5108', nombre: 'Peajes y Transporte' },
+  ];
+
+  for (const pc of partidasContablesMock) {
+    await prisma.partidaContable.upsert({
+      where: { codigo: pc.codigo },
+      update: { nombre: pc.nombre },
+      create: { codigo: pc.codigo, nombre: pc.nombre },
+    });
+  }
+  console.log(`Partidas Contables cargadas: ${partidasContablesMock.length}`);
+
   console.log(`✅ Seeding completado.`);
   console.log(`--- Resumen ---`);
   console.log(`Cuentas Bancarias: ${cuentaCount}`);
