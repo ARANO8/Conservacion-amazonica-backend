@@ -41,6 +41,58 @@ function parseCSVLine(line: string): string[] {
   return result.map((v) => v.replace(/^"|"$/g, '')); // Quitar comillas exteriores
 }
 
+// --- PartidaContable seed types & helpers ---
+
+interface PartidaContableNode {
+  codigo: string;
+  descripcion: string;
+  monetaria?: string | null;
+  auxiliar?: string | null;
+  subgrupos?: PartidaContableNode[];
+  cuentas?: PartidaContableNode[];
+  subcuentas?: PartidaContableNode[];
+  detalles?: PartidaContableNode[];
+}
+
+interface FlatPartida {
+  codigo: string;
+  nombre: string;
+  nivel: number;
+  parentCodigo: string | null;
+  monetaria: string | null;
+  auxiliar: string | null;
+}
+
+function flattenPartidaContable(
+  node: PartidaContableNode,
+  nivel: number,
+  parentCodigo: string | null,
+  result: FlatPartida[],
+): void {
+  result.push({
+    codigo: node.codigo,
+    nombre: node.descripcion,
+    nivel,
+    parentCodigo,
+    monetaria: node.monetaria ?? null,
+    auxiliar: node.auxiliar ?? null,
+  });
+
+  for (const key of [
+    'subgrupos',
+    'cuentas',
+    'subcuentas',
+    'detalles',
+  ] as const) {
+    const children = node[key];
+    if (children) {
+      for (const child of children) {
+        flattenPartidaContable(child, nivel + 1, node.codigo, result);
+      }
+    }
+  }
+}
+
 /**
  * Mapa de codificación por archivo CSV
  * POA.csv utiliza Latin-1 (ISO-8859-1) porque proviene de fuente externa
@@ -310,12 +362,15 @@ async function main() {
     }
   }
 
+  const partidaContableCount = await seedPartidasContables();
+
   console.log(`✅ Seeding completado.`);
   console.log(`--- Resumen ---`);
   console.log(`Cuentas Bancarias: ${cuentaCount}`);
   console.log(`Usuarios: ${userCount}`);
   console.log(`Estructuras: ${estructuraMap.size}`);
   console.log(`Filas POA: ${poaCount}`);
+  console.log(`Partidas Contables: ${partidaContableCount}`);
 
   if (credencialesGeneradas.length > 0) {
     console.log(
@@ -328,6 +383,57 @@ async function main() {
       console.log(`${cred.email} -> ${cred.password}`);
     }
   }
+}
+
+async function seedPartidasContables(): Promise<number> {
+  const filePath = path.join(__dirname, 'seeds', 'plan-de-cuentas.json');
+  if (!fs.existsSync(filePath)) {
+    console.log(
+      '⚠️  Archivo plan-de-cuentas.json no encontrado, saltando seed de PartidaContable',
+    );
+    return 0;
+  }
+
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  const root = JSON.parse(raw) as PartidaContableNode;
+
+  const flatList: FlatPartida[] = [];
+  flattenPartidaContable(root, 0, null, flatList);
+  flatList.sort((a, b) => a.nivel - b.nivel);
+
+  const codigoToId = new Map<string, number>();
+  let count = 0;
+
+  for (const item of flatList) {
+    const parentId = item.parentCodigo
+      ? (codigoToId.get(item.parentCodigo) ?? null)
+      : null;
+
+    const record = await prisma.partidaContable.upsert({
+      where: { codigo: item.codigo },
+      update: {
+        nombre: item.nombre,
+        nivel: item.nivel,
+        monetaria: item.monetaria,
+        auxiliar: item.auxiliar,
+        parentId,
+      },
+      create: {
+        codigo: item.codigo,
+        nombre: item.nombre,
+        nivel: item.nivel,
+        monetaria: item.monetaria,
+        auxiliar: item.auxiliar,
+        parentId,
+      },
+    });
+
+    codigoToId.set(item.codigo, record.id);
+    count++;
+  }
+
+  console.log(`✅ Partidas Contables sembradas: ${count}`);
+  return count;
 }
 
 main()
