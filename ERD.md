@@ -3,10 +3,10 @@ erDiagram
 
         Rol {
             ADMIN ADMIN
-EJECUTIVO EJECUTIVO
-CONTADOR CONTADOR
 TESORERO TESORERO
 USUARIO USUARIO
+EJECUTIVO EJECUTIVO
+CONTADOR CONTADOR
 VALIDADOR_COMPRAS VALIDADOR_COMPRAS
         }
     
@@ -57,6 +57,12 @@ TERCEROS TERCEROS
         TipoDocumento {
             FACTURA FACTURA
 RECIBO RECIBO
+BOLETA BOLETA
+LV LV
+DJ DJ
+PPT PPT
+PAT PAT
+PVT PVT
         }
     
 
@@ -66,9 +72,6 @@ RECIBO RECIBO
 APROBADO APROBADO
 OBSERVADO OBSERVADO
 RECHAZADO RECHAZADO
-APROBADA APROBADA
-OBSERVADA OBSERVADA
-RECHAZADA RECHAZADA
         }
     
 
@@ -97,12 +100,12 @@ EXTERNA EXTERNA
 
         EstadoCuadroComparativo {
             BORRADOR BORRADOR
-EN_REVISION EN_REVISION
 EN_VALIDACION EN_VALIDACION
+OBSERVADO OBSERVADO
+EN_REVISION EN_REVISION
+APROBADO APROBADO
 REVISADO REVISADO
 EN_APROBACION EN_APROBACION
-OBSERVADO OBSERVADO
-APROBADO APROBADO
         }
     
   "Usuario" {
@@ -162,15 +165,16 @@ APROBADO APROBADO
     Int cantidad 
     Decimal costoUnitario 
     Decimal costoTotal 
-    Decimal montoEjecutado 
     EstadoPoa estado 
     DateTime deletedAt "❓"
+    Decimal montoEjecutado 
+    DateTime createdAt 
+    DateTime updatedAt 
     }
   
 
   "Solicitud" {
     Int id "🗝️"
-    String codigoSolicitud 
     String descripcion "❓"
     DateTime fechaSolicitud 
     String motivoViaje "❓"
@@ -178,39 +182,42 @@ APROBADO APROBADO
     DateTime fechaInicio "❓"
     DateTime fechaFin "❓"
     String codigoDesembolso "❓"
-    String urlComprobante "❓"
-    String urlCuadroComparativo "❓"
-    String urlCotizaciones 
+    EstadoSolicitud estado 
+    DateTime deletedAt "❓"
+    String codigoSolicitud 
+    String observacion "❓"
     Decimal montoTotalNeto 
     Decimal montoTotalPresupuestado 
-    EstadoSolicitud estado 
-    String observacion "❓"
-    TipoSolicitud tipo 
-    String proyecto "❓"
-    String chequeANombreDe "❓"
+    String urlComprobante "❓"
+    String urlCotizaciones 
+    String urlCuadroComparativo "❓"
     String banco "❓"
+    String chequeANombreDe "❓"
     DateTime fechaDesembolso "❓"
-    DateTime deletedAt "❓"
+    String proyecto "❓"
+    TipoSolicitud tipo 
+    DateTime createdAt 
+    DateTime updatedAt 
     }
   
 
   "HistorialAprobacion" {
     Int id "🗝️"
-    TipoAccionHistorial accion 
     String comentario "❓"
     DateTime fecha 
+    TipoAccionHistorial accion 
     }
   
 
   "Notificacion" {
     Int id "🗝️"
-    String titulo 
     String mensaje 
-    TipoNotificacion tipo 
-    Boolean leida 
-    String urlDestino "❓"
     DateTime createdAt 
+    Boolean leida 
+    TipoNotificacion tipo 
+    String titulo 
     DateTime updatedAt 
+    String urlDestino "❓"
     }
   
 
@@ -218,9 +225,12 @@ APROBADO APROBADO
     Int id "🗝️"
     DateTime fechaRendicion 
     Decimal montoRespaldado 
-    Decimal saldoLiquido 
-    EstadoRendicion estado 
     String observaciones "❓"
+    EstadoRendicion estado 
+    Decimal saldoLiquido 
+    DateTime createdAt 
+    DateTime deletedAt "❓"
+    DateTime updatedAt 
     }
   
 
@@ -247,14 +257,15 @@ APROBADO APROBADO
     TipoDocumento tipoDocumento 
     String nroDocumento 
     DateTime fecha 
-    String concepto 
     String detalle 
-    String proveedor "❓"
-    String urlComprobante 
     Decimal monto 
+    String concepto 
     Decimal montoBruto 
     Decimal montoImpuestos 
     Decimal montoNeto 
+    String proveedor "❓"
+    String urlComprobante 
+    String tipoRetencion "❓"
     }
   
 
@@ -296,12 +307,12 @@ APROBADO APROBADO
     Int id "🗝️"
     TipoDestino tipoDestino 
     Decimal dias 
-    Int cantidadPersonas 
     Decimal costoUnitario 
-    Decimal montoPresupuestado 
     Decimal iva13 
     Decimal it3 
+    Int cantidadPersonas 
     Decimal montoNeto 
+    Decimal montoPresupuestado 
     }
   
 
@@ -317,12 +328,12 @@ APROBADO APROBADO
     TipoDocumento tipoDocumento 
     Int cantidad 
     Decimal costoUnitario 
-    Decimal montoPresupuestado 
     Decimal iva13 
     Decimal it3 
     Decimal iue5 
-    Decimal montoNeto 
     String detalle "❓"
+    Decimal montoNeto 
+    Decimal montoPresupuestado 
     }
   
 
@@ -344,13 +355,6 @@ APROBADO APROBADO
     }
   
 
-  "NominaTerceros" {
-    Int id "🗝️"
-    String nombreCompleto 
-    String ci 
-    }
-  
-
   "CuentaBancaria" {
     Int id "🗝️"
     String numeroCuenta 
@@ -363,13 +367,13 @@ APROBADO APROBADO
     Int id "🗝️"
     String region 
     String destino 
-    TipoDocumento tipoDocumento 
     Int personas 
     Int noches 
     Decimal cantidadUnitaria 
     Decimal costoTotal 
     Decimal iva 
     Decimal it 
+    TipoDocumento tipoDocumento 
     }
   
 
@@ -377,7 +381,6 @@ APROBADO APROBADO
     Int id "🗝️"
     String codigoCotizacion 
     DateTime fecha 
-    TipoCotizacion tipo 
     String proveedorNombre 
     String proveedorTelefono "❓"
     String proveedorDireccion "❓"
@@ -387,11 +390,12 @@ APROBADO APROBADO
     String duracionCotizacion "❓"
     Boolean emiteFactura 
     String observaciones "❓"
-    String adjuntoUrl "❓"
     Decimal total 
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
+    String adjuntoUrl "❓"
+    TipoCotizacion tipo 
     }
   
 
@@ -412,10 +416,10 @@ APROBADO APROBADO
     String observaciones "❓"
     EstadoCuadroComparativo estado 
     Decimal totalRecomendado "❓"
-    String motivoObservacion "❓"
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
+    String motivoObservacion "❓"
     }
   
 
@@ -474,47 +478,61 @@ APROBADO APROBADO
     Boolean sinCuadro 
     }
   
+
+  "PartidaContable" {
+    Int id "🗝️"
+    String codigo 
+    String nombre 
+    String descripcion "❓"
+    Int nivel 
+    String tipo "❓"
+    String monetaria "❓"
+    String auxiliar "❓"
+    DateTime deletedAt "❓"
+    }
+  
     "Usuario" |o--|| "Rol" : "enum:rol"
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
-    "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
     "EstructuraProgramatica" }o--|| "Grupo" : "grupo"
     "EstructuraProgramatica" }o--|| "Partida" : "partida"
+    "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
     "Poa" |o--|| "EstadoPoa" : "enum:estado"
-    "Poa" }o--|| "EstructuraProgramatica" : "estructura"
-    "Poa" }o--|| "CodigoPresupuestario" : "codigoPresupuestario"
     "Poa" }o--|| "Actividad" : "actividad"
+    "Poa" }o--|| "CodigoPresupuestario" : "codigoPresupuestario"
+    "Poa" }o--|| "EstructuraProgramatica" : "estructura"
     "Solicitud" |o--|| "EstadoSolicitud" : "enum:estado"
     "Solicitud" |o--|| "TipoSolicitud" : "enum:tipo"
-    "Solicitud" }o--|| "Usuario" : "usuarioEmisor"
     "Solicitud" }o--|o "Usuario" : "aprobador"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
+    "Solicitud" }o--|| "Usuario" : "usuarioEmisor"
     "HistorialAprobacion" |o--|| "TipoAccionHistorial" : "enum:accion"
-    "HistorialAprobacion" }o--|| "Usuario" : "usuario"
-    "HistorialAprobacion" }o--|o "Usuario" : "derivadoA"
-    "HistorialAprobacion" }o--|o "Solicitud" : "solicitud"
-    "HistorialAprobacion" }o--|o "Rendicion" : "rendicion"
     "HistorialAprobacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
+    "HistorialAprobacion" }o--|o "Usuario" : "derivadoA"
+    "HistorialAprobacion" }o--|o "Rendicion" : "rendicion"
+    "HistorialAprobacion" }o--|o "Solicitud" : "solicitud"
+    "HistorialAprobacion" }o--|| "Usuario" : "usuario"
     "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
-    "Notificacion" }o--|| "Usuario" : "usuario"
-    "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Notificacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
+    "Notificacion" }o--|o "Solicitud" : "solicitud"
+    "Notificacion" }o--|| "Usuario" : "usuario"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
-    "Rendicion" |o--|| "Solicitud" : "solicitud"
     "Rendicion" }o--|o "Usuario" : "aprobadorActual"
+    "Rendicion" |o--|| "Solicitud" : "solicitud"
     "InformeGastos" |o--|| "Rendicion" : "rendicion"
     "ActividadInforme" }o--|| "InformeGastos" : "informe"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
-    "GastoRendicion" }o--|| "Rendicion" : "rendicion"
+    "GastoRendicion" }o--|o "PartidaContable" : "partidaContable"
     "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"
+    "GastoRendicion" }o--|| "Rendicion" : "rendicion"
     "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
-    "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
+    "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "Planificacion" }o--|| "Solicitud" : "solicitud"
     "Planificacion" o{--}o "Viatico" : ""
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"
+    "Viatico" }o--|| "Concepto" : "concepto"
     "Viatico" }o--|| "Solicitud" : "solicitud"
     "Viatico" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
-    "Viatico" }o--|| "Concepto" : "concepto"
     "Gasto" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Gasto" }o--|| "Solicitud" : "solicitud"
     "Gasto" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
@@ -522,24 +540,24 @@ APROBADO APROBADO
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
     "GastoCompra" }o--|| "Solicitud" : "solicitud"
     "GastoCompra" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
-    "NominaTerceros" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
-    "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" }o--|| "Poa" : "poa"
+    "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Cotizacion" |o--|| "TipoCotizacion" : "enum:tipo"
     "Cotizacion" }o--|| "Usuario" : "usuarioEmisor"
     "LineaCotizacion" }o--|| "Cotizacion" : "cotizacion"
     "CuadroComparativo" |o--|| "EstadoCuadroComparativo" : "enum:estado"
-    "CuadroComparativo" }o--|| "Usuario" : "usuarioEmisor"
     "CuadroComparativo" }o--|o "CuadroCotizacion" : "cotizacionRecomendada"
-    "CuadroCotizacion" }o--|| "CuadroComparativo" : "cuadro"
+    "CuadroComparativo" }o--|| "Usuario" : "usuarioEmisor"
     "CuadroCotizacion" }o--|| "Cotizacion" : "cotizacion"
-    "CuadroItem" }o--|| "CuadroComparativo" : "cuadro"
+    "CuadroCotizacion" }o--|| "CuadroComparativo" : "cuadro"
     "CuadroItem" }o--|o "CuadroCotizacion" : "cotizacionGanadora"
-    "CuadroPrecio" }o--|| "CuadroItem" : "cuadroItem"
+    "CuadroItem" }o--|| "CuadroComparativo" : "cuadro"
     "CuadroPrecio" }o--|| "CuadroCotizacion" : "cuadroCotizacion"
+    "CuadroPrecio" }o--|| "CuadroItem" : "cuadroItem"
     "OrdenCompra" }o--|o "CuadroComparativo" : "cuadroComparativo"
     "OrdenCompra" }o--|| "Usuario" : "usuarioEmisor"
     "OrdenCompraItem" }o--|o "CuadroItem" : "cuadroItem"
     "OrdenCompraItem" }o--|| "OrdenCompra" : "ordenCompra"
+    "PartidaContable" |o--|o "PartidaContable" : "parent"
 ```
