@@ -1,0 +1,1285 @@
+{
+  "codigo": "5.0.0.0.00",
+  "descripcion": "EGRESOS",
+  "monetaria": null,
+  "auxiliar": null,
+  "subgrupos": [
+    {
+      "codigo": "5.1.0.0.00",
+      "descripcion": "GASTOS ADMINISTRATIVOS",
+      "cuentas": [
+        {
+          "codigo": "5.1.1.0.00",
+          "descripcion": "SUELDOS Y SALARIOS",
+          "subcuentas": [
+            {
+              "codigo": "5.1.1.1.00",
+              "descripcion": "PERSONAL PERMANENTE",
+              "detalles": [
+                {
+                  "codigo": "5.1.1.1.01",
+                  "descripcion": "Director Ejecutivo",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.02",
+                  "descripcion": "Técnico Áreas Protegidas Beni",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.03",
+                  "descripcion": "Director Técnico",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.04",
+                  "descripcion": "Técnico II Biodiversidad",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.05",
+                  "descripcion": "Asistente Administrativo",
+                  "monetaria": "Bolivianos",
+                  "auxiliar": "Auxiliar"
+                },
+                {
+                  "codigo": "5.1.1.1.06",
+                  "descripcion": "Director de Programa de Ciencia y Tecnología",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.07",
+                  "descripcion": "Director de Programa de Esp. de Conserv.",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.08",
+                  "descripcion": "Director de Programa de Empoderamiento Local",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.09",
+                  "descripcion": "Coordinadora Rainforest Trust",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.10",
+                  "descripcion": "Sub Director de Programas",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.11",
+                  "descripcion": "Coordinador de Comunicación Estratégica",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.12",
+                  "descripcion": "Especialista Manejo Forestal",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.13",
+                  "descripcion": "Asistente Técnico y Monitoreo CEPF",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.14",
+                  "descripcion": "Especialista Técnico SIG y Planificación Territorial",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.15",
+                  "descripcion": "Coordinador Regional Pando",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.16",
+                  "descripcion": "Coordinador Estratégico Pando",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.17",
+                  "descripcion": "Otros Descuentos",
+                  "monetaria": "Bolivianos",
+                  "auxiliar": "Auxiliar"
+                },
+                {
+                  "codigo": "5.1.1.1.18",
+                  "descripcion": "Especialista II en SIG y Teledetección Beni",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.19",
+                  "descripcion": "Personal de Limpieza",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.20",
+                  "descripcion": "Contador",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.21",
+                  "descripcion": "Coordinador Estratégico Beni",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.22",
+                  "descripcion": "Técnico Socio Económico",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.23",
+                  "descripcion": "Técnico en Sistematización",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.24",
+                  "descripcion": "Asistente Logístico CEPF",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.25",
+                  "descripcion": "Tec. Manej de Rec. Forest. no maderables",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.26",
+                  "descripcion": "Técnico en áreas de conservación",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.27",
+                  "descripcion": "Director Financiero",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.28",
+                  "descripcion": "Coordinador Políticas Locales Pando",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.29",
+                  "descripcion": "Coordinador de Investigación y Monitoreo",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.30",
+                  "descripcion": "Esp. Sistemas de inf. Geo. y Teledetección",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.31",
+                  "descripcion": "Técnico Local Pesca",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.32",
+                  "descripcion": "Encargado de Logistica",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.33",
+                  "descripcion": "Chofer",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.34",
+                  "descripcion": "Especialista en Comunicación II",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.35",
+                  "descripcion": "Técnico Local PFNM",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.36",
+                  "descripcion": "Profesional Manejo PFNM",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.37",
+                  "descripcion": "Especialista II Conflicto Ganado-VIda Silvestre Beni",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.38",
+                  "descripcion": "Coordinador de Conservación de Áreas Naturales",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.39",
+                  "descripcion": "Encargada de RRHH y Asistente Contable",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.40",
+                  "descripcion": "Técnico Local Porvenir",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.41",
+                  "descripcion": "Técnico Local Puerto Rico",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.42",
+                  "descripcion": "Técnico en SIG y Teledetección",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.43",
+                  "descripcion": "Especialista en Gestión Integral del Bosque",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.44",
+                  "descripcion": "Técnico Local en Gestión de Areas Protegidas Pando",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.45",
+                  "descripcion": "Especialista de Desarrollo de Capacidades",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.46",
+                  "descripcion": "Especialista en Sistematización y análisis de información",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.47",
+                  "descripcion": "Técnico de Enlace - Beni",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.48",
+                  "descripcion": "Coordinador Nacional CEPF",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.49",
+                  "descripcion": "Especialista en Monitoreo y Evaluación Institucional",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.50",
+                  "descripcion": "Técnico Local en Fortalecimiento de Capacidades Locales",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.51",
+                  "descripcion": "Técnico Municipal San Pedro",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.52",
+                  "descripcion": "Especialista en SIG y Fotogrametría",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.53",
+                  "descripcion": "Responsable de Coordinación Estratégica en Pando",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.54",
+                  "descripcion": "Especialista en Monitoreo y SIG",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.55",
+                  "descripcion": "Técnico en Manejo Agroforestal",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.56",
+                  "descripcion": "Especialista en Ecoclimatología",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.57",
+                  "descripcion": "Especialista en Gestión Social",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.58",
+                  "descripcion": "Técnico Municipal Ingavi",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.59",
+                  "descripcion": "Técnico Municipal Puerto Rico",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.60",
+                  "descripcion": "Especialista en Sistemas de Información Geográfica y Teledetección",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.61",
+                  "descripcion": "Responsable de comunicación estratégica",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.62",
+                  "descripcion": "Responsable de Gobernanza de Espacios de conservación",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.63",
+                  "descripcion": "Especialista en Manejo de Areas Protegidas Pando",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.64",
+                  "descripcion": "Técnico IT",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.65",
+                  "descripcion": "Técnico Areas Protegidas Beni",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.66",
+                  "descripcion": "Técnico en Coordinación Logística",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.67",
+                  "descripcion": "Especialista en Gestión de Programas y Proyectos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.68",
+                  "descripcion": "Especilaista en Políticas Públicas",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.69",
+                  "descripcion": "Asistente logístico Beni",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.70",
+                  "descripcion": "Especialista en Comercialización",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.71",
+                  "descripcion": "Técnico en Manejo de Biodiversidad BAMI Puerto Rico",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.72",
+                  "descripcion": "Técnico en Manejo Forestal",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.73",
+                  "descripcion": "Técnico en Gestión Social y Educación Ambiental",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.74",
+                  "descripcion": "Especialista en biodiversidad",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.75",
+                  "descripcion": "Especialista en Recursos hidrobiológicos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.76",
+                  "descripcion": "Especialista en Fortalecimiento de Areas de Conservación",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.77",
+                  "descripcion": "Técnico II en Comunicación",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.78",
+                  "descripcion": "Especialista en Áreas de Conservación",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.79",
+                  "descripcion": "Técnico Local AMI Santa Rosa",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.80",
+                  "descripcion": "Responsable de Coordinación Estratégica en Pando a.i.",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.81",
+                  "descripcion": "Técnico en Áreas de Conservación Pando",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.82",
+                  "descripcion": "Especialista en Sistemas de Información Geográfica y Análisis Espacial",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.83",
+                  "descripcion": "Técnico en Areas de Conservación Pando",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.84",
+                  "descripcion": "Técnico en Gestión Legal",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.85",
+                  "descripcion": "Administradora General",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.86",
+                  "descripcion": "Responsable de Adq. y Logística",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.87",
+                  "descripcion": "Contador II",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.88",
+                  "descripcion": "Especialista II en Gestión de Proyectos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.89",
+                  "descripcion": "Especialista II - IT",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.90",
+                  "descripcion": "Especilialista Il en Monitoreo",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.91",
+                  "descripcion": "Especialista II en Com. Interna",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.92",
+                  "descripcion": "Especialista en Gobernanza y Equidad",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.93",
+                  "descripcion": "Técnico Socioeconómico",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.94",
+                  "descripcion": "Coordinador BID",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.95",
+                  "descripcion": "Técnico I Logística",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.96",
+                  "descripcion": "Especialista II en Educación para la Conserv.",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.97",
+                  "descripcion": "Especialista II en Monit. Biodiv. Aves",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.98",
+                  "descripcion": "Chofer II",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.1.99",
+                  "descripcion": "Técnico II en Transform. de PFNM",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            },
+            {
+              "codigo": "5.1.1.2.00",
+              "descripcion": "PERSONAL EVENTUAL (SIN BENEF. SOC)",
+              "detalles": [
+                {
+                  "codigo": "5.1.1.2.01",
+                  "descripcion": "Técnicos Locales",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.2.02",
+                  "descripcion": "Consultores",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.2.03",
+                  "descripcion": "Guías Locales",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.2.04",
+                  "descripcion": "Practicantes / Estudiantes",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.2.05",
+                  "descripcion": "Trabajo en Campo",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "codigo": "5.1.2.0.00",
+          "descripcion": "CARGAS SOCIALES",
+          "detalles": [
+            {
+              "codigo": "5.1.2.1.00",
+              "descripcion": "Aporte Caja de Salud 10%",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.2.2.00",
+              "descripcion": "Aporte FONVI 2%",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.2.3.00",
+              "descripcion": "Aporte Patronal AFP 1.71%",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.2.4.00",
+              "descripcion": "Aporte Solidario Patronal 3%",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.2.5.00",
+              "descripcion": "Subsidios",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.2.6.00",
+              "descripcion": "Aguinaldos",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.2.7.00",
+              "descripcion": "Indemnización",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.2.8.00",
+              "descripcion": "Vacaciones",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.2.9.00",
+              "descripcion": "Otros Beneficios al Personal",
+              "monetaria": "Bolivianos"
+            }
+          ]
+        },
+        {
+          "codigo": "5.1.3.0.00",
+          "descripcion": "GASTOS GENERALES",
+          "subcuentas": [
+            {
+              "codigo": "5.1.3.1.00",
+              "descripcion": "SERVICIOS BÁSICOS",
+              "detalles": [
+                {
+                  "codigo": "5.1.3.1.01",
+                  "descripcion": "Servicios Telefónicos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.1.02",
+                  "descripcion": "Servicios de Internet",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.1.03",
+                  "descripcion": "Energía Eléctrica",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.1.04",
+                  "descripcion": "Servicio de Gas",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.1.05",
+                  "descripcion": "Overhead",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.1.06",
+                  "descripcion": "Servicio de Agua",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.1.07",
+                  "descripcion": "Servicio de Seguridad",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            },
+            {
+              "codigo": "5.1.3.2.00",
+              "descripcion": "ALQUILERES",
+              "detalles": [
+                {
+                  "codigo": "5.1.3.2.01",
+                  "descripcion": "Alquiler de Oficina",
+                  "monetaria": "Bolivianos",
+                  "auxiliar": "Auxiliar"
+                },
+                {
+                  "codigo": "5.1.3.2.02",
+                  "descripcion": "Alquiler de Salones para eventos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.2.03",
+                  "descripcion": "Alquiler Transporte",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.2.04",
+                  "descripcion": "Alquiler equipo y maquinaria",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.2.05",
+                  "descripcion": "Alquileres varios",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            },
+            {
+              "codigo": "5.1.3.3.00",
+              "descripcion": "GASTOS DE MANTENIMIENTO Y REPARACIONES",
+              "detalles": [
+                {
+                  "codigo": "5.1.3.3.01",
+                  "descripcion": "Mantenimiento y Reparación Inmuebles",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.3.02",
+                  "descripcion": "Mantenimiento y Reparación Muebles y Enseres",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.3.03",
+                  "descripcion": "Mantenimiento y Reparación de Maquinaria y Equipo",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.3.04",
+                  "descripcion": "Mantenimiento y Reparación Equipo de Computación",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.3.05",
+                  "descripcion": "Mantenimiento y Reparación Vehículos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.3.06",
+                  "descripcion": "Mantenimiento Sendas",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.3.07",
+                  "descripcion": "Mantenimiento y Reparación de Payoles",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            },
+            {
+              "codigo": "5.1.3.4.00",
+              "descripcion": "SERVICIOS PROFESIONALES Y COMERCIALES",
+              "detalles": [
+                {
+                  "codigo": "5.1.3.4.01",
+                  "descripcion": "Estudios e Investigaciones",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.02",
+                  "descripcion": "Servicios de Limpieza",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.03",
+                  "descripcion": "Publicidad",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.04",
+                  "descripcion": "Capacitación del Personal",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.05",
+                  "descripcion": "Servicio de Té y Refrigerios",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.06",
+                  "descripcion": "Honorarios Profesionales",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.07",
+                  "descripcion": "Fotocopias y Anillados",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.08",
+                  "descripcion": "Suscripción Membretes y libros",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.09",
+                  "descripcion": "Formularios o Impresos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.10",
+                  "descripcion": "Pagina Web",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.11",
+                  "descripcion": "Envíos, trámites, movilidades",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.12",
+                  "descripcion": "Impresiones (paneles, tripticos, ploteados, otros)",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.13",
+                  "descripcion": "Comisiones Varias",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.14",
+                  "descripcion": "Laboratorio",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.15",
+                  "descripcion": "Licencias software",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.16",
+                  "descripcion": "Edición videos, cuñas radiales y otros",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.17",
+                  "descripcion": "Diseño - Diagramación",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.18",
+                  "descripcion": "Apoyo institucional Terceros",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.4.19",
+                  "descripcion": "Material Comunicacional",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            },
+            {
+              "codigo": "5.1.3.5.00",
+              "descripcion": "MATERIAL FUNGIBLE",
+              "detalles": [
+                {
+                  "codigo": "5.1.3.5.01",
+                  "descripcion": "Material de oficina",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.5.02",
+                  "descripcion": "Artículos de Limpieza",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.5.03",
+                  "descripcion": "Artículos de Ferretería",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.5.04",
+                  "descripcion": "Suministros de oficina",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.5.05",
+                  "descripcion": "Utensilios",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.5.06",
+                  "descripcion": "Suministros de bioseguridad",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.5.07",
+                  "descripcion": "Suministros de proyecto",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            },
+            {
+              "codigo": "5.1.3.6.00",
+              "descripcion": "SERVICIOS DE TRANSPORTE Y SEGUROS",
+              "detalles": [
+                {
+                  "codigo": "5.1.3.6.01",
+                  "descripcion": "Pasajes Aéreos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.02",
+                  "descripcion": "Pasajes Terrestres",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.03",
+                  "descripcion": "Pasajes Fluviales",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.04",
+                  "descripcion": "Fletes y Almacenamiento",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.05",
+                  "descripcion": "Seguros contra Accidentes Personal",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.06",
+                  "descripcion": "Seguros Mobiliario y Equipo de Oficina",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.07",
+                  "descripcion": "Seguro Movilidades",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.08",
+                  "descripcion": "Repuestos y accesorios movilidades",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.09",
+                  "descripcion": "Peajes, migración, parqueo, paso ponton.",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.3.6.10",
+                  "descripcion": "Seguros Varios",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "codigo": "5.1.4.0.00",
+          "descripcion": "DEPRECIACIÓN BIENES DE USO",
+          "detalles": [
+            {
+              "codigo": "5.1.4.1.00",
+              "descripcion": "Depreciación Muebles y Enseres",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.4.2.00",
+              "descripcion": "Depreciación Equipo de Computación",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.4.3.00",
+              "descripcion": "Depreciación Equipo de Comunicación",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.4.4.00",
+              "descripcion": "Depreciación Equipo de Oficina",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.4.5.00",
+              "descripcion": "Depreciación Maquinaria y Equipo de Campo",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.4.6.00",
+              "descripcion": "Depreciación Equipo médico y de laboratorio",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.4.7.00",
+              "descripcion": "Depreciación Vehículos",
+              "monetaria": "Bolivianos"
+            }
+          ]
+        },
+        {
+          "codigo": "5.1.5.0.00",
+          "descripcion": "IMPUESTOS",
+          "detalles": [
+            {
+              "codigo": "5.1.5.1.00",
+              "descripcion": "Impuesto a las Transacciones IT",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.5.2.00",
+              "descripcion": "Impuesto a las Utilidades de las Empresas IUE",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.5.3.00",
+              "descripcion": "Impuesto a las Transacciones Financieras ITF",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.5.4.00",
+              "descripcion": "Impuesto al Valor Agregado RC-IVA",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.5.5.00",
+              "descripcion": "Intereses, Multas por incumplimiento de tributos",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.5.6.00",
+              "descripcion": "Impuestos Municipales",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.5.7.00",
+              "descripcion": "Impuesto Zofra Cobija (5%)",
+              "monetaria": "Bolivianos"
+            }
+          ]
+        },
+        {
+          "codigo": "5.1.6.0.00",
+          "descripcion": "PERDIDAS DE CAMBIO",
+          "detalles": [
+            {
+              "codigo": "5.1.6.1.00",
+              "descripcion": "Ajuste por diferencia de Cambio",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.6.2.00",
+              "descripcion": "Ajuste por Inflación y Tenencia de Bienes (egreso)",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.6.3.00",
+              "descripcion": "Perdida por diferencia de cambio",
+              "monetaria": "Bolivianos"
+            }
+          ]
+        },
+        {
+          "codigo": "5.1.7.0.00",
+          "descripcion": "GASTOS PREVISIONES Y PROVISIONES",
+          "detalles": [
+            {
+              "codigo": "5.1.7.1.00",
+              "descripcion": "Beneficios Sociales",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.7.2.00",
+              "descripcion": "Desahucio",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.7.3.00",
+              "descripcion": "Gastos Reservas y Seguros",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.7.4.00",
+              "descripcion": "Perdida por cuentas incobrables",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.7.5.00",
+              "descripcion": "Gastos Vacaciones Devengadas",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.7.6.00",
+              "descripcion": "Otras Previsiones",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.7.7.00",
+              "descripcion": "Aportes Sociales",
+              "detalles": [
+                {
+                  "codigo": "5.1.7.7.01",
+                  "descripcion": "Aporte Solidario Patronal 3.5%",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.7.7.02",
+                  "descripcion": "AFP 3.92% Riesgo común y Laboral",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            },
+            {
+              "codigo": "5.1.7.8.00",
+              "descripcion": "Gastos no deducibles",
+              "monetaria": "Bolivianos"
+            }
+          ]
+        },
+        {
+          "codigo": "5.1.8.0.00",
+          "descripcion": "GASTOS FINANCIEROS",
+          "detalles": [
+            {
+              "codigo": "5.1.8.1.00",
+              "descripcion": "Chequeras",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.8.2.00",
+              "descripcion": "Intereses Bancarios",
+              "monetaria": "Bolivianos"
+            },
+            {
+              "codigo": "5.1.8.3.00",
+              "descripcion": "Comisiones Bancarias",
+              "monetaria": "Bolivianos"
+            }
+          ]
+        },
+        {
+          "codigo": "5.1.9.0.00",
+          "descripcion": "GASTOS SALARIOS PERSONAL PROYECTOS",
+          "subcuentas": [
+            {
+              "codigo": "5.1.9.1.00",
+              "descripcion": "PERSONAL DE PROYECTOS",
+              "detalles": [
+                {
+                  "codigo": "5.1.9.1.01",
+                  "descripcion": "Sueldos Personal Proyecto",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.9.1.02",
+                  "descripcion": "Previsión de Sueldos Personal Proyecto",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "codigo": "5.2.0.0.00",
+      "descripcion": "GASTOS DE PROYECTOS",
+      "cuentas": [
+        {
+          "codigo": "5.2.1.0.00",
+          "descripcion": "ACTIVIDADES DE PROYECTO",
+          "subcuentas": [
+            {
+              "codigo": "5.2.1.1.00",
+              "descripcion": "CONVENIOS",
+              "detalles": [
+                {
+                  "codigo": "5.2.1.1.01",
+                  "descripcion": "Sub Convenio CITRMD",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.1.02",
+                  "descripcion": "Sub Convenio PROFIT RURAL",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.1.03",
+                  "descripcion": "Sub Convenio (Otros)",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            },
+            {
+              "codigo": "5.2.1.2.00",
+              "descripcion": "ACTIVIDADES",
+              "detalles": [
+                {
+                  "codigo": "5.2.1.2.01",
+                  "descripcion": "Viáticos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.02",
+                  "descripcion": "Hospedaje",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.03",
+                  "descripcion": "Combustible",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.04",
+                  "descripcion": "Gastos aeroportuarios",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.05",
+                  "descripcion": "Alimentación",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.06",
+                  "descripcion": "Material de campo",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.07",
+                  "descripcion": "Reuniones y talleres",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.08",
+                  "descripcion": "Comunicaciones",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.09",
+                  "descripcion": "Servicios Varios",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.10",
+                  "descripcion": "Compras Varias",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.11",
+                  "descripcion": "Equipos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.12",
+                  "descripcion": "Construcciones",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.13",
+                  "descripcion": "Movilidades",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.14",
+                  "descripcion": "Bote",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.15",
+                  "descripcion": "Muebles y enseres",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.16",
+                  "descripcion": "Maquinaria en general",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.17",
+                  "descripcion": "Material y Equipos para Escuelas",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.18",
+                  "descripcion": "Gastos No Reconocidos por el Proyecto",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.19",
+                  "descripcion": "Contraparte proyectos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.20",
+                  "descripcion": "Estipendios",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.21",
+                  "descripcion": "Otros gastos",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.22",
+                  "descripcion": "Gastos para ferias",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.23",
+                  "descripcion": "Costos Indirectos de Oficina",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.2.1.2.24",
+                  "descripcion": "Víveres/Alimentos",
+                  "monetaria": "Bolivianos"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
