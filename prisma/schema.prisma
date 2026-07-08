@@ -95,7 +95,7 @@ model Poa {
   actividadId            Int
   montoEjecutado         Decimal                @default(0) @db.Decimal(10, 2)
   createdAt              DateTime               @default(now())
-  updatedAt              DateTime
+  updatedAt              DateTime               @default(now())
   hospedajes             Hospedaje[]
   actividad              Actividad              @relation(fields: [actividadId], references: [id])
   codigoPresupuestario   CodigoPresupuestario   @relation(fields: [codigoPresupuestarioId], references: [id])
