@@ -130,7 +130,7 @@ model Solicitud {
   proyecto                String?                @db.VarChar(200)
   tipo                    TipoSolicitud          @default(VIAJE)
   createdAt               DateTime               @default(now())
-  updatedAt               DateTime
+  updatedAt               DateTime               @default(now())
   gastos                  Gasto[]
   gastosCompra            GastoCompra[]
   historialAprobaciones   HistorialAprobacion[]  @relation("SolicitudHistorial")
@@ -204,7 +204,7 @@ model Rendicion {
   aprobadorActualId     Int?
   createdAt             DateTime              @default(now())
   deletedAt             DateTime?
-  updatedAt             DateTime
+  updatedAt             DateTime              @default(now())
   declaracionesJuradas  DeclaracionJurada[]
   gastosRendicion       GastoRendicion[]
   historialAprobaciones HistorialAprobacion[] @relation("RendicionHistorial")
