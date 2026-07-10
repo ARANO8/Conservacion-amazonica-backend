@@ -194,7 +194,7 @@ model Notificacion {
 model Rendicion {
   id                    Int                   @id @default(autoincrement())
   fechaRendicion        DateTime              @default(now())
-  /// Suma de todos los GastoRendicion + DeclaracionJurada
+  /// Suma de todos los GastoRendicion
   montoRespaldado       Decimal               @default(0) @db.Decimal(10, 2)
   observaciones         String?
   solicitudId           Int                   @unique
@@ -205,7 +205,6 @@ model Rendicion {
   createdAt             DateTime              @default(now())
   deletedAt             DateTime?
   updatedAt             DateTime              @default(now())
-  declaracionesJuradas  DeclaracionJurada[]
   gastosRendicion       GastoRendicion[]
   historialAprobaciones HistorialAprobacion[] @relation("RendicionHistorial")
   informeGastos         InformeGastos?
@@ -259,17 +258,6 @@ model GastoRendicion {
 
   @@index([partidaContableId])
   @@index([partidaId])
-  @@index([rendicionId])
-}
-
-model DeclaracionJurada {
-  id          Int       @id @default(autoincrement())
-  fecha       DateTime
-  detalle     String
-  monto       Decimal   @db.Decimal(10, 2)
-  rendicionId Int
-  rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
-
   @@index([rendicionId])
 }
 

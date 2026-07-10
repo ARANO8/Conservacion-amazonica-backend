@@ -18,6 +18,8 @@ import { CreateRendicionDto } from './dto/create-rendicion.dto';
 import { UpdateRendicionDto } from './dto/update-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
+import { UpdateGastoPartidaContableDto } from './dto/update-gasto-partida-contable.dto';
+import { UpdateGastoPartidaPresupuestariaDto } from './dto/update-gasto-partida-presupuestaria.dto';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 
@@ -41,6 +43,22 @@ const RENDICION_INCLUDE = {
           rol: true,
         },
       },
+      presupuestos: {
+        include: {
+          poa: {
+            include: {
+              estructura: {
+                include: {
+                  proyecto: true,
+                  grupo: true,
+                  partida: true,
+                },
+              },
+              actividad: true,
+            },
+          },
+        },
+      },
     },
   },
   aprobadorActual: {
@@ -53,6 +71,7 @@ const RENDICION_INCLUDE = {
   },
   gastosRendicion: {
     include: {
+      partidaContable: true,
       partida: {
         include: {
           poa: {
@@ -68,7 +87,6 @@ const RENDICION_INCLUDE = {
       },
     },
   },
-  declaracionesJuradas: true,
   informeGastos: {
     include: {
       actividades: true,
@@ -373,8 +391,7 @@ export class RendicionesService {
           fechaRendicion: dto.fechaRendicion,
           estado: EstadoRendicion.PENDIENTE,
           aprobadorActualId: dto.aprobadorActualId,
-          observaciones:
-            dto.observaciones ?? dto.declaracionJurada?.observaciones,
+          observaciones: dto.observaciones,
           montoRespaldado: totalRespaldado,
           saldoLiquido,
           gastosRendicion: {
@@ -391,13 +408,6 @@ export class RendicionesService {
               montoBruto: new Prisma.Decimal(gasto.montoBruto),
               montoImpuestos: new Prisma.Decimal(gasto.montoImpuestos),
               montoNeto: new Prisma.Decimal(gasto.montoNeto),
-            })),
-          },
-          declaracionesJuradas: {
-            create: (dto.gastosSinRespaldo ?? []).map((declaracion) => ({
-              fecha: declaracion.fechaGasto ?? dto.fechaRendicion,
-              detalle: declaracion.detalle,
-              monto: new Prisma.Decimal(declaracion.monto),
             })),
           },
           informeGastos: dto.informeGastos
@@ -419,7 +429,6 @@ export class RendicionesService {
         },
         include: {
           gastosRendicion: true,
-          declaracionesJuradas: true,
           informeGastos: {
             include: {
               actividades: true,
@@ -495,7 +504,6 @@ export class RendicionesService {
             },
           },
           gastosRendicion: true,
-          declaracionesJuradas: true,
           informeGastos: {
             include: {
               actividades: true,
@@ -574,12 +582,8 @@ export class RendicionesService {
         }
       }
 
-      // 7. Eliminar gastos, declaraciones e informe anteriores
+      // 7. Eliminar gastos e informe anteriores
       await tx.gastoRendicion.deleteMany({
-        where: { rendicionId: id },
-      });
-
-      await tx.declaracionJurada.deleteMany({
         where: { rendicionId: id },
       });
 
@@ -595,14 +599,12 @@ export class RendicionesService {
       // 8. Calcular nuevos totales
       const fechaRendicion = dto.fechaRendicion ?? rendicion.fechaRendicion;
       const gastos = dto.gastos ?? [];
-      const gastosSinRespaldo = dto.gastosSinRespaldo ?? [];
 
       const totalRespaldado = this.calcularTotalRespaldado({
         solicitudId: rendicion.solicitudId,
         fechaRendicion,
         aprobadorActualId: dto.aprobadorActualId,
         gastos,
-        gastosSinRespaldo,
       } as CreateRendicionDto);
 
       const solicitud = await tx.solicitud.findUnique({
@@ -621,8 +623,7 @@ export class RendicionesService {
           fechaRendicion,
           estado: EstadoRendicion.PENDIENTE,
           aprobadorActualId: dto.aprobadorActualId,
-          observaciones:
-            dto.observaciones ?? dto.declaracionJurada?.observaciones,
+          observaciones: dto.observaciones,
           montoRespaldado: totalRespaldado,
           saldoLiquido,
           gastosRendicion: {
@@ -639,13 +640,6 @@ export class RendicionesService {
               montoBruto: new Prisma.Decimal(gasto.montoBruto),
               montoImpuestos: new Prisma.Decimal(gasto.montoImpuestos),
               montoNeto: new Prisma.Decimal(gasto.montoNeto),
-            })),
-          },
-          declaracionesJuradas: {
-            create: gastosSinRespaldo.map((declaracion) => ({
-              fecha: declaracion.fechaGasto ?? fechaRendicion,
-              detalle: declaracion.detalle,
-              monto: new Prisma.Decimal(declaracion.monto),
             })),
           },
           informeGastos: dto.informeGastos
@@ -716,7 +710,7 @@ export class RendicionesService {
     usuarioId: number,
     rolUsuario: Rol,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const rendicion = await tx.rendicion.findUnique({
         where: { id },
         include: {
@@ -914,6 +908,30 @@ export class RendicionesService {
 
       return rendicionDerivada;
     });
+
+    if (rolUsuario !== Rol.CONTADOR && dto.derivadoAId) {
+      try {
+        await this.notificacionesService.crearNotificacion({
+          titulo: 'Rendición derivada para revisión',
+          mensaje: `Se ha derivado la rendición #${id} para su revisión y aprobación`,
+          tipo: 'RENDICION_PENDIENTE',
+          usuarioId: dto.derivadoAId,
+          solicitudId: result.solicitudId,
+          urlDestino: `/app/rendiciones/${id}`,
+        });
+      } catch (error: unknown) {
+        const normalizedError =
+          error instanceof Error
+            ? error
+            : new Error(String(error));
+        this.logger.error(
+          `[RendicionesService] Error al crear notificación de derivación para rendición ${id}: ${normalizedError.message}`,
+          normalizedError.stack,
+        );
+      }
+    }
+
+    return result;
   }
 
   async observar(
@@ -1003,8 +1021,138 @@ export class RendicionesService {
     return rendicionObservada.updated;
   }
 
+  async updatePartidaContable(
+    gastoId: number,
+    dto: UpdateGastoPartidaContableDto,
+    usuarioId: number,
+  ) {
+    const gasto = await this.prisma.gastoRendicion.findUnique({
+      where: { id: gastoId },
+      include: {
+        rendicion: {
+          select: {
+            id: true,
+            aprobadorActualId: true,
+            solicitud: { select: { usuarioEmisorId: true } },
+          },
+        },
+      },
+    });
+
+    if (!gasto) {
+      throw new NotFoundException('Gasto de rendición no encontrado');
+    }
+
+    if (gasto.rendicion.aprobadorActualId !== usuarioId) {
+      throw new ForbiddenException(
+        'No tienes permiso para modificar este gasto',
+      );
+    }
+
+    if (dto.codigo) {
+      let partida = await this.prisma.partidaContable.findUnique({
+        where: { codigo: dto.codigo },
+        select: { id: true, codigo: true, nombre: true },
+      });
+
+      if (!partida) {
+        const candidates = await this.prisma.partidaContable.findMany({
+          where: { codigo: { startsWith: dto.codigo } },
+          select: { id: true, codigo: true, nombre: true },
+          take: 2,
+        });
+
+        if (candidates.length === 1) {
+          partida = candidates[0];
+        } else if (candidates.length === 0) {
+          throw new NotFoundException(
+            `No se encontró ninguna partida contable con el código "${dto.codigo}"`,
+          );
+        } else {
+          throw new BadRequestException(
+            `El código "${dto.codigo}" es ambiguo: coincide con múltiples partidas. Especifique el código completo`,
+          );
+        }
+      }
+
+      await this.prisma.gastoRendicion.update({
+        where: { id: gastoId },
+        data: { partidaContableId: partida.id },
+      });
+    } else {
+      await this.prisma.gastoRendicion.update({
+        where: { id: gastoId },
+        data: { partidaContableId: null },
+      });
+    }
+
+    return this.prisma.gastoRendicion.findUnique({
+      where: { id: gastoId },
+      include: { partidaContable: true },
+    });
+  }
+
+  async updatePartidaPresupuestaria(
+    gastoId: number,
+    dto: UpdateGastoPartidaPresupuestariaDto,
+    usuarioId: number,
+  ) {
+    const gasto = await this.prisma.gastoRendicion.findUnique({
+      where: { id: gastoId },
+      include: {
+        rendicion: {
+          select: {
+            id: true,
+            aprobadorActualId: true,
+            solicitud: { select: { usuarioEmisorId: true } },
+          },
+        },
+      },
+    });
+
+    if (!gasto) {
+      throw new NotFoundException('Gasto de rendición no encontrado');
+    }
+
+    if (gasto.rendicion.aprobadorActualId !== usuarioId) {
+      throw new ForbiddenException(
+        'No tienes permiso para modificar este gasto',
+      );
+    }
+
+    if (dto.partidaId) {
+      const partida = await this.prisma.solicitudPresupuesto.findUnique({
+        where: { id: dto.partidaId },
+      });
+
+      if (!partida) {
+        throw new NotFoundException(
+          'Partida presupuestaria no encontrada',
+        );
+      }
+
+      await this.prisma.gastoRendicion.update({
+        where: { id: gastoId },
+        data: { partidaId: partida.id },
+      });
+    } else {
+      await this.prisma.gastoRendicion.update({
+        where: { id: gastoId },
+        data: { partidaId: null },
+      });
+    }
+
+    return this.prisma.gastoRendicion.findUnique({
+      where: { id: gastoId },
+      include: { partida: { include: { poa: { include: { estructura: { include: { partida: true, proyecto: true, grupo: true } } } } } } },
+    });
+  }
+
   private toTipoDocumento(tipoDocumento: string): TipoDocumento {
-    if (tipoDocumento === TipoDocumento.FACTURA) return TipoDocumento.FACTURA;
+    const validValues = Object.values(TipoDocumento) as string[];
+    if (validValues.includes(tipoDocumento)) {
+      return tipoDocumento as TipoDocumento;
+    }
     return TipoDocumento.RECIBO;
   }
 
@@ -1015,12 +1163,7 @@ export class RendicionesService {
       new Prisma.Decimal(0),
     );
 
-    const totalSinRespaldo = (dto.gastosSinRespaldo ?? []).reduce(
-      (acc, declaracion) => acc.plus(new Prisma.Decimal(declaracion.monto)),
-      new Prisma.Decimal(0),
-    );
-
-    return totalGastos.plus(totalSinRespaldo);
+    return totalGastos;
   }
 
   private agruparMontosPorPartida(

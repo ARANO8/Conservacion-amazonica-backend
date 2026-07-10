@@ -17,6 +17,7 @@ import { CodigosPresupuestariosModule } from './catalogos/codigos-presupuestario
 import { ReportsModule } from './reports/reports.module';
 import { SolicitudPresupuestoModule } from './solicitudes-presupuestos/solicitudes-presupuestos.module';
 import { CuentasBancariasModule } from './catalogos/cuentas-bancarias/cuentas-bancarias.module';
+import { PartidasContablesModule } from './catalogos/partidas-contables/partidas-contables.module';
 import { NotificacionesModule } from './notificaciones/notificaciones.module';
 import { RendicionesModule } from './rendiciones/rendiciones.module';
 import { DashboardModule } from './dashboard/dashboard.module';
@@ -74,6 +75,7 @@ function getPositiveIntFromEnv(
     ReportsModule,
     SolicitudPresupuestoModule,
     CuentasBancariasModule,
+    PartidasContablesModule,
     NotificacionesModule,
     RendicionesModule,
     DashboardModule,

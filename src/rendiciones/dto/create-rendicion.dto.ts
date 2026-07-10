@@ -3,7 +3,6 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
-  IsBoolean,
   IsDate,
   IsEnum,
   IsInt,
@@ -133,13 +132,14 @@ export class CreateGastoRendicionDto {
   @Min(1)
   partidaId: number;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'https://drive.google.com/file/d/abc/view',
     description: 'URL del comprobante digital',
   })
+  @IsOptional()
   @IsUrl()
   @IsNotEmpty()
-  urlComprobante: string;
+  urlComprobante?: string;
 
   @ApiPropertyOptional({ enum: TipoRetencionDto, example: 'SERVICIO' })
   @IsOptional()
@@ -200,71 +200,6 @@ export class CreateInformeGastosDto {
   actividades: CreateActividadInformeDto[];
 }
 
-export class CreateGastoSinRespaldoDto {
-  @ApiPropertyOptional({
-    example: '2026-03-13T00:00:00.000Z',
-    description: 'Fecha del gasto sin respaldo',
-  })
-  @IsOptional()
-  @Type(() => Date)
-  @IsDate()
-  fechaGasto?: Date;
-
-  @ApiProperty({ example: 'Pago de taxi urbano en zona sin facturación' })
-  @IsString()
-  @IsNotEmpty()
-  detalle: string;
-
-  @ApiProperty({ example: 35.5 })
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0.01)
-  monto: number;
-}
-
-export class CreateDeclaracionJuradaDto {
-  @ApiProperty({
-    example: true,
-    description: 'Confirmación de veracidad de los datos de rendición',
-  })
-  @IsBoolean()
-  confirmaDatosVeridicos: boolean;
-
-  @ApiProperty({
-    example: true,
-    description: 'Aceptación de la política de devolución de saldos',
-  })
-  @IsBoolean()
-  aceptaPoliticaDevolucion: boolean;
-
-  @ApiPropertyOptional({
-    example: 'COMPLETA',
-    description: 'Tipo de declaración jurada seleccionada por frontend',
-  })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  tipoDeclaracion?: string;
-
-  @ApiPropertyOptional({
-    example: 0,
-    description: 'Monto declarado a devolver',
-  })
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  montoADevolver?: number;
-
-  @ApiPropertyOptional({
-    example: 'La rendición incluye gastos menores por contingencia.',
-  })
-  @IsOptional()
-  @IsString()
-  @IsNotEmpty()
-  observaciones?: string;
-}
-
 export class CreateRendicionDto {
   @ApiProperty({ example: 123 })
   @Type(() => Number)
@@ -295,24 +230,11 @@ export class CreateRendicionDto {
   @Type(() => CreateGastoRendicionDto)
   gastos: CreateGastoRendicionDto[];
 
-  @ApiPropertyOptional({ type: [CreateGastoSinRespaldoDto] })
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateGastoSinRespaldoDto)
-  gastosSinRespaldo?: CreateGastoSinRespaldoDto[];
-
   @ApiPropertyOptional({ type: CreateInformeGastosDto })
   @IsOptional()
   @ValidateNested()
   @Type(() => CreateInformeGastosDto)
   informeGastos?: CreateInformeGastosDto;
-
-  @ApiPropertyOptional({ type: CreateDeclaracionJuradaDto })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => CreateDeclaracionJuradaDto)
-  declaracionJurada?: CreateDeclaracionJuradaDto;
 
   @ApiPropertyOptional({
     example: 'Observaciones adicionales del responsable de la rendición',

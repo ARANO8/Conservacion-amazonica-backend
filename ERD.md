@@ -269,14 +269,6 @@ EN_APROBACION EN_APROBACION
     }
   
 
-  "DeclaracionJurada" {
-    Int id "🗝️"
-    DateTime fecha 
-    String detalle 
-    Decimal monto 
-    }
-  
-
   "SolicitudPresupuesto" {
     Int id "🗝️"
     Decimal subtotalNeto 
@@ -524,7 +516,6 @@ EN_APROBACION EN_APROBACION
     "GastoRendicion" }o--|o "PartidaContable" : "partidaContable"
     "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"
     "GastoRendicion" }o--|| "Rendicion" : "rendicion"
-    "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "Planificacion" }o--|| "Solicitud" : "solicitud"
