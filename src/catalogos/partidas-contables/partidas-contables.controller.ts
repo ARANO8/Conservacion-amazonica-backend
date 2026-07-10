@@ -14,9 +14,13 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 @UseGuards(JwtAuthGuard)
 @Controller('catalogos/partidas-contables')
 export class PartidasContablesController {
-  constructor(
-    private readonly partidasContablesService: PartidasContablesService,
-  ) {}
+  constructor(private readonly service: PartidasContablesService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Obtener catálogo de partidas contables' })
+  async findAll() {
+    return this.service.findAll();
+  }
 
   @Get('search')
   @Throttle({ default: { limit: 60, ttl: 60000 } })
@@ -27,6 +31,6 @@ export class PartidasContablesController {
     description: 'Prefijo del código de partida contable',
   })
   search(@Query('q') q: string) {
-    return this.partidasContablesService.search(q);
+    return this.service.search(q);
   }
 }

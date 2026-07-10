@@ -10,7 +10,6 @@ import {
   IsNumber,
   IsOptional,
   IsString,
-  IsUrl,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -19,6 +18,11 @@ export enum TipoDocumentoRendicionDto {
   FACTURA = 'FACTURA',
   RECIBO = 'RECIBO',
   BOLETA = 'BOLETA',
+  LV = 'LV',
+  DJ = 'DJ',
+  PPT = 'PPT',
+  PAT = 'PAT',
+  PVT = 'PVT',
 }
 
 export enum EstadoGastoRendicionDto {
@@ -227,15 +231,6 @@ export class CreateRendicionDto {
   @ValidateNested()
   @Type(() => CreateInformeGastosDto)
   informeGastos?: CreateInformeGastosDto;
-
-  @ApiProperty({
-    example: 'https://drive.google.com/drive/folders/abc123',
-    description:
-      'URL obligatoria con los comprobantes digitales adjuntos de toda la rendición',
-  })
-  @IsUrl()
-  @IsNotEmpty()
-  comprobanteUrl: string;
 
   @ApiPropertyOptional({
     example: 'Observaciones adicionales del responsable de la rendición',

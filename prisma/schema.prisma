@@ -2,578 +2,19 @@ generator client {
   provider = "prisma-client-js"
 }
 
-generator erd {
-  provider = "prisma-erd-generator"
-  output   = "../ERD.md"
-}
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model Usuario {
-  id                      Int                   @id @default(autoincrement())
-  email                   String                @unique
-  password                String
-  nombreCompleto          String
-  rol                     Rol                   @default(USUARIO)
-  cargo                   String?
-  createdAt               DateTime              @default(now())
-  updatedAt               DateTime              @updatedAt
-  deletedAt               DateTime?
-  cotizacionesEmitidas    Cotizacion[]          @relation("CotizacionesEmitidas")
-  cuadrosEmitidos         CuadroComparativo[]   @relation("CuadrosEmitidos")
-  historialesRecibidos    HistorialAprobacion[] @relation("DestinatarioHistorial")
-  historialesCreados      HistorialAprobacion[] @relation("ActorHistorial")
-  notificaciones          Notificacion[]
-  ordenesEmitidas         OrdenCompra[]         @relation("OrdenesEmitidas")
-  rendicionesPorAprobar   Rendicion[]           @relation("RendicionAprobador")
-  solicitudesPorAprobar   Solicitud[]           @relation("AprobadorSolicitud")
-  solicitudesBeneficiadas Solicitud[]           @relation("Beneficiario")
-  solicitudesEmitidas     Solicitud[]           @relation("Emisor")
-}
-
-model Proyecto {
-  id               Int                      @id @default(autoincrement())
-  nombre           String
-  deletedAt        DateTime?
-  cuentaBancariaId Int?
-  estructuras      EstructuraProgramatica[]
-  cuentaBancaria   CuentaBancaria?          @relation(fields: [cuentaBancariaId], references: [id])
-}
-
-model Grupo {
-  id          Int                      @id @default(autoincrement())
-  nombre      String
-  deletedAt   DateTime?
-  estructuras EstructuraProgramatica[]
-}
-
-model Partida {
-  id          Int                      @id @default(autoincrement())
-  nombre      String
-  deletedAt   DateTime?
-  estructuras EstructuraProgramatica[]
-}
-
-model CodigoPresupuestario {
-  id             Int    @id @default(autoincrement())
-  codigoCompleto String
-  poas           Poa[]
-}
-
-model Actividad {
-  id                 Int    @id @default(autoincrement())
-  detalleDescripcion String
-  poas               Poa[]
-}
-
-model EstructuraProgramatica {
-  id         Int      @id @default(autoincrement())
-  proyectoId Int
-  grupoId    Int
-  partidaId  Int
-  grupo      Grupo    @relation(fields: [grupoId], references: [id])
-  partida    Partida  @relation(fields: [partidaId], references: [id])
-  proyecto   Proyecto @relation(fields: [proyectoId], references: [id])
-  poas       Poa[]
-
-  @@unique([proyectoId, grupoId, partidaId])
-}
-
-model Poa {
-  id                     Int                    @id @default(autoincrement())
-  codigoPoa              String
-  cantidad               Int
-  costoUnitario          Decimal                @db.Decimal(10, 2)
-  costoTotal             Decimal                @db.Decimal(10, 2)
-  estado                 EstadoPoa              @default(ACTIVO)
-  deletedAt              DateTime?
-  estructuraId           Int
-  codigoPresupuestarioId Int
-  actividadId            Int
-  montoEjecutado         Decimal                @default(0) @db.Decimal(10, 2)
-  createdAt              DateTime               @default(now())
-  updatedAt              DateTime               @default(now())
-  hospedajes             Hospedaje[]
-  actividad              Actividad              @relation(fields: [actividadId], references: [id])
-  codigoPresupuestario   CodigoPresupuestario   @relation(fields: [codigoPresupuestarioId], references: [id])
-  estructura             EstructuraProgramatica @relation(fields: [estructuraId], references: [id])
-  solicitudes            SolicitudPresupuesto[]
-}
-
-model Solicitud {
-  id                      Int                    @id @default(autoincrement())
-  descripcion             String?
-  fechaSolicitud          DateTime               @default(now())
-  motivoViaje             String?
-  lugarViaje              String?
-  fechaInicio             DateTime?
-  fechaFin                DateTime?
-  codigoDesembolso        String?
-  estado                  EstadoSolicitud        @default(PENDIENTE)
-  deletedAt               DateTime?
-  usuarioEmisorId         Int
-  usuarioBeneficiadoId    Int?
-  aprobadorId             Int?
-  codigoSolicitud         String                 @unique
-  observacion             String?
-  montoTotalNeto          Decimal                @default(0) @db.Decimal(10, 2)
-  montoTotalPresupuestado Decimal                @default(0) @db.Decimal(10, 2)
-  urlComprobante          String?
-  urlCotizaciones         String[]               @default([])
-  urlCuadroComparativo    String?
-  banco                   String?                @db.VarChar(100)
-  chequeANombreDe         String?                @db.VarChar(200)
-  fechaDesembolso         DateTime?
-  proyecto                String?                @db.VarChar(200)
-  tipo                    TipoSolicitud          @default(VIAJE)
-  createdAt               DateTime               @default(now())
-  updatedAt               DateTime               @default(now())
-  gastos                  Gasto[]
-  gastosCompra            GastoCompra[]
-  historialAprobaciones   HistorialAprobacion[]  @relation("SolicitudHistorial")
-  hospedajes              Hospedaje[]
-  notificaciones          Notificacion[]
-  personasExternas        PersonaExterna[]
-  planificaciones         Planificacion[]
-  rendicion               Rendicion?
-  aprobador               Usuario?               @relation("AprobadorSolicitud", fields: [aprobadorId], references: [id])
-  usuarioBeneficiado      Usuario?               @relation("Beneficiario", fields: [usuarioBeneficiadoId], references: [id])
-  usuarioEmisor           Usuario                @relation("Emisor", fields: [usuarioEmisorId], references: [id])
-  presupuestos            SolicitudPresupuesto[]
-  viaticos                Viatico[]
-
-  @@index([aprobadorId])
-  @@index([deletedAt])
-  @@index([usuarioEmisorId])
-}
-
-model HistorialAprobacion {
-  id                  Int                 @id @default(autoincrement())
-  comentario          String?
-  solicitudId         Int?
-  derivadoAId         Int?
-  fecha               DateTime            @default(now())
-  rendicionId         Int?
-  usuarioId           Int
-  accion              TipoAccionHistorial
-  cuadroComparativoId Int?
-  cuadroComparativo   CuadroComparativo?  @relation("CuadroHistorial", fields: [cuadroComparativoId], references: [id])
-  derivadoA           Usuario?            @relation("DestinatarioHistorial", fields: [derivadoAId], references: [id])
-  rendicion           Rendicion?          @relation("RendicionHistorial", fields: [rendicionId], references: [id])
-  solicitud           Solicitud?          @relation("SolicitudHistorial", fields: [solicitudId], references: [id])
-  usuario             Usuario             @relation("ActorHistorial", fields: [usuarioId], references: [id])
-
-  @@index([cuadroComparativoId])
-  @@index([rendicionId])
-  @@index([solicitudId])
-  @@index([usuarioId])
-}
-
-model Notificacion {
-  id                  Int                @id @default(autoincrement())
-  mensaje             String
-  usuarioId           Int
-  solicitudId         Int?
-  createdAt           DateTime           @default(now())
-  leida               Boolean            @default(false)
-  tipo                TipoNotificacion   @default(SOLICITUD_ASIGNADA)
-  titulo              String
-  updatedAt           DateTime           @updatedAt
-  urlDestino          String?
-  cuadroComparativoId Int?
-  cuadroComparativo   CuadroComparativo? @relation(fields: [cuadroComparativoId], references: [id])
-  solicitud           Solicitud?         @relation(fields: [solicitudId], references: [id])
-  usuario             Usuario            @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-
-  @@index([usuarioId, leida])
-}
-
-model Rendicion {
-  id                    Int                   @id @default(autoincrement())
-  fechaRendicion        DateTime              @default(now())
-  /// Suma de todos los GastoRendicion
-  montoRespaldado       Decimal               @default(0) @db.Decimal(10, 2)
-  observaciones         String?
-  solicitudId           Int                   @unique
-  estado                EstadoRendicion       @default(PENDIENTE)
-  /// montoDesembolsado - montoRespaldado (positivo = devolver, negativo = falta respaldo)
-  saldoLiquido          Decimal               @default(0) @db.Decimal(10, 2)
-  aprobadorActualId     Int?
-  comprobanteUrl        String                @default("")
-  createdAt             DateTime              @default(now())
-  deletedAt             DateTime?
-  updatedAt             DateTime              @default(now())
-  gastosRendicion       GastoRendicion[]
-  historialAprobaciones HistorialAprobacion[] @relation("RendicionHistorial")
-  informeGastos         InformeGastos?
-  aprobadorActual       Usuario?              @relation("RendicionAprobador", fields: [aprobadorActualId], references: [id])
-  solicitud             Solicitud             @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-
-  @@index([deletedAt])
-}
-
-model InformeGastos {
-  id          Int                @id @default(autoincrement())
-  rendicionId Int                @unique
-  fechaInicio DateTime
-  fechaFin    DateTime
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  actividades ActividadInforme[]
-  rendicion   Rendicion          @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
-}
-
-model ActividadInforme {
-  id                    Int           @id @default(autoincrement())
-  informeId             Int
-  fecha                 DateTime
-  lugar                 String
-  personaInstitucion    String
-  actividadesRealizadas String
-  informe               InformeGastos @relation(fields: [informeId], references: [id], onDelete: Cascade)
-}
-
-model GastoRendicion {
-  id                Int                   @id @default(autoincrement())
-  tipoDocumento     TipoDocumento
-  nroDocumento      String
-  fecha             DateTime
-  detalle           String
-  monto             Decimal               @default(0) @db.Decimal(10, 2)
-  rendicionId       Int
-  concepto          String                @default("")
-  montoBruto        Decimal               @default(0) @db.Decimal(10, 2)
-  montoImpuestos    Decimal               @default(0) @db.Decimal(10, 2)
-  montoNeto         Decimal               @default(0) @db.Decimal(10, 2)
-  partidaId         Int?
-  proveedor         String?
-  tipoRetencion     String?
-  partidaContableId Int?
-  partidaContable   PartidaContable?      @relation(fields: [partidaContableId], references: [id])
-  partida           SolicitudPresupuesto? @relation(fields: [partidaId], references: [id])
-  rendicion         Rendicion             @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
-
-  @@index([partidaContableId])
-  @@index([partidaId])
-  @@index([rendicionId])
-}
-
-model SolicitudPresupuesto {
-  id                    Int              @id @default(autoincrement())
-  subtotalNeto          Decimal          @default(0) @db.Decimal(10, 2)
-  subtotalPresupuestado Decimal          @default(0) @db.Decimal(10, 2)
-  solicitudId           Int
-  poaId                 Int
-  gastos                Gasto[]
-  gastosCompra          GastoCompra[]
-  gastosRendicion       GastoRendicion[]
-  poa                   Poa              @relation(fields: [poaId], references: [id])
-  solicitud             Solicitud        @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-  viaticos              Viatico[]
-
-  @@unique([solicitudId, poaId])
-  @@index([poaId])
-}
-
-model Planificacion {
-  id                            Int       @id @default(autoincrement())
-  actividadProgramada           String
-  cantidadPersonasInstitucional Int       @default(0)
-  cantidadPersonasTerceros      Int       @default(0)
-  fechaInicio                   DateTime
-  fechaFin                      DateTime
-  diasCalculados                Decimal   @db.Decimal(5, 2)
-  solicitudId                   Int
-  solicitud                     Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-  viaticos                      Viatico[] @relation("PlanificacionToViatico")
-}
-
-model Concepto {
-  id                  Int       @id @default(autoincrement())
-  nombre              String    @unique
-  precioInstitucional Decimal   @db.Decimal(10, 2)
-  precioTerceros      Decimal   @db.Decimal(10, 2)
-  viaticos            Viatico[]
-}
-
-model Viatico {
-  id                     Int                  @id @default(autoincrement())
-  tipoDestino            TipoDestino
-  dias                   Decimal              @db.Decimal(5, 2)
-  costoUnitario          Decimal              @db.Decimal(10, 2)
-  iva13                  Decimal              @db.Decimal(10, 2)
-  it3                    Decimal              @db.Decimal(10, 2)
-  solicitudId            Int
-  conceptoId             Int
-  cantidadPersonas       Int                  @default(1)
-  montoNeto              Decimal              @db.Decimal(10, 2)
-  montoPresupuestado     Decimal              @db.Decimal(10, 2)
-  solicitudPresupuestoId Int
-  concepto               Concepto             @relation(fields: [conceptoId], references: [id])
-  solicitud              Solicitud            @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id], onDelete: Cascade)
-  planificaciones        Planificacion[]      @relation("PlanificacionToViatico")
-
-  @@index([solicitudId])
-  @@index([solicitudPresupuestoId])
-}
-
-model TipoGasto {
-  id     Int     @id @default(autoincrement())
-  nombre String
-  codigo String  @unique
-  gastos Gasto[]
-}
-
-model Gasto {
-  id                     Int                  @id @default(autoincrement())
-  tipoDocumento          TipoDocumento
-  cantidad               Int
-  costoUnitario          Decimal              @db.Decimal(10, 2)
-  iva13                  Decimal              @db.Decimal(10, 2)
-  it3                    Decimal              @db.Decimal(10, 2)
-  iue5                   Decimal              @db.Decimal(10, 2)
-  solicitudId            Int
-  tipoGastoId            Int
-  detalle                String?
-  montoNeto              Decimal              @db.Decimal(10, 2)
-  montoPresupuestado     Decimal              @db.Decimal(10, 2)
-  solicitudPresupuestoId Int
-  solicitud              Solicitud            @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id], onDelete: Cascade)
-  tipoGasto              TipoGasto            @relation(fields: [tipoGastoId], references: [id])
-
-  @@index([solicitudId])
-  @@index([solicitudPresupuestoId])
-}
-
-model PersonaExterna {
-  id                     Int       @id @default(autoincrement())
-  nombreCompleto         String
-  procedenciaInstitucion String
-  solicitudId            Int
-  solicitud              Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-}
-
-model GastoCompra {
-  id                     Int                  @id @default(autoincrement())
-  cantidad               Decimal              @db.Decimal(10, 2)
-  descripcion            String               @db.VarChar(500)
-  uso                    String?              @db.VarChar(100)
-  costoUnitario          Decimal              @db.Decimal(10, 2)
-  total                  Decimal              @db.Decimal(10, 2)
-  solicitudId            Int
-  solicitudPresupuestoId Int
-  deletedAt              DateTime?
-  solicitud              Solicitud            @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id], onDelete: Cascade)
-
-  @@index([deletedAt])
-  @@index([solicitudId])
-  @@index([solicitudPresupuestoId])
-}
-
-model CuentaBancaria {
-  id           Int        @id @default(autoincrement())
-  numeroCuenta String     @unique
-  banco        String     @default("BISA S.A.")
-  moneda       String     @default("M/N")
-  proyectos    Proyecto[]
-}
-
-model Hospedaje {
-  id               Int           @id @default(autoincrement())
-  region           String
-  destino          String
-  personas         Int
-  noches           Int
-  cantidadUnitaria Decimal       @db.Decimal(10, 2)
-  costoTotal       Decimal       @db.Decimal(10, 2)
-  iva              Decimal       @db.Decimal(10, 2)
-  it               Decimal       @db.Decimal(10, 2)
-  solicitudId      Int
-  poaId            Int
-  tipoDocumento    TipoDocumento @default(RECIBO)
-  poa              Poa           @relation(fields: [poaId], references: [id])
-  solicitud        Solicitud     @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
-
-  @@index([poaId])
-  @@index([solicitudId])
-}
-
-model Cotizacion {
-  id                 Int                @id @default(autoincrement())
-  codigoCotizacion   String             @unique
-  fecha              DateTime           @default(now())
-  proveedorNombre    String
-  proveedorTelefono  String?
-  proveedorDireccion String?
-  proveedorCorreo    String?
-  garantia           String?
-  disponibilidad     String?
-  duracionCotizacion String?
-  emiteFactura       Boolean            @default(false)
-  observaciones      String?
-  total              Decimal            @default(0) @db.Decimal(10, 2)
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  deletedAt          DateTime?
-  usuarioEmisorId    Int
-  adjuntoUrl         String?
-  tipo               TipoCotizacion     @default(PROPIA)
-  usuarioEmisor      Usuario            @relation("CotizacionesEmitidas", fields: [usuarioEmisorId], references: [id])
-  cuadroCotizaciones CuadroCotizacion[]
-  lineas             LineaCotizacion[]
-
-  @@index([deletedAt])
-  @@index([usuarioEmisorId])
-}
-
-model LineaCotizacion {
-  id             Int        @id @default(autoincrement())
-  cantidad       Decimal    @db.Decimal(10, 2)
-  unidad         String?
-  detalle        String
-  precioUnitario Decimal    @db.Decimal(10, 2)
-  total          Decimal    @db.Decimal(10, 2)
-  cotizacionId   Int
-  cotizacion     Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
-}
-
-model CuadroComparativo {
-  id                      Int                     @id @default(autoincrement())
-  codigoCuadro            String                  @unique
-  lugarFecha              String?
-  observaciones           String?
-  estado                  EstadoCuadroComparativo @default(BORRADOR)
-  totalRecomendado        Decimal?                @db.Decimal(12, 2)
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
-  deletedAt               DateTime?
-  usuarioEmisorId         Int
-  cotizacionRecomendadaId Int?
-  motivoObservacion       String?
-  cotizacionRecomendada   CuadroCotizacion?       @relation("CuadroRecomendada", fields: [cotizacionRecomendadaId], references: [id])
-  usuarioEmisor           Usuario                 @relation("CuadrosEmitidos", fields: [usuarioEmisorId], references: [id])
-  cotizaciones            CuadroCotizacion[]      @relation("CuadroCotizaciones")
-  items                   CuadroItem[]
-  historialAprobaciones   HistorialAprobacion[]   @relation("CuadroHistorial")
-  notificaciones          Notificacion[]
-  ordenesCompra           OrdenCompra[]
-
-  @@index([deletedAt])
-  @@index([usuarioEmisorId])
-}
-
-model CuadroCotizacion {
-  id              Int                 @id @default(autoincrement())
-  orden           Int
-  proveedorNombre String
-  total           Decimal             @default(0) @db.Decimal(12, 2)
-  cuadroId        Int
-  cotizacionId    Int
-  recomendadaEn   CuadroComparativo[] @relation("CuadroRecomendada")
-  cotizacion      Cotizacion          @relation(fields: [cotizacionId], references: [id])
-  cuadro          CuadroComparativo   @relation("CuadroCotizaciones", fields: [cuadroId], references: [id], onDelete: Cascade)
-  itemsGanados    CuadroItem[]        @relation("ItemGanadora")
-  precios         CuadroPrecio[]
-}
-
-model CuadroItem {
-  id                   Int               @id @default(autoincrement())
-  orden                Int
-  descripcion          String
-  cantidad             Decimal           @db.Decimal(10, 2)
-  unidad               String?
-  cuadroId             Int
-  cotizacionGanadoraId Int?
-  cotizacionGanadora   CuadroCotizacion? @relation("ItemGanadora", fields: [cotizacionGanadoraId], references: [id])
-  cuadro               CuadroComparativo @relation(fields: [cuadroId], references: [id], onDelete: Cascade)
-  precios              CuadroPrecio[]
-  ordenCompraItems     OrdenCompraItem[]
-}
-
-model CuadroPrecio {
-  id                 Int              @id @default(autoincrement())
-  precioUnitario     Decimal?         @db.Decimal(12, 2)
-  total              Decimal?         @db.Decimal(12, 2)
-  noMenciona         Boolean          @default(false)
-  cuadroItemId       Int
-  cuadroCotizacionId Int
-  cuadroCotizacion   CuadroCotizacion @relation(fields: [cuadroCotizacionId], references: [id], onDelete: Cascade)
-  cuadroItem         CuadroItem       @relation(fields: [cuadroItemId], references: [id], onDelete: Cascade)
-
-  @@unique([cuadroItemId, cuadroCotizacionId])
-}
-
-model OrdenCompra {
-  id                  Int                @id @default(autoincrement())
-  codigoOrden         String             @unique
-  fecha               DateTime           @default(now())
-  proveedorNombre     String
-  proveedorDireccion  String?
-  proveedorTelefono   String?
-  lugarEntrega        String?
-  formaPago           String             @default("Transferencia bancaria")
-  garantia            String             @default("N/A")
-  observaciones       String?
-  total               Decimal            @default(0) @db.Decimal(12, 2)
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  deletedAt           DateTime?
-  cuadroComparativoId Int?
-  usuarioEmisorId     Int
-  cuadroComparativo   CuadroComparativo? @relation(fields: [cuadroComparativoId], references: [id])
-  usuarioEmisor       Usuario            @relation("OrdenesEmitidas", fields: [usuarioEmisorId], references: [id])
-  items               OrdenCompraItem[]
-
-  @@index([cuadroComparativoId])
-  @@index([deletedAt])
-  @@index([usuarioEmisorId])
-}
-
-model OrdenCompraItem {
-  id             Int         @id @default(autoincrement())
-  orden          Int
-  item           String
-  cantidad       Decimal     @db.Decimal(10, 2)
-  unidad         String?
-  detalle        String?
-  precioUnitario Decimal     @default(0) @db.Decimal(10, 2)
-  total          Decimal     @default(0) @db.Decimal(12, 2)
-  sinCuadro      Boolean     @default(false)
-  cuadroItemId   Int?
-  ordenCompraId  Int
-  cuadroItem     CuadroItem? @relation(fields: [cuadroItemId], references: [id])
-  ordenCompra    OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
-}
-
-model PartidaContable {
-  id              Int               @id @default(autoincrement())
-  codigo          String            @unique
-  nombre          String
-  descripcion     String?
-  nivel           Int               @default(0)
-  tipo            String?
-  monetaria       String?
-  auxiliar        String?
-  parentId        Int?
-  parent          PartidaContable?  @relation("PartidaHierarchy", fields: [parentId], references: [id])
-  children        PartidaContable[] @relation("PartidaHierarchy")
-  deletedAt       DateTime?
-
-  gastosRendicion GastoRendicion[]
-}
+// --- ENUMS ---
 
 enum Rol {
   ADMIN
-  TESORERO
-  USUARIO
   EJECUTIVO
   CONTADOR
+  TESORERO
+  USUARIO
   VALIDADOR_COMPRAS
 }
 
@@ -640,17 +81,667 @@ enum TipoNotificacion {
   CUADRO_APROBADO
 }
 
+// --- MODELOS ---
+
+model Usuario {
+  id             Int       @id @default(autoincrement())
+  email          String    @unique
+  password       String
+  nombreCompleto String
+  rol            Rol       @default(USUARIO)
+  cargo          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  solicitudesEmitidas     Solicitud[]           @relation("Emisor")
+  solicitudesPorAprobar   Solicitud[]           @relation("AprobadorSolicitud")
+  solicitudesBeneficiadas Solicitud[]           @relation("Beneficiario")
+  historialesCreados      HistorialAprobacion[] @relation("ActorHistorial")
+  historialesRecibidos    HistorialAprobacion[] @relation("DestinatarioHistorial")
+  rendicionesPorAprobar   Rendicion[]           @relation("RendicionAprobador")
+  notificaciones          Notificacion[]
+  cotizacionesEmitidas    Cotizacion[]          @relation("CotizacionesEmitidas")
+  cuadrosEmitidos         CuadroComparativo[]   @relation("CuadrosEmitidos")
+  ordenesEmitidas         OrdenCompra[]         @relation("OrdenesEmitidas")
+}
+
+model Proyecto {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  deletedAt DateTime?
+
+  cuentaBancariaId Int?
+  cuentaBancaria   CuentaBancaria? @relation(fields: [cuentaBancariaId], references: [id])
+
+  estructuras EstructuraProgramatica[]
+}
+
+model Grupo {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  deletedAt DateTime?
+
+  estructuras EstructuraProgramatica[]
+}
+
+model Partida {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  deletedAt DateTime?
+
+  estructuras EstructuraProgramatica[]
+}
+
+model PartidaContable {
+  id          Int               @id @default(autoincrement())
+  codigo      String            @unique
+  nombre      String
+  descripcion String?
+  nivel       Int               @default(0)
+  tipo        String?
+  monetaria   String?
+  auxiliar    String?
+  parentId    Int?
+  parent      PartidaContable?  @relation("PartidaHierarchy", fields: [parentId], references: [id])
+  children    PartidaContable[] @relation("PartidaHierarchy")
+  deletedAt   DateTime?
+
+  gastosRendicion GastoRendicion[]
+}
+
+model CodigoPresupuestario {
+  id             Int    @id @default(autoincrement())
+  codigoCompleto String
+
+  poas Poa[]
+}
+
+model Actividad {
+  id                 Int    @id @default(autoincrement())
+  detalleDescripcion String
+
+  poas Poa[]
+}
+
+model EstructuraProgramatica {
+  id         Int      @id @default(autoincrement())
+  proyectoId Int
+  proyecto   Proyecto @relation(fields: [proyectoId], references: [id])
+  grupoId    Int
+  grupo      Grupo    @relation(fields: [grupoId], references: [id])
+  partidaId  Int
+  partida    Partida  @relation(fields: [partidaId], references: [id])
+
+  poas Poa[]
+
+  @@unique([proyectoId, grupoId, partidaId])
+}
+
+model Poa {
+  id             Int       @id @default(autoincrement())
+  codigoPoa      String
+  cantidad       Int
+  costoUnitario  Decimal   @db.Decimal(10, 2)
+  costoTotal     Decimal   @db.Decimal(10, 2)
+  montoEjecutado Decimal   @default(0) @db.Decimal(10, 2)
+  estado         EstadoPoa @default(ACTIVO)
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  estructuraId Int
+  estructura   EstructuraProgramatica @relation(fields: [estructuraId], references: [id])
+
+  codigoPresupuestarioId Int
+  codigoPresupuestario   CodigoPresupuestario @relation(fields: [codigoPresupuestarioId], references: [id])
+
+  actividadId Int
+  actividad   Actividad @relation(fields: [actividadId], references: [id])
+
+  solicitudes SolicitudPresupuesto[]
+  hospedajes  Hospedaje[]
+}
+
+model Solicitud {
+  id                      Int             @id @default(autoincrement())
+  codigoSolicitud         String          @unique
+  descripcion             String?
+  fechaSolicitud          DateTime        @default(now())
+  motivoViaje             String?
+  lugarViaje              String?
+  fechaInicio             DateTime?
+  fechaFin                DateTime?
+  codigoDesembolso        String?
+  urlComprobante          String?
+  urlCuadroComparativo    String?
+  urlCotizaciones         String[]        @default([])
+  montoTotalNeto          Decimal         @default(0) @db.Decimal(10, 2)
+  montoTotalPresupuestado Decimal         @default(0) @db.Decimal(10, 2)
+  estado                  EstadoSolicitud @default(PENDIENTE)
+  observacion             String?
+  tipo                    TipoSolicitud   @default(VIAJE)
+  proyecto                String?         @db.VarChar(200)
+  chequeANombreDe         String?         @db.VarChar(200)
+  banco                   String?         @db.VarChar(100)
+  fechaDesembolso         DateTime?
+  deletedAt               DateTime?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("Emisor", fields: [usuarioEmisorId], references: [id])
+
+  aprobadorId Int?
+  aprobador   Usuario? @relation("AprobadorSolicitud", fields: [aprobadorId], references: [id])
+
+  usuarioBeneficiadoId Int?
+  usuarioBeneficiado   Usuario? @relation("Beneficiario", fields: [usuarioBeneficiadoId], references: [id])
+
+  presupuestos SolicitudPresupuesto[]
+
+  planificaciones Planificacion[]
+
+
+  historialAprobaciones HistorialAprobacion[] @relation("SolicitudHistorial")
+  notificaciones        Notificacion[]
+  rendicion             Rendicion?
+  viaticos              Viatico[]
+  gastos                Gasto[]
+  gastosCompra          GastoCompra[]
+  personasExternas      PersonaExterna[]
+  hospedajes            Hospedaje[]
+
+  @@index([usuarioEmisorId])
+  @@index([aprobadorId])
+  @@index([deletedAt])
+}
+
+model HistorialAprobacion {
+  id         Int                 @id @default(autoincrement())
+  accion     TipoAccionHistorial
+  comentario String?
+  fecha      DateTime            @default(now())
+
+  usuarioId Int
+  usuario   Usuario @relation("ActorHistorial", fields: [usuarioId], references: [id])
+
+  derivadoAId Int?
+  derivadoA   Usuario? @relation("DestinatarioHistorial", fields: [derivadoAId], references: [id])
+
+  solicitudId Int?
+  solicitud   Solicitud? @relation("SolicitudHistorial", fields: [solicitudId], references: [id])
+
+  rendicionId Int?
+  rendicion   Rendicion? @relation("RendicionHistorial", fields: [rendicionId], references: [id])
+
+  cuadroComparativoId Int?
+  cuadroComparativo   CuadroComparativo? @relation("CuadroHistorial", fields: [cuadroComparativoId], references: [id])
+
+  @@index([solicitudId])
+  @@index([rendicionId])
+  @@index([cuadroComparativoId])
+  @@index([usuarioId])
+}
+
+model Notificacion {
+  id         Int              @id @default(autoincrement())
+  titulo     String
+  mensaje    String
+  tipo       TipoNotificacion @default(SOLICITUD_ASIGNADA)
+  leida      Boolean          @default(false)
+  urlDestino String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  solicitudId Int?
+  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id], onDelete: SetNull)
+
+  cuadroComparativoId Int?
+  cuadroComparativo   CuadroComparativo? @relation(fields: [cuadroComparativoId], references: [id], onDelete: SetNull)
+
+  @@index([usuarioId, leida])
+}
+
+model Rendicion {
+  id                Int             @id @default(autoincrement())
+  fechaRendicion    DateTime        @default(now())
+  /// Suma de todos los GastoRendicion + DeclaracionJurada
+  montoRespaldado   Decimal         @default(0) @db.Decimal(10, 2)
+  /// montoDesembolsado - montoRespaldado (positivo = devolver, negativo = falta respaldo)
+  saldoLiquido      Decimal         @default(0) @db.Decimal(10, 2)
+  estado            EstadoRendicion @default(PENDIENTE)
+  aprobadorActualId Int?
+  observaciones     String?
+  deletedAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  solicitudId Int       @unique
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  aprobadorActual Usuario? @relation("RendicionAprobador", fields: [aprobadorActualId], references: [id])
+
+  informeGastos         InformeGastos?
+  gastosRendicion       GastoRendicion[]
+  declaracionesJuradas  DeclaracionJurada[]
+  historialAprobaciones HistorialAprobacion[] @relation("RendicionHistorial")
+
+  @@index([deletedAt])
+}
+
+model InformeGastos {
+  id          Int       @id @default(autoincrement())
+  rendicionId Int       @unique
+  rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
+  fechaInicio DateTime
+  fechaFin    DateTime
+
+  actividades ActividadInforme[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ActividadInforme {
+  id                    Int           @id @default(autoincrement())
+  informeId             Int
+  informe               InformeGastos @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  fecha                 DateTime
+  lugar                 String
+  personaInstitucion    String
+  actividadesRealizadas String
+}
+
+model GastoRendicion {
+  id             Int           @id @default(autoincrement())
+  tipoDocumento  TipoDocumento
+  tipoRetencion  String?
+  nroDocumento   String
+  fecha          DateTime
+  concepto       String        @default("")
+  detalle        String
+  proveedor      String?
+  urlComprobante String        @default("")
+  monto          Decimal       @default(0) @db.Decimal(10, 2)
+  montoBruto     Decimal       @default(0) @db.Decimal(10, 2)
+  montoImpuestos Decimal       @default(0) @db.Decimal(10, 2)
+  montoNeto      Decimal       @default(0) @db.Decimal(10, 2)
+
+  rendicionId Int
+  rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
+
+  partidaId Int?
+  partida   SolicitudPresupuesto? @relation(fields: [partidaId], references: [id], onDelete: SetNull)
+
+  partidaContableId Int?
+  partidaContable   PartidaContable? @relation(fields: [partidaContableId], references: [id], onDelete: SetNull)
+
+  @@index([rendicionId])
+  @@index([partidaId])
+  @@index([partidaContableId])
+}
+
+model DeclaracionJurada {
+  id      Int      @id @default(autoincrement())
+  fecha   DateTime
+  detalle String
+  monto   Decimal  @db.Decimal(10, 2)
+
+  rendicionId Int
+  rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
+
+  @@index([rendicionId])
+}
+
+model SolicitudPresupuesto {
+  id                    Int     @id @default(autoincrement())
+  subtotalNeto          Decimal @default(0) @db.Decimal(10, 2)
+  subtotalPresupuestado Decimal @default(0) @db.Decimal(10, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  poaId Int
+  poa   Poa @relation(fields: [poaId], references: [id])
+
+  viaticos        Viatico[]
+  gastos          Gasto[]
+  gastosCompra    GastoCompra[]
+  gastosRendicion GastoRendicion[]
+
+  @@unique([solicitudId, poaId])
+  @@index([poaId])
+}
+
+model Planificacion {
+  id                            Int      @id @default(autoincrement())
+  actividadProgramada           String
+  cantidadPersonasInstitucional Int      @default(0)
+  cantidadPersonasTerceros      Int      @default(0)
+  fechaInicio                   DateTime
+  fechaFin                      DateTime
+  diasCalculados                Decimal  @db.Decimal(5, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  viaticos    Viatico[]
+}
+
+model Concepto {
+  id                  Int       @id @default(autoincrement())
+  nombre              String    @unique
+  precioInstitucional Decimal   @db.Decimal(10, 2)
+  precioTerceros      Decimal   @db.Decimal(10, 2)
+  viaticos            Viatico[]
+}
+
+model Viatico {
+  id                 Int         @id @default(autoincrement())
+  tipoDestino        TipoDestino
+  dias               Decimal     @db.Decimal(5, 2)
+  cantidadPersonas   Int         @default(1)
+  costoUnitario      Decimal     @db.Decimal(10, 2)
+  montoPresupuestado Decimal     @db.Decimal(10, 2)
+  iva13              Decimal     @db.Decimal(10, 2)
+  it3                Decimal     @db.Decimal(10, 2)
+  montoNeto          Decimal     @db.Decimal(10, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  solicitudPresupuestoId Int
+  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id], onDelete: Cascade)
+
+  planificaciones Planificacion[]
+
+  conceptoId Int
+  concepto   Concepto @relation(fields: [conceptoId], references: [id])
+
+  @@index([solicitudId])
+  @@index([solicitudPresupuestoId])
+}
+
+model TipoGasto {
+  id     Int     @id @default(autoincrement())
+  nombre String
+  codigo String  @unique
+  gastos Gasto[]
+}
+
+model Gasto {
+  id                 Int           @id @default(autoincrement())
+  tipoDocumento      TipoDocumento
+  cantidad           Int
+  costoUnitario      Decimal       @db.Decimal(10, 2)
+  montoPresupuestado Decimal       @db.Decimal(10, 2)
+  iva13              Decimal       @db.Decimal(10, 2)
+  it3                Decimal       @db.Decimal(10, 2)
+  iue5               Decimal       @db.Decimal(10, 2)
+  montoNeto          Decimal       @db.Decimal(10, 2)
+  detalle            String?
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  solicitudPresupuestoId Int
+  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id], onDelete: Cascade)
+
+  tipoGastoId Int
+  tipoGasto   TipoGasto @relation(fields: [tipoGastoId], references: [id])
+
+  @@index([solicitudId])
+  @@index([solicitudPresupuestoId])
+}
+
+model PersonaExterna {
+  id                     Int       @id @default(autoincrement())
+  nombreCompleto         String
+  procedenciaInstitucion String
+  solicitudId            Int
+  solicitud              Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+}
+
+model GastoCompra {
+  id            Int     @id @default(autoincrement())
+  cantidad      Decimal @db.Decimal(10, 2)
+  descripcion   String  @db.VarChar(500)
+  uso           String? @db.VarChar(100)
+  costoUnitario Decimal @db.Decimal(10, 2)
+  total         Decimal @db.Decimal(10, 2)
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  solicitudPresupuestoId Int
+  solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime?
+
+  @@index([solicitudId])
+  @@index([solicitudPresupuestoId])
+  @@index([deletedAt])
+}
+
+
+model CuentaBancaria {
+  id           Int    @id @default(autoincrement())
+  numeroCuenta String @unique
+  banco        String @default("BISA S.A.")
+  moneda       String @default("M/N")
+
+  proyectos Proyecto[]
+}
+
+generator erd {
+  provider = "prisma-erd-generator"
+  output   = "../ERD.md"
+}
+
+model Hospedaje {
+  id               Int           @id @default(autoincrement())
+  region           String // "Eje troncal", "Ciudades Intermedias", "Bolivia Norte", "Pueblos"
+  destino          String // Ej: "La Paz", "Sucre", "Rurrenabaque"
+  tipoDocumento    TipoDocumento @default(RECIBO)
+  personas         Int
+  noches           Int
+  cantidadUnitaria Decimal       @db.Decimal(10, 2)
+  costoTotal       Decimal       @db.Decimal(10, 2) // personas * noches * cantidadUnitaria
+  iva              Decimal       @db.Decimal(10, 2) // 13% del costoTotal
+  it               Decimal       @db.Decimal(10, 2) // 3% del costoTotal
+
+  solicitudId Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  poaId Int
+  poa   Poa @relation(fields: [poaId], references: [id])
+
+  @@index([solicitudId])
+  @@index([poaId])
+}
+
+// --- COMPRAS Y SERVICIOS ---
+
+model Cotizacion {
+  id                 Int            @id @default(autoincrement())
+  codigoCotizacion   String         @unique
+  fecha              DateTime       @default(now())
+  tipo               TipoCotizacion @default(PROPIA)
+  proveedorNombre    String
+  proveedorTelefono  String?
+  proveedorDireccion String?
+  proveedorCorreo    String?
+  garantia           String?
+  disponibilidad     String?
+  duracionCotizacion String?
+  emiteFactura       Boolean        @default(false)
+  observaciones      String?
+  adjuntoUrl         String?
+  total              Decimal        @default(0) @db.Decimal(10, 2)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  deletedAt          DateTime?
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("CotizacionesEmitidas", fields: [usuarioEmisorId], references: [id])
+
+  lineas             LineaCotizacion[]
+  cuadroCotizaciones CuadroCotizacion[]
+
+  @@index([usuarioEmisorId])
+  @@index([deletedAt])
+}
+
 enum TipoCotizacion {
   PROPIA
   EXTERNA
 }
 
+model LineaCotizacion {
+  id             Int     @id @default(autoincrement())
+  cantidad       Decimal @db.Decimal(10, 2)
+  unidad         String?
+  detalle        String
+  precioUnitario Decimal @db.Decimal(10, 2)
+  total          Decimal @db.Decimal(10, 2)
+
+  cotizacionId Int
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+}
+
 enum EstadoCuadroComparativo {
   BORRADOR
-  EN_VALIDACION
-  OBSERVADO
   EN_REVISION
-  APROBADO
+  EN_VALIDACION
   REVISADO
   EN_APROBACION
+  OBSERVADO
+  APROBADO
+}
+
+model CuadroComparativo {
+  id                Int                     @id @default(autoincrement())
+  codigoCuadro      String                  @unique
+  lugarFecha        String?
+  observaciones     String?
+  estado            EstadoCuadroComparativo @default(BORRADOR)
+  totalRecomendado  Decimal?                @db.Decimal(12, 2)
+  motivoObservacion String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  deletedAt         DateTime?
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("CuadrosEmitidos", fields: [usuarioEmisorId], references: [id])
+
+  cotizacionRecomendadaId Int?
+  cotizacionRecomendada   CuadroCotizacion? @relation("CuadroRecomendada", fields: [cotizacionRecomendadaId], references: [id])
+
+  cotizaciones          CuadroCotizacion[]    @relation("CuadroCotizaciones")
+  items                 CuadroItem[]
+  historialAprobaciones HistorialAprobacion[] @relation("CuadroHistorial")
+  notificaciones        Notificacion[]
+  ordenesCompra         OrdenCompra[]
+
+  @@index([usuarioEmisorId])
+  @@index([deletedAt])
+}
+
+model CuadroCotizacion {
+  id              Int     @id @default(autoincrement())
+  orden           Int
+  proveedorNombre String
+  total           Decimal @default(0) @db.Decimal(12, 2)
+
+  cuadroId Int
+  cuadro   CuadroComparativo @relation("CuadroCotizaciones", fields: [cuadroId], references: [id], onDelete: Cascade)
+
+  cotizacionId Int
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id])
+
+  precios       CuadroPrecio[]
+  itemsGanados  CuadroItem[]        @relation("ItemGanadora")
+  recomendadaEn CuadroComparativo[] @relation("CuadroRecomendada")
+}
+
+model CuadroItem {
+  id          Int     @id @default(autoincrement())
+  orden       Int
+  descripcion String
+  cantidad    Decimal @db.Decimal(10, 2)
+  unidad      String?
+
+  cuadroId Int
+  cuadro   CuadroComparativo @relation(fields: [cuadroId], references: [id], onDelete: Cascade)
+
+  cotizacionGanadoraId Int?
+  cotizacionGanadora   CuadroCotizacion? @relation("ItemGanadora", fields: [cotizacionGanadoraId], references: [id])
+
+  precios          CuadroPrecio[]
+  ordenCompraItems OrdenCompraItem[]
+}
+
+model CuadroPrecio {
+  id             Int      @id @default(autoincrement())
+  precioUnitario Decimal? @db.Decimal(12, 2)
+  total          Decimal? @db.Decimal(12, 2)
+  noMenciona     Boolean  @default(false)
+
+  cuadroItemId Int
+  cuadroItem   CuadroItem @relation(fields: [cuadroItemId], references: [id], onDelete: Cascade)
+
+  cuadroCotizacionId Int
+  cuadroCotizacion   CuadroCotizacion @relation(fields: [cuadroCotizacionId], references: [id], onDelete: Cascade)
+
+  @@unique([cuadroItemId, cuadroCotizacionId])
+}
+
+model OrdenCompra {
+  id                 Int       @id @default(autoincrement())
+  codigoOrden        String    @unique
+  fecha              DateTime  @default(now())
+  proveedorNombre    String
+  proveedorDireccion String?
+  proveedorTelefono  String?
+  lugarEntrega       String?
+  formaPago          String    @default("Transferencia bancaria")
+  garantia           String    @default("N/A")
+  observaciones      String?
+  total              Decimal   @default(0) @db.Decimal(12, 2)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  deletedAt          DateTime?
+
+  cuadroComparativoId Int?
+  cuadroComparativo   CuadroComparativo? @relation(fields: [cuadroComparativoId], references: [id])
+
+  usuarioEmisorId Int
+  usuarioEmisor   Usuario @relation("OrdenesEmitidas", fields: [usuarioEmisorId], references: [id])
+
+  items OrdenCompraItem[]
+
+  @@index([cuadroComparativoId])
+  @@index([usuarioEmisorId])
+  @@index([deletedAt])
+}
+
+model OrdenCompraItem {
+  id             Int     @id @default(autoincrement())
+  orden          Int
+  item           String
+  cantidad       Decimal @db.Decimal(10, 2)
+  unidad         String?
+  detalle        String?
+  precioUnitario Decimal @default(0) @db.Decimal(10, 2)
+  total          Decimal @default(0) @db.Decimal(12, 2)
+  sinCuadro      Boolean @default(false)
+
+  cuadroItemId Int?
+  cuadroItem   CuadroItem? @relation(fields: [cuadroItemId], references: [id])
+
+  ordenCompraId Int
+  ordenCompra   OrdenCompra @relation(fields: [ordenCompraId], references: [id], onDelete: Cascade)
 }

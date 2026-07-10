@@ -3,7 +3,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class PartidasContablesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) {}
+
+  async findAll() {
+    return this.prisma.partidaContable.findMany({
+      where: { deletedAt: null },
+      orderBy: { codigo: 'asc' },
+    });
+  }
 
   async search(q: string) {
     return this.prisma.partidaContable.findMany({

@@ -218,21 +218,6 @@ export class CreateNominaDto {
   @IsString()
   @IsNotEmpty()
   procedenciaInstitucion: string;
-
-  @ApiProperty({ example: 0, required: false })
-  @IsNumber()
-  @IsOptional()
-  montoNeto?: number;
-
-  @ApiProperty({ example: 0, required: false })
-  @IsNumber()
-  @IsOptional()
-  montoPresupuestado?: number;
-
-  @ApiProperty({ example: 0, required: false })
-  @IsNumber()
-  @IsOptional()
-  monto?: number;
 }
 
 export class CreateGastoCompraDto {

@@ -229,7 +229,7 @@ export class SolicitudesService {
       const costoTotal = new Prisma.Decimal(hDto.costoTotal);
       const { iva, it, montoPresupuestado } = calcularMontosHospedaje(
         costoTotal,
-        tipoDocumento,
+        tipoDocumento === 'FACTURA' ? 'FACTURA' : 'RECIBO',
       );
 
       montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
