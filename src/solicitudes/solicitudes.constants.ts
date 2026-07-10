@@ -54,9 +54,9 @@ export const SOLICITUD_INCLUDE = {
       },
     },
   },
+  gastosCompra: true,
   planificaciones: true,
   hospedajes: true,
-  nominasTerceros: true,
   personasExternas: true,
   rendicion: {
     select: {

@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { EstadoPoa, EstadoSolicitud, Prisma } from '@prisma/client';
+import { EstadoPoa, Prisma } from '@prisma/client';
+import { ESTADOS_COMPROMISO_ACTIVO } from '../common/constants/financial.constants';
 import { CreatePoaDto } from './dto/create-poa.dto';
 import { UpdatePoaDto } from './dto/update-poa.dto';
 import { PoaPaginationDto } from './dto/poa-pagination.dto';
@@ -29,13 +30,6 @@ type PoaWithSaldo<T> = T & {
   montoComprometido: number;
   tieneCompromisos: boolean;
 };
-
-const ESTADOS_COMPROMISO_ACTIVO: EstadoSolicitud[] = [
-  // En este dominio no existe EstadoSolicitud.APROBADO explícito.
-  // PENDIENTE representa solicitudes aprobables/en curso antes del desembolso.
-  EstadoSolicitud.PENDIENTE,
-  EstadoSolicitud.DESEMBOLSADO,
-];
 
 @Injectable()
 export class PoaService {

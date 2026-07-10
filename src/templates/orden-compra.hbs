@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orden de Compra/Servicio {{codigoOrden}}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @page {
+        size: A4 portrait;
+        margin: 12mm;
+      }
+
+      body {
+        font-family: Georgia, 'Times New Roman', serif;
+      }
+
+      table.oc {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      table.oc th,
+      table.oc td {
+        border: 1px solid #1f3a5f;
+        padding: 3px 6px;
+      }
+
+      .hd {
+        background: #cdddf0;
+        font-weight: 700;
+        text-align: center;
+      }
+
+      .sc-badge {
+        background: #fff2a8;
+        color: #92400e;
+        font-size: 7px;
+        font-style: italic;
+        padding: 0 3px;
+        border-radius: 2px;
+      }
+
+      .leader {
+        flex: 1 1 auto;
+        border-bottom: 1px dotted #334155;
+        padding-left: 4px;
+        min-height: 1rem;
+      }
+
+      .info-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 9px;
+      }
+
+      .info-table td {
+        padding: 2px 5px;
+        border: 1px solid #1f3a5f;
+      }
+
+      .info-label {
+        background: #cdddf0;
+        font-weight: 700;
+        white-space: nowrap;
+        width: 1%;
+      }
+    </style>
+  </head>
+  <body class="bg-white text-[9px] text-slate-900">
+    <div class="mb-1 text-right text-[12px] font-bold">ANEXO 12</div>
+
+    <header class="mb-3 flex items-center gap-4">
+      <div class="w-28 shrink-0">
+        {{#if logoBase64}}
+          <img
+            src="data:image/png;base64,{{logoBase64}}"
+            alt="Conservación Amazónica"
+            class="h-12 w-auto object-contain"
+          />
+        {{/if}}
+      </div>
+      <div class="flex-1 text-center">
+        <h1 class="text-[14px] font-bold uppercase tracking-wide">
+          Orden de Compra / Servicio
+        </h1>
+        <p class="text-[10px] font-bold text-slate-700">ACEAA</p>
+        <p class="text-[9px] text-slate-600">(Expresado en Bolivianos)</p>
+      </div>
+      <div class="w-28 shrink-0 text-right text-[8px] text-slate-500">
+        <p class="font-bold">{{codigoOrden}}</p>
+        {{#if cuadroCodigo}}
+          <p class="text-slate-400">Ref: {{cuadroCodigo}}</p>
+        {{/if}}
+      </div>
+    </header>
+
+    <table class="info-table mb-3">
+      <tr>
+        <td class="info-label">Fecha</td>
+        <td colspan="3">{{fecha}}</td>
+        <td class="info-label">T/C</td>
+        <td>1 USD = Bs {{tc}}</td>
+      </tr>
+      <tr>
+        <td class="info-label">Proveedor / Empresa</td>
+        <td colspan="5">{{proveedorNombre}}</td>
+      </tr>
+      <tr>
+        <td class="info-label">Dirección</td>
+        <td colspan="2">{{proveedorDireccion}}</td>
+        <td class="info-label">Teléfono</td>
+        <td colspan="2">{{proveedorTelefono}}</td>
+      </tr>
+      <tr>
+        <td class="info-label">Factura a nombre de</td>
+        <td colspan="2">ACEAA</td>
+        <td class="info-label">NIT</td>
+        <td colspan="2">{{nit}}</td>
+      </tr>
+    </table>
+
+    <table class="oc text-[9px]">
+      <thead>
+        <tr>
+          <th class="hd" style="width: 4%">N°</th>
+          <th class="hd" style="width: 28%">ARTÍCULO / SERVICIO</th>
+          <th class="hd" style="width: 8%">CANTIDAD</th>
+          <th class="hd" style="width: 8%">UNIDAD</th>
+          <th class="hd">DETALLE</th>
+          <th class="hd" style="width: 13%">PRECIO UNIT. (Bs)</th>
+          <th class="hd" style="width: 13%">TOTAL (Bs)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each items}}
+          <tr>
+            <td class="text-center">{{orden}}</td>
+            <td>
+              {{item}}
+              {{#if sinCuadro}}
+                <span class="sc-badge">sin cuadro</span>
+              {{/if}}
+            </td>
+            <td class="text-center">{{cantidad}}</td>
+            <td class="text-center">{{unidad}}</td>
+            <td>{{detalle}}</td>
+            <td class="text-right">{{precioUnitario}}</td>
+            <td class="text-right">{{total}}</td>
+          </tr>
+        {{/each}}
+        <tr>
+          <td class="hd text-right" colspan="6">TOTAL</td>
+          <td class="text-right font-bold" style="background:#d8efd8">{{total}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <table class="info-table mt-3">
+      <tr>
+        <td class="info-label">Son</td>
+        <td class="italic">{{totalLetras}}</td>
+      </tr>
+      <tr>
+        <td class="info-label">Lugar de entrega / prestación</td>
+        <td>{{lugarEntrega}}</td>
+      </tr>
+      <tr>
+        <td class="info-label">Forma de pago</td>
+        <td>{{formaPago}}</td>
+      </tr>
+      <tr>
+        <td class="info-label">Garantía</td>
+        <td>{{garantia}}</td>
+      </tr>
+      {{#if observaciones}}
+        <tr>
+          <td class="info-label">Observaciones</td>
+          <td class="whitespace-pre-line">{{observaciones}}</td>
+        </tr>
+      {{/if}}
+    </table>
+
+    <section class="mt-10 grid grid-cols-3 gap-6 text-center text-[9px]">
+      <div>
+        <div class="mx-auto mb-1 h-px w-40 bg-slate-500"></div>
+        <p class="font-bold">ELABORADO POR</p>
+        <p>{{preparadoPor}}</p>
+      </div>
+      <div>
+        <div class="mx-auto mb-1 h-px w-40 bg-slate-500"></div>
+        <p class="font-bold">{{cargoDirectorFinanciero}}</p>
+        <p>{{directorFinanciero}}</p>
+      </div>
+      <div>
+        <div class="mx-auto mb-1 h-px w-40 bg-slate-500"></div>
+        <p class="font-bold">{{cargoDirectorEjecutivo}}</p>
+        <p>{{directorEjecutivo}}</p>
+      </div>
+    </section>
+
+    <div class="mt-10 border border-slate-600 p-3 text-[9px]">
+      <p class="mb-3 font-bold uppercase">Conformidad de Recepción</p>
+      <div class="grid grid-cols-2 gap-8">
+        <div>
+          <div class="flex items-baseline gap-2 mb-2">
+            <span class="font-bold shrink-0">Fecha de recepción:</span>
+            <span class="leader"></span>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="font-bold shrink-0">Observaciones:</span>
+            <span class="leader"></span>
+          </div>
+        </div>
+        <div class="text-center">
+          <div class="mx-auto mb-1 mt-6 h-px w-40 bg-slate-500"></div>
+          <p class="font-bold">FIRMA Y SELLO DE RECEPCIÓN</p>
+          <p class="text-slate-500">Nombre y cargo</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

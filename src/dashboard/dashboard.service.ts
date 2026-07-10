@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { EstadoRendicion, EstadoSolicitud, Prisma, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ESTADOS_COMPROMISO_ACTIVO } from '../common/constants/financial.constants';
 
 type DashboardMovimiento = {
   id: number;
@@ -42,13 +43,6 @@ type DashboardAdvancedAnalyticsResponse = {
 const ESTADOS_SOLICITUDES_ACTIVAS: EstadoSolicitud[] = [
   EstadoSolicitud.PENDIENTE,
   EstadoSolicitud.OBSERVADO,
-];
-
-const ESTADOS_COMPROMISO_ACTIVO: EstadoSolicitud[] = [
-  // En este dominio no existe EstadoSolicitud.APROBADO explícito.
-  // PENDIENTE representa solicitudes activas en espera de flujo administrativo.
-  EstadoSolicitud.PENDIENTE,
-  EstadoSolicitud.DESEMBOLSADO,
 ];
 
 const ESTADOS_ANALITICA_SOLICITUD: EstadoSolicitud[] = [

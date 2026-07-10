@@ -2,6 +2,8 @@ import { PrismaClient, Rol, EstadoPoa } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
+import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -37,6 +39,58 @@ function parseCSVLine(line: string): string[] {
   }
   result.push(current.trim());
   return result.map((v) => v.replace(/^"|"$/g, '')); // Quitar comillas exteriores
+}
+
+// --- PartidaContable seed types & helpers ---
+
+interface PartidaContableNode {
+  codigo: string;
+  descripcion: string;
+  monetaria?: string | null;
+  auxiliar?: string | null;
+  subgrupos?: PartidaContableNode[];
+  cuentas?: PartidaContableNode[];
+  subcuentas?: PartidaContableNode[];
+  detalles?: PartidaContableNode[];
+}
+
+interface FlatPartida {
+  codigo: string;
+  nombre: string;
+  nivel: number;
+  parentCodigo: string | null;
+  monetaria: string | null;
+  auxiliar: string | null;
+}
+
+function flattenPartidaContable(
+  node: PartidaContableNode,
+  nivel: number,
+  parentCodigo: string | null,
+  result: FlatPartida[],
+): void {
+  result.push({
+    codigo: node.codigo,
+    nombre: node.descripcion,
+    nivel,
+    parentCodigo,
+    monetaria: node.monetaria ?? null,
+    auxiliar: node.auxiliar ?? null,
+  });
+
+  for (const key of [
+    'subgrupos',
+    'cuentas',
+    'subcuentas',
+    'detalles',
+  ] as const) {
+    const children = node[key];
+    if (children) {
+      for (const child of children) {
+        flattenPartidaContable(child, nivel + 1, node.codigo, result);
+      }
+    }
+  }
 }
 
 /**
@@ -80,8 +134,12 @@ async function processCSV(
 
 async function main() {
   const STICKY_PLACEHOLDER = 'SIN_CLASIFICAR_REQUIERE_REVISION';
-  const passwordHash =
-    '$2a$12$wbhVNc2q5wLlKnryn3F8SOjhR2YYregnGlRB.R2VmhNNhnrhMpYBe';
+
+  // Contraseñas del seed: distintas por usuario. Cada usuario nuevo recibe una
+  // contraseña aleatoria que se imprime UNA sola vez al final. Para fijar una
+  // contraseña conocida en desarrollo, exporta SEED_PASSWORD antes de sembrar.
+  const seedPasswordOverride = process.env.SEED_PASSWORD;
+  const credencialesGeneradas: { email: string; password: string }[] = [];
 
   // Mapas para cach en memoria (Cach Agresivo)
   const proyectoMap = new Map<string, number>();
@@ -99,17 +157,29 @@ async function main() {
     const [nombre, email, cargo, rolStr] = row;
     const rol = (Rol[rolStr as keyof typeof Rol] || Rol.USUARIO) as Rol;
 
-    await prisma.usuario.upsert({
-      where: { email },
-      update: { nombreCompleto: nombre, cargo, rol },
-      create: {
-        email,
-        nombreCompleto: nombre,
-        cargo,
-        rol,
-        password: passwordHash,
-      },
-    });
+    const existente = await prisma.usuario.findUnique({ where: { email } });
+
+    if (existente) {
+      // No se reescribe la contraseña de usuarios ya existentes.
+      await prisma.usuario.update({
+        where: { email },
+        data: { nombreCompleto: nombre, cargo, rol },
+      });
+    } else {
+      const plainPassword =
+        seedPasswordOverride ?? crypto.randomBytes(9).toString('base64url');
+      const passwordHash = await bcrypt.hash(plainPassword, 12);
+      await prisma.usuario.create({
+        data: {
+          email,
+          nombreCompleto: nombre,
+          cargo,
+          rol,
+          password: passwordHash,
+        },
+      });
+      credencialesGeneradas.push({ email, password: plainPassword });
+    }
     userCount++;
   });
 
@@ -166,12 +236,25 @@ async function main() {
   async function getOrCreate(
     map: Map<string, number>,
     name: string | undefined,
-    model: { create: (args: { data: any }) => Promise<{ id: number }> },
+    model: {
+      findFirst: (args: {
+        where: Record<string, any>;
+      }) => Promise<{ id: number } | null>;
+      create: (args: { data: any }) => Promise<{ id: number }>;
+    },
     field: string,
   ): Promise<number> {
     const val = (name || STICKY_PLACEHOLDER).trim();
     const cachedId = map.get(val);
     if (cachedId !== undefined) return cachedId;
+
+    const existing = await model.findFirst({
+      where: { [field]: val },
+    });
+    if (existing) {
+      map.set(val, existing.id);
+      return existing.id;
+    }
 
     const record = await model.create({
       data: { [field]: val },
@@ -182,6 +265,11 @@ async function main() {
   }
 
   // 4. Inserción del POA (Fuente única de Verdad)
+  // Limpiar POA y EstructuraProgramatica existentes para idempotencia total
+  await prisma.poa.deleteMany({});
+  await prisma.estructuraProgramatica.deleteMany({});
+  // También limpiar los maps de estructura ya que se regenerarán
+  estructuraMap.clear();
   console.log('📄 Procesando POA.csv (Estructura Dinámica)...');
   let poaCount = 0;
   await processCSV('POA.csv', async (row) => {
@@ -292,12 +380,78 @@ async function main() {
     }
   }
 
+  const partidaContableCount = await seedPartidasContables();
+
   console.log(`✅ Seeding completado.`);
   console.log(`--- Resumen ---`);
   console.log(`Cuentas Bancarias: ${cuentaCount}`);
   console.log(`Usuarios: ${userCount}`);
   console.log(`Estructuras: ${estructuraMap.size}`);
   console.log(`Filas POA: ${poaCount}`);
+  console.log(`Partidas Contables: ${partidaContableCount}`);
+
+  if (credencialesGeneradas.length > 0) {
+    console.log(
+      '\n--- Credenciales generadas (guardalas; no se vuelven a mostrar) ---',
+    );
+    if (seedPasswordOverride) {
+      console.log('(Se uso SEED_PASSWORD para todos los usuarios nuevos)');
+    }
+    for (const cred of credencialesGeneradas) {
+      console.log(`${cred.email} -> ${cred.password}`);
+    }
+  }
+}
+
+async function seedPartidasContables(): Promise<number> {
+  const filePath = path.join(__dirname, 'seeds', 'plan-de-cuentas.json');
+  if (!fs.existsSync(filePath)) {
+    console.log(
+      '⚠️  Archivo plan-de-cuentas.json no encontrado, saltando seed de PartidaContable',
+    );
+    return 0;
+  }
+
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  const root = JSON.parse(raw) as PartidaContableNode;
+
+  const flatList: FlatPartida[] = [];
+  flattenPartidaContable(root, 0, null, flatList);
+  flatList.sort((a, b) => a.nivel - b.nivel);
+
+  const codigoToId = new Map<string, number>();
+  let count = 0;
+
+  for (const item of flatList) {
+    const parentId = item.parentCodigo
+      ? (codigoToId.get(item.parentCodigo) ?? null)
+      : null;
+
+    const record = await prisma.partidaContable.upsert({
+      where: { codigo: item.codigo },
+      update: {
+        nombre: item.nombre,
+        nivel: item.nivel,
+        monetaria: item.monetaria,
+        auxiliar: item.auxiliar,
+        parentId,
+      },
+      create: {
+        codigo: item.codigo,
+        nombre: item.nombre,
+        nivel: item.nivel,
+        monetaria: item.monetaria,
+        auxiliar: item.auxiliar,
+        parentId,
+      },
+    });
+
+    codigoToId.set(item.codigo, record.id);
+    count++;
+  }
+
+  console.log(`✅ Partidas Contables sembradas: ${count}`);
+  return count;
 }
 
 main()

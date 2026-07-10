@@ -29,6 +29,8 @@ import { CreateRendicionDto } from './dto/create-rendicion.dto';
 import { UpdateRendicionDto } from './dto/update-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
+import { UpdateGastoPartidaContableDto } from './dto/update-gasto-partida-contable.dto';
+import { UpdateGastoPartidaPresupuestariaDto } from './dto/update-gasto-partida-presupuestaria.dto';
 import { RendicionesService } from './rendiciones.service';
 
 interface RequestWithUser extends Request {
@@ -63,7 +65,10 @@ export class RendicionesController {
     status: 200,
     description: 'Listado de rendiciones obtenido correctamente',
   })
-  findAll(@Query('solicitudId') solicitudId?: string) {
+  findAll(
+    @Req() req: RequestWithUser,
+    @Query('solicitudId') solicitudId?: string,
+  ) {
     const solicitudIdNumber =
       solicitudId && solicitudId.trim() !== ''
         ? Number(solicitudId)
@@ -75,7 +80,10 @@ export class RendicionesController {
       );
     }
 
-    return this.rendicionesService.findAll(solicitudIdNumber);
+    return this.rendicionesService.findAll(solicitudIdNumber, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
   }
 
   @Get('mis-rendiciones')
@@ -100,8 +108,14 @@ export class RendicionesController {
     status: 404,
     description: 'No se encontró rendición para la solicitud indicada',
   })
-  findBySolicitudId(@Param('solicitudId', ParseIntPipe) solicitudId: number) {
-    return this.rendicionesService.findBySolicitudId(solicitudId);
+  findBySolicitudId(
+    @Param('solicitudId', ParseIntPipe) solicitudId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.rendicionesService.findBySolicitudId(solicitudId, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
   }
 
   @Get(':id')
@@ -114,8 +128,11 @@ export class RendicionesController {
     status: 404,
     description: 'No se encontró la rendición indicada',
   })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.rendicionesService.findOne(id);
+  findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
+    return this.rendicionesService.findOne(id, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
   }
 
   @Get(':id/pdf')
@@ -134,9 +151,13 @@ export class RendicionesController {
   })
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.rendicionesService.generatePdf(id);
+    const buffer = await this.rendicionesService.generatePdf(id, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
 
     res.set({
       'Content-Type': 'application/pdf',
@@ -225,6 +246,56 @@ export class RendicionesController {
       observarRendicionDto,
       req.user!.userId,
       req.user!.rol,
+    );
+  }
+
+  @Patch('gastos/:gastoId/partida-contable')
+  @ApiOperation({
+    summary:
+      'Vincular o desvincular una partida contable a un gasto de rendición',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Partida contable vinculada correctamente',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Gasto o partida contable no encontrado',
+  })
+  updatePartidaContable(
+    @Param('gastoId', ParseIntPipe) gastoId: number,
+    @Body() dto: UpdateGastoPartidaContableDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.rendicionesService.updatePartidaContable(
+      gastoId,
+      dto,
+      req.user!.userId,
+    );
+  }
+
+  @Patch('gastos/:gastoId/partida-presupuestaria')
+  @ApiOperation({
+    summary:
+      'Vincular o desvincular una partida presupuestaria (SolicitudPresupuesto) a un gasto de rendición',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Partida presupuestaria vinculada correctamente',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Gasto o partida presupuestaria no encontrado',
+  })
+  updatePartidaPresupuestaria(
+    @Param('gastoId', ParseIntPipe) gastoId: number,
+    @Body() dto: UpdateGastoPartidaPresupuestariaDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.rendicionesService.updatePartidaPresupuestaria(
+      gastoId,
+      dto,
+      req.user!.userId,
     );
   }
 }

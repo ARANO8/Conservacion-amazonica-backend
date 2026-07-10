@@ -1,10 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   IsInt,
   IsNumber,
   IsString,
   IsOptional,
   IsDateString,
+  IsPositive,
   Min,
   IsEnum,
   IsArray,
@@ -12,7 +13,7 @@ import {
   IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { TipoDestino, TipoDocumento } from '@prisma/client';
+import { TipoDestino, TipoDocumento, TipoSolicitud } from '@prisma/client';
 
 export class CreatePlanificacionDto {
   @ApiProperty({ example: 'Reunión con comunarios' })
@@ -217,21 +218,40 @@ export class CreateNominaDto {
   @IsString()
   @IsNotEmpty()
   procedenciaInstitucion: string;
+}
 
-  @ApiProperty({ example: 0, required: false })
+export class CreateGastoCompraDto {
+  @ApiProperty({ example: 2, description: 'Cantidad de unidades' })
   @IsNumber()
-  @IsOptional()
-  montoNeto?: number;
+  @IsPositive()
+  cantidad: number;
 
-  @ApiProperty({ example: 0, required: false })
-  @IsNumber()
-  @IsOptional()
-  montoPresupuestado?: number;
+  @ApiProperty({ example: 'Alquiler de salón para taller' })
+  @IsString()
+  @IsNotEmpty()
+  descripcion: string;
 
-  @ApiProperty({ example: 0, required: false })
-  @IsNumber()
+  @ApiPropertyOptional({
+    example: 'Campo',
+    description: 'Uso: Oficina / Campo (informativo)',
+  })
   @IsOptional()
-  monto?: number;
+  @IsString()
+  uso?: string;
+
+  @ApiProperty({
+    example: 2000,
+    minimum: 0,
+    description: 'Costo unitario en Bolivianos',
+  })
+  @IsNumber()
+  @Min(0)
+  costoUnitario: number;
+
+  @ApiProperty({ example: 1, description: 'ID de la línea POA asociada' })
+  @IsInt()
+  @Min(1)
+  poaId: number;
 }
 
 export class CreateSolicitudDto {
@@ -247,16 +267,48 @@ export class CreateSolicitudDto {
   @IsInt()
   aprobadorId: number;
 
-  @ApiProperty({ example: 'Trinidad', description: 'Lugar del viaje' })
-  @IsString()
-  lugarViaje: string;
-
-  @ApiProperty({
-    example: 'Supervisión de campo',
-    description: 'Motivo del viaje',
+  @ApiPropertyOptional({
+    enum: TipoSolicitud,
+    default: TipoSolicitud.VIAJE,
+    description:
+      'VIAJE = solicitud de viáticos | COMPRA_SERVICIO = solicitud de compras/servicios',
   })
+  @IsOptional()
+  @IsEnum(TipoSolicitud)
+  tipo?: TipoSolicitud;
+
+  @ApiPropertyOptional({
+    example: 'Rainforest Trust',
+    description: 'Nombre del proyecto (solo COMPRA_SERVICIO)',
+  })
+  @IsOptional()
   @IsString()
-  motivoViaje: string;
+  proyecto?: string;
+
+  @ApiPropertyOptional({
+    example: 'Giovanni Altuzarra',
+    description: 'Nombre en el cheque (solo COMPRA_SERVICIO)',
+  })
+  @IsOptional()
+  @IsString()
+  chequeANombreDe?: string;
+
+  @ApiPropertyOptional({
+    example: 'Trinidad',
+    description: 'Lugar del viaje (solo VIAJE)',
+  })
+  @IsOptional()
+  @IsString()
+  lugarViaje?: string;
+
+  @ApiPropertyOptional({
+    example: 'Supervisión de campo',
+    description:
+      'Motivo del viaje (VIAJE) o motivo de la solicitud (COMPRA_SERVICIO)',
+  })
+  @IsOptional()
+  @IsString()
+  motivoViaje?: string;
 
   @ApiProperty({
     example: 'Solicitud para la misión de febrero',
@@ -321,4 +373,14 @@ export class CreateSolicitudDto {
   @ValidateNested({ each: true })
   @Type(() => CreateHospedajeDto)
   hospedajes: CreateHospedajeDto[];
+
+  @ApiPropertyOptional({
+    type: [CreateGastoCompraDto],
+    description: 'Ítems de gasto (solo COMPRA_SERVICIO)',
+  })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => CreateGastoCompraDto)
+  gastosCompra?: CreateGastoCompraDto[];
 }

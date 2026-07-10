@@ -22,6 +22,7 @@ import {
   Solicitud,
   Prisma,
   TipoAccionHistorial,
+  TipoSolicitud,
 } from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
@@ -32,6 +33,7 @@ import {
   validarLimitesViatico,
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
+import { ESTADOS_COMPROMISO_ACTIVO } from '../common/constants/financial.constants';
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PdfService } from '../pdf/pdf.service';
@@ -54,6 +56,13 @@ type DetalleSolicitud = {
     >;
     poaId: number;
   }[];
+  gastosCompraData: {
+    data: Omit<
+      Prisma.GastoCompraUncheckedCreateInput,
+      'solicitudId' | 'solicitudPresupuestoId'
+    >;
+    poaId: number;
+  }[];
   planificaciones: CreatePlanificacionDto[];
   nominasTerceros: CreateNominaDto[];
   hospedajes: CreateHospedajeDto[];
@@ -62,13 +71,6 @@ type DetalleSolicitud = {
 type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
 }>;
-
-const ESTADOS_COMPROMISO_ACTIVO: EstadoSolicitud[] = [
-  // En este dominio no existe EstadoSolicitud.APROBADO explícito.
-  // PENDIENTE representa solicitudes activas previas al desembolso.
-  EstadoSolicitud.PENDIENTE,
-  EstadoSolicitud.DESEMBOLSADO,
-];
 
 @Injectable()
 export class SolicitudesService {
@@ -105,6 +107,7 @@ export class SolicitudesService {
       planificaciones = [],
       viaticos = [],
       gastos = [],
+      gastosCompra = [],
       nominasTerceros = [],
       hospedajes = [],
     } = dto;
@@ -226,7 +229,7 @@ export class SolicitudesService {
       const costoTotal = new Prisma.Decimal(hDto.costoTotal);
       const { iva, it, montoPresupuestado } = calcularMontosHospedaje(
         costoTotal,
-        tipoDocumento,
+        tipoDocumento === 'FACTURA' ? 'FACTURA' : 'RECIBO',
       );
 
       montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
@@ -295,11 +298,35 @@ export class SolicitudesService {
       });
     }
 
+    // --- Procesar GastosCompra ---
+    const gastosCompraData: DetalleSolicitud['gastosCompraData'] = [];
+
+    for (const gcDto of gastosCompra) {
+      const cantidad = new Prisma.Decimal(gcDto.cantidad);
+      const costoUnitario = new Prisma.Decimal(gcDto.costoUnitario);
+      const total = cantidad.mul(costoUnitario);
+
+      montoTotalPresupuestado = montoTotalPresupuestado.add(total);
+      montoTotalNeto = montoTotalNeto.add(total);
+
+      gastosCompraData.push({
+        poaId: gcDto.poaId,
+        data: {
+          cantidad,
+          descripcion: gcDto.descripcion.trim(),
+          uso: gcDto.uso?.trim() || null,
+          costoUnitario,
+          total,
+        },
+      });
+    }
+
     return {
       montoTotalPresupuestado,
       montoTotalNeto,
       viaticosData,
       gastosData,
+      gastosCompraData,
       planificaciones,
       nominasTerceros,
       hospedajes: hospedajesData,
@@ -398,7 +425,25 @@ export class SolicitudesService {
       this.logger.log(`[insertarRelaciones] Gasto ${idx} creado OK`);
     }
 
-    // F. Crear PersonaExterna (viene de nominasTerceros)
+    // F. Crear GastosCompra (COMPRA_SERVICIO)
+    for (let idx = 0; idx < detalles.gastosCompraData.length; idx++) {
+      const gcRecord = detalles.gastosCompraData[idx];
+      const spId = presupuestosMap.get(gcRecord.poaId);
+      if (!spId) {
+        throw new BadRequestException(
+          `GastoCompra referencia la partida POA ${gcRecord.poaId} que no está incluida en poaIds`,
+        );
+      }
+      await tx.gastoCompra.create({
+        data: {
+          ...gcRecord.data,
+          solicitudId,
+          solicitudPresupuestoId: spId,
+        },
+      });
+    }
+
+    // G. Crear PersonaExterna (viene de nominasTerceros)
     for (const n of detalles.nominasTerceros) {
       this.logger.log(
         `[insertarRelaciones] Creando PersonaExterna: ${n.nombreCompleto}`,
@@ -423,6 +468,9 @@ export class SolicitudesService {
       aprobadorId,
       lugarViaje,
       motivoViaje,
+      proyecto,
+      chequeANombreDe,
+      tipo,
       urlCuadroComparativo,
       urlCotizaciones,
     } = createSolicitudDto;
@@ -512,6 +560,13 @@ export class SolicitudesService {
         );
       }
     }
+    for (const gc of detalles.gastosCompraData) {
+      if (!poaIdSet.has(gc.poaId)) {
+        throw new BadRequestException(
+          `El gasto de compra referencia la partida POA ${gc.poaId} que no está incluida en poaIds`,
+        );
+      }
+    }
 
     // Calcular monto solicitado por POA (viáticos + gastos + hospedajes)
     const montosByPoa = new Map<number, Prisma.Decimal>();
@@ -535,6 +590,10 @@ export class SolicitudesService {
         .add(new Prisma.Decimal(h.iva))
         .add(new Prisma.Decimal(h.it));
       montosByPoa.set(h.poaId, prev.add(hospPresupuestado));
+    }
+    for (const gc of detalles.gastosCompraData) {
+      const prev = montosByPoa.get(gc.poaId) ?? new Prisma.Decimal(0);
+      montosByPoa.set(gc.poaId, prev.add(gc.data.total as Prisma.Decimal));
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -581,11 +640,14 @@ export class SolicitudesService {
       const solicitud = await tx.solicitud.create({
         data: {
           codigoSolicitud,
+          tipo: tipo ?? TipoSolicitud.VIAJE,
           descripcion,
+          proyecto: proyecto?.trim() || null,
+          chequeANombreDe: chequeANombreDe?.trim() || null,
           montoTotalPresupuestado: detalles.montoTotalPresupuestado,
           montoTotalNeto: detalles.montoTotalNeto,
-          lugarViaje,
-          motivoViaje,
+          lugarViaje: lugarViaje ?? null,
+          motivoViaje: motivoViaje ?? null,
           urlCuadroComparativo,
           urlCotizaciones: urlCotizaciones ?? [],
           fechaInicio: minDate,
@@ -696,7 +758,7 @@ export class SolicitudesService {
     return Promise.all(solicitudes.map((s) => this.enriquecerConSaldos(s)));
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, usuario?: { id: number; rol: Rol }) {
     const solicitud = await this.prisma.solicitud.findFirst({
       where: { id, deletedAt: null },
       include: {
@@ -709,11 +771,40 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
+    this.assertPuedeVerSolicitud(solicitud, usuario);
+
     return this.enriquecerConSaldos(solicitud);
   }
 
-  async generatePdf(id: number): Promise<Buffer> {
-    const solicitud = await this.findOne(id);
+  /**
+   * Verifica que el usuario pueda acceder a la solicitud. Refleja la misma
+   * visibilidad que findAll: los roles privilegiados ven todo; un USUARIO solo
+   * puede ver las solicitudes que emitió o en las que es el aprobador asignado.
+   * Si no se provee usuario (contexto interno de confianza) no se valida.
+   */
+  private assertPuedeVerSolicitud(
+    solicitud: { usuarioEmisorId: number; aprobadorId: number | null },
+    usuario?: { id: number; rol: Rol },
+  ): void {
+    if (!usuario || usuario.rol !== Rol.USUARIO) {
+      return;
+    }
+
+    const esEmisor = solicitud.usuarioEmisorId === usuario.id;
+    const esAprobador = solicitud.aprobadorId === usuario.id;
+
+    if (!esEmisor && !esAprobador) {
+      throw new ForbiddenException(
+        'No tienes permiso para acceder a esta solicitud',
+      );
+    }
+  }
+
+  async generatePdf(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<Buffer> {
+    const solicitud = await this.findOne(id, usuario);
     const cuentaBancaria =
       solicitud.presupuestos?.[0]?.poa?.estructura?.proyecto?.cuentaBancaria;
 
@@ -881,6 +972,9 @@ export class SolicitudesService {
       gastos,
       hospedajes,
       nominasTerceros,
+      gastosCompra,
+      proyecto,
+      chequeANombreDe,
     } = updateSolicitudDto;
 
     // VALIDACIÓN 2: Mandatory Approver on Subsanación
@@ -913,7 +1007,8 @@ export class SolicitudesService {
       viaticos !== undefined ||
       gastos !== undefined ||
       hospedajes !== undefined ||
-      nominasTerceros !== undefined;
+      nominasTerceros !== undefined ||
+      gastosCompra !== undefined;
 
     const solicitudActualizada = await this.prisma.$transaction(async (tx) => {
       let finalMontoTotalPresupuestado = solicitud.montoTotalPresupuestado;
@@ -940,6 +1035,7 @@ export class SolicitudesService {
           gastos: gastos ?? [],
           hospedajes: hospedajes ?? [],
           nominasTerceros: nominasTerceros ?? [],
+          gastosCompra: gastosCompra ?? [],
         };
 
         // B. Recalcular y re-insertar
@@ -975,8 +1071,8 @@ export class SolicitudesService {
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
+        await tx.gastoCompra.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
-        await tx.nominaTerceros.deleteMany({ where: { solicitudId: id } });
         await tx.planificacion.deleteMany({ where: { solicitudId: id } });
         await tx.solicitudPresupuesto.deleteMany({
           where: { solicitudId: id },
@@ -1034,6 +1130,9 @@ export class SolicitudesService {
           lugarViaje,
           motivoViaje,
           descripcion,
+          proyecto: proyecto !== undefined ? proyecto : undefined,
+          chequeANombreDe:
+            chequeANombreDe !== undefined ? chequeANombreDe : undefined,
           urlCuadroComparativo:
             urlCuadroComparativo !== undefined
               ? urlCuadroComparativo
@@ -1279,6 +1378,10 @@ export class SolicitudesService {
           estado: EstadoSolicitud.DESEMBOLSADO,
           codigoDesembolso: desembolsarDto.codigoDesembolso,
           urlComprobante: desembolsarDto.urlComprobante ?? null,
+          banco: desembolsarDto.banco?.trim() || null,
+          fechaDesembolso: desembolsarDto.fechaDesembolso
+            ? new Date(desembolsarDto.fechaDesembolso)
+            : null,
           aprobadorId: null, // Finalizado
         },
         include: SOLICITUD_INCLUDE,
