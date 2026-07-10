@@ -265,7 +265,9 @@ async function main() {
   }
 
   // 4. Inserción del POA (Fuente única de Verdad)
-  // Limpiar POA y EstructuraProgramatica existentes para idempotencia total
+  // Limpiar tablas que referencian POA + POA + EstructuraProgramatica para idempotencia total
+  await prisma.solicitudPresupuesto.deleteMany({});
+  await prisma.hospedaje.deleteMany({});
   await prisma.poa.deleteMany({});
   await prisma.estructuraProgramatica.deleteMany({});
   // También limpiar los maps de estructura ya que se regenerarán
