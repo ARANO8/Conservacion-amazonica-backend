@@ -660,6 +660,16 @@ export class SolicitudesService {
       });
       this.logger.log(`[create TX] Solicitud creada OK (id=${solicitud.id})`);
 
+      // Registrar evento CREADO en historial
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.CREADO,
+          usuarioId,
+          solicitudId: solicitud.id,
+        },
+      });
+      this.logger.log(`[create TX] Historial CREADO registrado`);
+
       // B. Crear SolicitudPresupuesto (transaccional, save-at-end)
       const presupuestosMap = new Map<number, number>(); // poaId → SolicitudPresupuesto.id
       for (const poaId of poaIds) {
@@ -1149,6 +1159,16 @@ export class SolicitudesService {
         },
         include: SOLICITUD_INCLUDE,
       });
+
+      // Registrar evento CORREGIDO en historial
+      await tx.historialAprobacion.create({
+        data: {
+          accion: TipoAccionHistorial.CORREGIDO,
+          usuarioId,
+          solicitudId: id,
+        },
+      });
+      this.logger.log(`[create TX] Historial CORREGIDO registrado`);
     });
 
     try {
