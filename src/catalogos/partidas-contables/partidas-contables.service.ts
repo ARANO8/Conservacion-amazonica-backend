@@ -9,9 +9,7 @@ export class PartidasContablesService {
     return this.prisma.partidaContable.findMany({
       where: {
         deletedAt: null,
-        ...(q.trim()
-          ? { codigo: { startsWith: q.trim() } }
-          : {}),
+        ...(q.trim() ? { codigo: { startsWith: q.trim() } } : {}),
       },
       select: {
         id: true,
@@ -20,7 +18,7 @@ export class PartidasContablesService {
         nivel: true,
       },
       orderBy: { codigo: 'asc' },
-      take: 10,
+      take: 300,
     });
   }
 }

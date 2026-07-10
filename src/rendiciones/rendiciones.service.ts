@@ -79,6 +79,8 @@ const RENDICION_INCLUDE = {
               estructura: {
                 include: {
                   partida: true,
+                  proyecto: true,
+                  grupo: true,
                 },
               },
             },
@@ -392,6 +394,7 @@ export class RendicionesService {
           estado: EstadoRendicion.PENDIENTE,
           aprobadorActualId: dto.aprobadorActualId,
           observaciones: dto.observaciones,
+          comprobanteUrl: dto.comprobanteUrl,
           montoRespaldado: totalRespaldado,
           saldoLiquido,
           gastosRendicion: {
@@ -403,7 +406,6 @@ export class RendicionesService {
               detalle: gasto.detalle ?? gasto.concepto,
               proveedor: gasto.proveedor,
               partidaId: gasto.partidaId,
-              urlComprobante: gasto.urlComprobante,
               monto: new Prisma.Decimal(gasto.montoBruto),
               montoBruto: new Prisma.Decimal(gasto.montoBruto),
               montoImpuestos: new Prisma.Decimal(gasto.montoImpuestos),
@@ -624,6 +626,7 @@ export class RendicionesService {
           estado: EstadoRendicion.PENDIENTE,
           aprobadorActualId: dto.aprobadorActualId,
           observaciones: dto.observaciones,
+          comprobanteUrl: dto.comprobanteUrl,
           montoRespaldado: totalRespaldado,
           saldoLiquido,
           gastosRendicion: {
@@ -635,7 +638,6 @@ export class RendicionesService {
               detalle: gasto.detalle ?? gasto.concepto,
               proveedor: gasto.proveedor,
               partidaId: gasto.partidaId,
-              urlComprobante: gasto.urlComprobante,
               monto: new Prisma.Decimal(gasto.montoBruto),
               montoBruto: new Prisma.Decimal(gasto.montoBruto),
               montoImpuestos: new Prisma.Decimal(gasto.montoImpuestos),
@@ -921,9 +923,7 @@ export class RendicionesService {
         });
       } catch (error: unknown) {
         const normalizedError =
-          error instanceof Error
-            ? error
-            : new Error(String(error));
+          error instanceof Error ? error : new Error(String(error));
         this.logger.error(
           `[RendicionesService] Error al crear notificación de derivación para rendición ${id}: ${normalizedError.message}`,
           normalizedError.stack,
@@ -1126,9 +1126,7 @@ export class RendicionesService {
       });
 
       if (!partida) {
-        throw new NotFoundException(
-          'Partida presupuestaria no encontrada',
-        );
+        throw new NotFoundException('Partida presupuestaria no encontrada');
       }
 
       await this.prisma.gastoRendicion.update({
@@ -1144,7 +1142,19 @@ export class RendicionesService {
 
     return this.prisma.gastoRendicion.findUnique({
       where: { id: gastoId },
-      include: { partida: { include: { poa: { include: { estructura: { include: { partida: true, proyecto: true, grupo: true } } } } } } },
+      include: {
+        partida: {
+          include: {
+            poa: {
+              include: {
+                estructura: {
+                  include: { partida: true, proyecto: true, grupo: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
   }
 

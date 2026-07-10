@@ -236,12 +236,25 @@ async function main() {
   async function getOrCreate(
     map: Map<string, number>,
     name: string | undefined,
-    model: { create: (args: { data: any }) => Promise<{ id: number }> },
+    model: {
+      findFirst: (args: {
+        where: Record<string, any>;
+      }) => Promise<{ id: number } | null>;
+      create: (args: { data: any }) => Promise<{ id: number }>;
+    },
     field: string,
   ): Promise<number> {
     const val = (name || STICKY_PLACEHOLDER).trim();
     const cachedId = map.get(val);
     if (cachedId !== undefined) return cachedId;
+
+    const existing = await model.findFirst({
+      where: { [field]: val },
+    });
+    if (existing) {
+      map.set(val, existing.id);
+      return existing.id;
+    }
 
     const record = await model.create({
       data: { [field]: val },
@@ -252,6 +265,11 @@ async function main() {
   }
 
   // 4. Inserción del POA (Fuente única de Verdad)
+  // Limpiar POA y EstructuraProgramatica existentes para idempotencia total
+  await prisma.poa.deleteMany({});
+  await prisma.estructuraProgramatica.deleteMany({});
+  // También limpiar los maps de estructura ya que se regenerarán
+  estructuraMap.clear();
   console.log('📄 Procesando POA.csv (Estructura Dinámica)...');
   let poaCount = 0;
   await processCSV('POA.csv', async (row) => {

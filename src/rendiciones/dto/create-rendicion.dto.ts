@@ -125,21 +125,13 @@ export class CreateGastoRendicionDto {
 
   @ApiProperty({
     example: 15,
-    description: 'ID de la partida presupuestaria seleccionada',
+    description:
+      'ID del registro SolicitudPresupuesto (presupuestos[].id de la solicitud), no confundir con Partida.id del catálogo',
   })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   partidaId: number;
-
-  @ApiPropertyOptional({
-    example: 'https://drive.google.com/file/d/abc/view',
-    description: 'URL del comprobante digital',
-  })
-  @IsOptional()
-  @IsUrl()
-  @IsNotEmpty()
-  urlComprobante?: string;
 
   @ApiPropertyOptional({ enum: TipoRetencionDto, example: 'SERVICIO' })
   @IsOptional()
@@ -235,6 +227,15 @@ export class CreateRendicionDto {
   @ValidateNested()
   @Type(() => CreateInformeGastosDto)
   informeGastos?: CreateInformeGastosDto;
+
+  @ApiProperty({
+    example: 'https://drive.google.com/drive/folders/abc123',
+    description:
+      'URL obligatoria con los comprobantes digitales adjuntos de toda la rendición',
+  })
+  @IsUrl()
+  @IsNotEmpty()
+  comprobanteUrl: string;
 
   @ApiPropertyOptional({
     example: 'Observaciones adicionales del responsable de la rendición',
