@@ -41,6 +41,58 @@ function parseCSVLine(line: string): string[] {
   return result.map((v) => v.replace(/^"|"$/g, '')); // Quitar comillas exteriores
 }
 
+// --- PartidaContable seed types & helpers ---
+
+interface PartidaContableNode {
+  codigo: string;
+  descripcion: string;
+  monetaria?: string | null;
+  auxiliar?: string | null;
+  subgrupos?: PartidaContableNode[];
+  cuentas?: PartidaContableNode[];
+  subcuentas?: PartidaContableNode[];
+  detalles?: PartidaContableNode[];
+}
+
+interface FlatPartida {
+  codigo: string;
+  nombre: string;
+  nivel: number;
+  parentCodigo: string | null;
+  monetaria: string | null;
+  auxiliar: string | null;
+}
+
+function flattenPartidaContable(
+  node: PartidaContableNode,
+  nivel: number,
+  parentCodigo: string | null,
+  result: FlatPartida[],
+): void {
+  result.push({
+    codigo: node.codigo,
+    nombre: node.descripcion,
+    nivel,
+    parentCodigo,
+    monetaria: node.monetaria ?? null,
+    auxiliar: node.auxiliar ?? null,
+  });
+
+  for (const key of [
+    'subgrupos',
+    'cuentas',
+    'subcuentas',
+    'detalles',
+  ] as const) {
+    const children = node[key];
+    if (children) {
+      for (const child of children) {
+        flattenPartidaContable(child, nivel + 1, node.codigo, result);
+      }
+    }
+  }
+}
+
 /**
  * Mapa de codificación por archivo CSV
  * POA.csv utiliza Latin-1 (ISO-8859-1) porque proviene de fuente externa
@@ -184,12 +236,25 @@ async function main() {
   async function getOrCreate(
     map: Map<string, number>,
     name: string | undefined,
-    model: { create: (args: { data: any }) => Promise<{ id: number }> },
+    model: {
+      findFirst: (args: {
+        where: Record<string, any>;
+      }) => Promise<{ id: number } | null>;
+      create: (args: { data: any }) => Promise<{ id: number }>;
+    },
     field: string,
   ): Promise<number> {
     const val = (name || STICKY_PLACEHOLDER).trim();
     const cachedId = map.get(val);
     if (cachedId !== undefined) return cachedId;
+
+    const existing = await model.findFirst({
+      where: { [field]: val },
+    });
+    if (existing) {
+      map.set(val, existing.id);
+      return existing.id;
+    }
 
     const record = await model.create({
       data: { [field]: val },
@@ -200,6 +265,11 @@ async function main() {
   }
 
   // 4. Inserción del POA (Fuente única de Verdad)
+  // Limpiar POA y EstructuraProgramatica existentes para idempotencia total
+  await prisma.poa.deleteMany({});
+  await prisma.estructuraProgramatica.deleteMany({});
+  // También limpiar los maps de estructura ya que se regenerarán
+  estructuraMap.clear();
   console.log('📄 Procesando POA.csv (Estructura Dinámica)...');
   let poaCount = 0;
   await processCSV('POA.csv', async (row) => {
@@ -310,28 +380,7 @@ async function main() {
     }
   }
 
-  console.log('Seeding Partidas Contables mock...');
-  const partidasContablesMock = [
-    { codigo: '1101', nombre: 'Caja General' },
-    { codigo: '1102', nombre: 'Banco Unión' },
-    { codigo: '5101', nombre: 'Gastos de Viaje y Representación' },
-    { codigo: '5102', nombre: 'Combustibles y Lubricantes' },
-    { codigo: '5103', nombre: 'Material de Escritorio' },
-    { codigo: '5104', nombre: 'Alquileres' },
-    { codigo: '5105', nombre: 'Servicios Básicos' },
-    { codigo: '5106', nombre: 'Consultorías y Servicios de Terceros' },
-    { codigo: '5107', nombre: 'Alimentación y Hospedaje' },
-    { codigo: '5108', nombre: 'Peajes y Transporte' },
-  ];
-
-  for (const pc of partidasContablesMock) {
-    await prisma.partidaContable.upsert({
-      where: { codigo: pc.codigo },
-      update: { nombre: pc.nombre },
-      create: { codigo: pc.codigo, nombre: pc.nombre },
-    });
-  }
-  console.log(`Partidas Contables cargadas: ${partidasContablesMock.length}`);
+  const partidaContableCount = await seedPartidasContables();
 
   console.log(`✅ Seeding completado.`);
   console.log(`--- Resumen ---`);
@@ -339,6 +388,7 @@ async function main() {
   console.log(`Usuarios: ${userCount}`);
   console.log(`Estructuras: ${estructuraMap.size}`);
   console.log(`Filas POA: ${poaCount}`);
+  console.log(`Partidas Contables: ${partidaContableCount}`);
 
   if (credencialesGeneradas.length > 0) {
     console.log(
@@ -351,6 +401,57 @@ async function main() {
       console.log(`${cred.email} -> ${cred.password}`);
     }
   }
+}
+
+async function seedPartidasContables(): Promise<number> {
+  const filePath = path.join(__dirname, 'seeds', 'plan-de-cuentas.json');
+  if (!fs.existsSync(filePath)) {
+    console.log(
+      '⚠️  Archivo plan-de-cuentas.json no encontrado, saltando seed de PartidaContable',
+    );
+    return 0;
+  }
+
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  const root = JSON.parse(raw) as PartidaContableNode;
+
+  const flatList: FlatPartida[] = [];
+  flattenPartidaContable(root, 0, null, flatList);
+  flatList.sort((a, b) => a.nivel - b.nivel);
+
+  const codigoToId = new Map<string, number>();
+  let count = 0;
+
+  for (const item of flatList) {
+    const parentId = item.parentCodigo
+      ? (codigoToId.get(item.parentCodigo) ?? null)
+      : null;
+
+    const record = await prisma.partidaContable.upsert({
+      where: { codigo: item.codigo },
+      update: {
+        nombre: item.nombre,
+        nivel: item.nivel,
+        monetaria: item.monetaria,
+        auxiliar: item.auxiliar,
+        parentId,
+      },
+      create: {
+        codigo: item.codigo,
+        nombre: item.nombre,
+        nivel: item.nivel,
+        monetaria: item.monetaria,
+        auxiliar: item.auxiliar,
+        parentId,
+      },
+    });
+
+    codigoToId.set(item.codigo, record.id);
+    count++;
+  }
+
+  console.log(`✅ Partidas Contables sembradas: ${count}`);
+  return count;
 }
 
 main()

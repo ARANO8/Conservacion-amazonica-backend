@@ -1,4 +1,4 @@
-import { Prisma } from '@prisma/client';
+import { Prisma, TipoDocumento } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 import {
   CreatePlanificacionDto,
@@ -129,9 +129,9 @@ export function calcularMontosGastos(
 
 export function calcularMontosHospedaje(
   costoTotal: Prisma.Decimal,
-  tipoDocumento: 'FACTURA' | 'RECIBO',
+  tipoDocumento: TipoDocumento,
 ) {
-  if (tipoDocumento === 'FACTURA') {
+  if (tipoDocumento === TipoDocumento.FACTURA) {
     return {
       iva: new Prisma.Decimal(0),
       it: new Prisma.Decimal(0),

@@ -11,9 +11,7 @@ import {
 import {
   CreateRendicionDto,
   CreateGastoRendicionDto,
-  CreateGastoSinRespaldoDto,
   CreateInformeGastosDto,
-  CreateDeclaracionJuradaDto,
 } from './create-rendicion.dto';
 
 /**
@@ -46,22 +44,9 @@ export class UpdateRendicionDto extends PartialType(CreateRendicionDto) {
   @Type(() => CreateGastoRendicionDto)
   gastos?: CreateGastoRendicionDto[];
 
-  @ApiPropertyOptional({ type: [CreateGastoSinRespaldoDto] })
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => CreateGastoSinRespaldoDto)
-  gastosSinRespaldo?: CreateGastoSinRespaldoDto[];
-
   @ApiPropertyOptional({ type: CreateInformeGastosDto })
   @IsOptional()
   @ValidateNested()
   @Type(() => CreateInformeGastosDto)
   informeGastos?: CreateInformeGastosDto;
-
-  @ApiPropertyOptional({ type: CreateDeclaracionJuradaDto })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => CreateDeclaracionJuradaDto)
-  declaracionJurada?: CreateDeclaracionJuradaDto;
 }

@@ -4,11 +4,11 @@ const prisma = new PrismaClient();
 
 async function main() {
   const emisor = await prisma.usuario.findFirst({
-    where: { email: 'larteaga@conservacionamazonica.org.bo' }
+    where: { email: 'larteaga@conservacionamazonica.org.bo' },
   });
 
   const aprobador = await prisma.usuario.findFirst({
-    where: { email: 'walba@conservacionamazonica.org.bo' }
+    where: { email: 'walba@conservacionamazonica.org.bo' },
   });
 
   if (!emisor || !aprobador) {
@@ -18,7 +18,7 @@ async function main() {
 
   // Encontrar un POA activo para imputar el gasto
   const poa = await prisma.poa.findFirst({
-    where: { estado: 'ACTIVO' }
+    where: { estado: 'ACTIVO' },
   });
 
   if (!poa) {
@@ -43,13 +43,15 @@ async function main() {
         create: {
           poaId: poa.id,
           subtotalNeto: 1000,
-          subtotalPresupuestado: 1000
-        }
-      }
-    }
+          subtotalPresupuestado: 1000,
+        },
+      },
+    },
   });
 
-  console.log(`✅ Created test Solicitud: ${solicitud.codigoSolicitud} (ID: ${solicitud.id})`);
+  console.log(
+    `✅ Created test Solicitud: ${solicitud.codigoSolicitud} (ID: ${solicitud.id})`,
+  );
 }
 
 main()

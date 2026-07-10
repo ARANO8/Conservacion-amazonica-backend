@@ -154,7 +154,7 @@ export class SolicitudesController {
   }
 
   @Patch(':id/desembolsar')
-  @Roles(Rol.TESORERO)
+  @Roles(Rol.TESORERO, Rol.ADMIN, Rol.EJECUTIVO)
   @ApiOperation({
     summary: 'Desembolsar solicitud (Cambia de PENDIENTE a DESEMBOLSADO)',
   })

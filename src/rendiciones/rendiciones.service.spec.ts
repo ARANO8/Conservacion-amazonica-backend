@@ -1,6 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { EstadoRendicion, EstadoSolicitud, Prisma, Rol, TipoDocumento } from '@prisma/client';
+import {
+  EstadoRendicion,
+  EstadoSolicitud,
+  Prisma,
+  Rol,
+  TipoDocumento,
+} from '@prisma/client';
 import { RendicionesService } from './rendiciones.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from '../pdf/pdf.service';
@@ -346,10 +353,10 @@ describe('RendicionesService', () => {
 
       const [templateName, params] = pdfServiceMock.generatePdf.mock.calls[0];
       expect(templateName).toBe('rendicion.hbs');
-      
+
       // Debe registrar 4 movimientos: Anticipo, Factura, Recibo, DJ
       expect(params.transacciones).toHaveLength(4);
-      
+
       // Primera transacción es el anticipo de 1000 Bs
       expect(params.transacciones[0]).toMatchObject({
         concepto: expect.stringContaining('Anticipo recibido'),

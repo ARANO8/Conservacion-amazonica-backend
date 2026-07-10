@@ -1,7 +1,6 @@
-import { NestFactory } from '@nestjs/core';
-import { HttpAdapterHost } from '@nestjs/core';
+import { NestFactory, HttpAdapterHost } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -10,6 +9,8 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
 const DEFAULT_FRONTEND_URL = 'http://localhost:4200';
 const DEFAULT_PORT = 3000;
+
+const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -54,16 +55,26 @@ async function bootstrap() {
     new PrismaClientExceptionFilter(httpAdapterHost),
   );
 
-  // Swagger Configuration
-  const config = new DocumentBuilder()
+  // Swagger Configuration (diferido para no bloquear el arranque del servidor HTTP)
+  const swaggerConfig = new DocumentBuilder()
     .setTitle('AMZdesk API - Conservación Amazónica')
     .setDescription('API para AMZdesk (POA, Solicitudes, Rendiciones)')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('doc', app, document);
 
+  // createDocument hace introspección de todos los controladores/DTOs y puede ser lento
+  // con 16+ módulos. Inicializamos el server HTTP primero.
   await app.listen(port);
+
+  setImmediate(() => {
+    try {
+      const document = SwaggerModule.createDocument(app, swaggerConfig);
+      SwaggerModule.setup('doc', app, document);
+      logger.log('Swagger documentación disponible en /doc');
+    } catch (err) {
+      logger.warn('Error al generar Swagger', err);
+    }
+  });
 }
 void bootstrap();

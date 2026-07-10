@@ -29,6 +29,8 @@ import { CreateRendicionDto } from './dto/create-rendicion.dto';
 import { UpdateRendicionDto } from './dto/update-rendicion.dto';
 import { AprobarRendicionDto } from './dto/aprobar-rendicion.dto';
 import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
+import { UpdateGastoPartidaContableDto } from './dto/update-gasto-partida-contable.dto';
+import { UpdateGastoPartidaPresupuestariaDto } from './dto/update-gasto-partida-presupuestaria.dto';
 import { RendicionesService } from './rendiciones.service';
 
 interface RequestWithUser extends Request {
@@ -249,19 +251,51 @@ export class RendicionesController {
 
   @Patch('gastos/:gastoId/partida-contable')
   @ApiOperation({
-    summary: 'Asociar una partida contable a un gasto de rendición',
+    summary:
+      'Vincular o desvincular una partida contable a un gasto de rendición',
   })
   @ApiResponse({
     status: 200,
-    description: 'Partida contable asociada correctamente',
+    description: 'Partida contable vinculada correctamente',
   })
-  async updateGastoPartidaContable(
+  @ApiResponse({
+    status: 404,
+    description: 'Gasto o partida contable no encontrado',
+  })
+  updatePartidaContable(
     @Param('gastoId', ParseIntPipe) gastoId: number,
-    @Body('partidaContableId') partidaContableId: number | null,
+    @Body() dto: UpdateGastoPartidaContableDto,
+    @Req() req: RequestWithUser,
   ) {
-    return this.rendicionesService.updateGastoPartidaContable(
+    return this.rendicionesService.updatePartidaContable(
       gastoId,
-      partidaContableId,
+      dto,
+      req.user!.userId,
+    );
+  }
+
+  @Patch('gastos/:gastoId/partida-presupuestaria')
+  @ApiOperation({
+    summary:
+      'Vincular o desvincular una partida presupuestaria (SolicitudPresupuesto) a un gasto de rendición',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Partida presupuestaria vinculada correctamente',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Gasto o partida presupuestaria no encontrado',
+  })
+  updatePartidaPresupuestaria(
+    @Param('gastoId', ParseIntPipe) gastoId: number,
+    @Body() dto: UpdateGastoPartidaPresupuestariaDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.rendicionesService.updatePartidaPresupuestaria(
+      gastoId,
+      dto,
+      req.user!.userId,
     );
   }
 }

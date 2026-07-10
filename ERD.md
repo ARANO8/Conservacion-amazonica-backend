@@ -146,6 +146,11 @@ APROBADO APROBADO
     Int id "🗝️"
     String codigo 
     String nombre 
+    String descripcion "❓"
+    Int nivel 
+    String tipo "❓"
+    String monetaria "❓"
+    String auxiliar "❓"
     DateTime deletedAt "❓"
     }
   
@@ -488,6 +493,7 @@ APROBADO APROBADO
   
     "Usuario" |o--|| "Rol" : "enum:rol"
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
+    "PartidaContable" |o--|o "PartidaContable" : "parent"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
     "EstructuraProgramatica" }o--|| "Grupo" : "grupo"
     "EstructuraProgramatica" }o--|| "Partida" : "partida"

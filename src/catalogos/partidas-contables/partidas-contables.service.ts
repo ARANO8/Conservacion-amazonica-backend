@@ -11,4 +11,21 @@ export class PartidasContablesService {
       orderBy: { codigo: 'asc' },
     });
   }
+
+  async search(q: string) {
+    return this.prisma.partidaContable.findMany({
+      where: {
+        deletedAt: null,
+        ...(q.trim() ? { codigo: { startsWith: q.trim() } } : {}),
+      },
+      select: {
+        id: true,
+        codigo: true,
+        nombre: true,
+        nivel: true,
+      },
+      orderBy: { codigo: 'asc' },
+      take: 300,
+    });
+  }
 }

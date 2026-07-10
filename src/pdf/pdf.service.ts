@@ -5,8 +5,7 @@ import {
 } from '@nestjs/common';
 import * as fs from 'fs';
 import { join } from 'path';
-import Handlebars from 'handlebars';
-import puppeteer, { Browser } from 'puppeteer';
+import type { Browser, LaunchOptions } from 'puppeteer';
 
 @Injectable()
 export class PdfService {
@@ -17,6 +16,10 @@ export class PdfService {
     data: any,
     options?: { landscape?: boolean },
   ): Promise<Buffer> {
+    // Dynamic imports para evitar cargar puppeteer y handlebars en startup
+    const Handlebars = await import('handlebars');
+    const puppeteer = await import('puppeteer');
+
     const templateFile = this.readTemplate(templateName);
     const template = Handlebars.compile(templateFile);
     const logoBase64 = this.readLogoBase64();
@@ -29,7 +32,7 @@ export class PdfService {
 
     try {
       // Configuración de Puppeteer con soporte para variables de entorno
-      const launchOptions: Parameters<typeof puppeteer.launch>[0] = {
+      const launchOptions: LaunchOptions = {
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       };

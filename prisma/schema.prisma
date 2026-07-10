@@ -134,12 +134,20 @@ model Partida {
 }
 
 model PartidaContable {
-  id        Int       @id @default(autoincrement())
-  codigo    String    @unique
-  nombre    String
-  deletedAt DateTime?
+  id          Int               @id @default(autoincrement())
+  codigo      String            @unique
+  nombre      String
+  descripcion String?
+  nivel       Int               @default(0)
+  tipo        String?
+  monetaria   String?
+  auxiliar    String?
+  parentId    Int?
+  parent      PartidaContable?  @relation("PartidaHierarchy", fields: [parentId], references: [id])
+  children    PartidaContable[] @relation("PartidaHierarchy")
+  deletedAt   DateTime?
 
-  gastos GastoRendicion[]
+  gastosRendicion GastoRendicion[]
 }
 
 model CodigoPresupuestario {
