@@ -17,11 +17,11 @@ export class PdfService {
     options?: { landscape?: boolean },
   ): Promise<Buffer> {
     // Dynamic imports para evitar cargar puppeteer y handlebars en startup
-    const { compile } = await import('handlebars');
+    const handlebars = await import('handlebars');
     const puppeteer = await import('puppeteer');
 
     const templateFile = this.readTemplate(templateName);
-    const template = compile(templateFile);
+    const template = handlebars.default.compile(templateFile);
     const logoBase64 = this.readLogoBase64();
     const html = template({
       ...data,
