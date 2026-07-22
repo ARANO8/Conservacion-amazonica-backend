@@ -12,6 +12,7 @@ import {
   Res,
   Logger,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -100,13 +101,14 @@ export class CotizacionesController {
     });
   }
 
+  @SkipThrottle()
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Generar y descargar el PDF de la cotización' })
   @ApiProduces('application/pdf')
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const buffer = await this.cotizacionesService.generatePdf(id, {
       id: req.user.userId,
@@ -116,6 +118,6 @@ export class CotizacionesController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="cotizacion.pdf"',
     });
-    res.send(buffer);
+    return buffer;
   }
 }

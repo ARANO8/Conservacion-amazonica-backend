@@ -56,11 +56,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         }
       }
 
-      // Las HttpException (400, 401, 403, 404) no necesitan stack trace
+      // HttpException: 4xx como warn, 5xx como error con stack trace
       if ((status as number) >= 500) {
         this.logger.error(
           `[${request.method}] ${request.url} → HTTP ${status} | ${message}`,
           (exception as Error).stack,
+        );
+      } else if ((status as number) >= 400) {
+        this.logger.warn(
+          `[${request.method}] ${request.url} → HTTP ${status} | ${message}`,
         );
       }
     } else if (exception instanceof Error) {

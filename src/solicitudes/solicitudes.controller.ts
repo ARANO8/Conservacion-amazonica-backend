@@ -14,6 +14,7 @@ import {
   Query,
   BadRequestException,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -170,6 +171,7 @@ export class SolicitudesController {
     );
   }
 
+  @SkipThrottle()
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Generar y descargar reporte PDF de la solicitud' })
   @ApiProduces('application/pdf')
@@ -187,7 +189,7 @@ export class SolicitudesController {
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     const buffer = await this.solicitudesService.generatePdf(id, {
       id: req.user.userId,
@@ -198,6 +200,6 @@ export class SolicitudesController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="solicitud.pdf"',
     });
-    res.send(buffer);
+    return buffer as unknown as Promise<void>;
   }
 }

@@ -12,6 +12,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiOkResponse,
@@ -135,6 +136,7 @@ export class RendicionesController {
     });
   }
 
+  @SkipThrottle()
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Generar y visualizar PDF de una rendición' })
   @ApiProduces('application/pdf')
@@ -152,7 +154,7 @@ export class RendicionesController {
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ): Promise<void> {
     const buffer = await this.rendicionesService.generatePdf(id, {
       id: req.user!.userId,
@@ -163,7 +165,7 @@ export class RendicionesController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="rendicion.pdf"',
     });
-    res.send(buffer);
+    return buffer as unknown as Promise<void>;
   }
 
   @Post()

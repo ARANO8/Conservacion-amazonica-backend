@@ -12,6 +12,7 @@ import {
   Res,
   Logger,
 } from '@nestjs/common';
+import { SkipThrottle } from '@nestjs/throttler';
 import {
   ApiTags,
   ApiOperation,
@@ -90,13 +91,14 @@ export class OrdenesCompraController {
     return this.service.remove(id, { id: req.user.userId, rol: req.user.rol });
   }
 
+  @SkipThrottle()
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Generar y descargar el PDF (ANEXO 12)' })
   @ApiProduces('application/pdf')
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
-    @Res() res: Response,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const buffer = await this.service.generatePdf(id, {
       id: req.user.userId,
@@ -106,6 +108,6 @@ export class OrdenesCompraController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="orden-compra.pdf"',
     });
-    res.send(buffer);
+    return buffer;
   }
 }
