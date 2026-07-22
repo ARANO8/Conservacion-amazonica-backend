@@ -108,7 +108,7 @@ export class CotizacionesController {
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ) {
     const buffer = await this.cotizacionesService.generatePdf(id, {
       id: req.user.userId,
@@ -118,6 +118,6 @@ export class CotizacionesController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="cotizacion.pdf"',
     });
-    return buffer;
+    res.send(buffer);
   }
 }

@@ -98,7 +98,7 @@ export class OrdenesCompraController {
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ) {
     const buffer = await this.service.generatePdf(id, {
       id: req.user.userId,
@@ -108,6 +108,6 @@ export class OrdenesCompraController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="orden-compra.pdf"',
     });
-    return buffer;
+    res.send(buffer);
   }
 }

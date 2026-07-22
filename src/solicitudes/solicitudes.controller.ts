@@ -189,7 +189,7 @@ export class SolicitudesController {
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ): Promise<void> {
     const buffer = await this.solicitudesService.generatePdf(id, {
       id: req.user.userId,
@@ -200,6 +200,6 @@ export class SolicitudesController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="solicitud.pdf"',
     });
-    return buffer as unknown as Promise<void>;
+    res.send(buffer);
   }
 }

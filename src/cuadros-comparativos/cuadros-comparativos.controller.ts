@@ -209,7 +209,7 @@ export class CuadrosComparativosController {
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ) {
     const buffer = await this.cuadrosService.generatePdf(id, {
       id: req.user.userId,
@@ -219,6 +219,6 @@ export class CuadrosComparativosController {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="cuadro-comparativo.pdf"',
     });
-    return buffer;
+    res.send(buffer);
   }
 }
