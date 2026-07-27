@@ -119,6 +119,38 @@
       </div>
     </section>
 
+    {{#if codigoDesembolso}}
+    <section class="avoid-break mb-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+      <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-blue-700">
+        Datos del Desembolso
+      </h2>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-2">
+        <div>
+          <span class="font-semibold text-slate-700">Código de Desembolso:</span>
+          <span class="ml-1 rounded border border-blue-300 bg-white px-2 py-0.5 font-mono text-xs">{{codigoDesembolso}}</span>
+        </div>
+        {{#if banco}}
+        <div>
+          <span class="font-semibold text-slate-700">Banco:</span>
+          <span>{{banco}}</span>
+        </div>
+        {{/if}}
+        {{#if fechaDesembolso}}
+        <div>
+          <span class="font-semibold text-slate-700">Fecha de Desembolso:</span>
+          <span>{{fechaDesembolso}}</span>
+        </div>
+        {{/if}}
+        {{#if urlComprobante}}
+        <div class="col-span-2">
+          <span class="font-semibold text-slate-700">Comprobante:</span>
+          <a href="{{urlComprobante}}" class="ml-1 text-blue-600 underline">{{urlComprobante}}</a>
+        </div>
+        {{/if}}
+      </div>
+    </section>
+    {{/if}}
+
     <section class="mb-4 rounded-lg border border-slate-200 p-4">
       <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
         Detalle de Solicitud
