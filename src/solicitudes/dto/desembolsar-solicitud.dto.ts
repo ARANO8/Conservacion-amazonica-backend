@@ -16,13 +16,15 @@ export class DesembolsarSolicitudDto {
   @IsNotEmpty({ message: 'El código de desembolso es obligatorio' })
   codigoDesembolso: string;
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     example: 'https://drive.google.com/file/d/abc123/view',
     description: 'URL del PDF escaneado del comprobante de depósito',
   })
-  @IsOptional()
+  @IsNotEmpty({
+    message: 'La URL del comprobante de transferencia es obligatoria',
+  })
   @IsUrl({}, { message: 'La URL del comprobante no es válida' })
-  urlComprobante?: string;
+  urlComprobante: string;
 
   @ApiPropertyOptional({
     example: 'Bisa 34-6839-020-4',
