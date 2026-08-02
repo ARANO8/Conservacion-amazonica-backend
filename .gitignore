@@ -57,6 +57,10 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 
 /generated/prisma
 
+# Scripts locales de diagnostico y fixtures (no versionados)
+prisma/check-data.ts
+prisma/seed-test-data.ts
+
 
 ERD.md
 
