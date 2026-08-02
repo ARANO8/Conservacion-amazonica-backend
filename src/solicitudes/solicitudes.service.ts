@@ -321,6 +321,18 @@ export class SolicitudesService {
       });
     }
 
+    // --- Validar índices de planificación de la nómina de terceros ---
+    for (const n of nominasTerceros) {
+      if (n.planificacionIndex === undefined || n.planificacionIndex === null) {
+        continue;
+      }
+      if (!planificaciones[n.planificacionIndex]) {
+        throw new BadRequestException(
+          `Índice de planificación ${n.planificacionIndex} es inválido en la nómina de terceros`,
+        );
+      }
+    }
+
     return {
       montoTotalPresupuestado,
       montoTotalNeto,
@@ -453,6 +465,10 @@ export class SolicitudesService {
           nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
           procedenciaInstitucion: n.procedenciaInstitucion.trim().toUpperCase(),
           solicitudId,
+          planificacionId:
+            n.planificacionIndex !== undefined && n.planificacionIndex !== null
+              ? (createdPlanificaciones[n.planificacionIndex]?.id ?? null)
+              : null,
         },
       });
     }

@@ -430,6 +430,8 @@ model Planificacion {
   solicitudId Int
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
   viaticos    Viatico[]
+
+  personasExternas PersonaExterna[]
 }
 
 model Concepto {
@@ -504,6 +506,12 @@ model PersonaExterna {
   procedenciaInstitucion String
   solicitudId            Int
   solicitud              Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+
+  planificacionId Int?
+  planificacion   Planificacion? @relation(fields: [planificacionId], references: [id], onDelete: Cascade)
+
+  @@index([solicitudId])
+  @@index([planificacionId])
 }
 
 model GastoCompra {

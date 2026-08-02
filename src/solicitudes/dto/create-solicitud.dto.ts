@@ -218,6 +218,17 @@ export class CreateNominaDto {
   @IsString()
   @IsNotEmpty()
   procedenciaInstitucion: string;
+
+  @ApiProperty({
+    example: 0,
+    description:
+      'Índice posicional de la planificación a la que pertenece esta persona',
+    required: false,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  planificacionIndex?: number;
 }
 
 export class CreateGastoCompraDto {

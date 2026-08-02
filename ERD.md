@@ -540,6 +540,7 @@ APROBADO APROBADO
     "Gasto" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
     "Gasto" }o--|| "TipoGasto" : "tipoGasto"
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
+    "PersonaExterna" }o--|o "Planificacion" : "planificacion"
     "GastoCompra" }o--|| "Solicitud" : "solicitud"
     "GastoCompra" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
