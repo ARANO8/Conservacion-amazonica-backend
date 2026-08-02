@@ -54,7 +54,24 @@ export const SOLICITUD_INCLUDE = {
       },
     },
   },
-  gastosCompra: true,
+  gastosCompra: {
+    include: {
+      pagos: {
+        orderBy: { numero: 'asc' as const },
+      },
+      solicitudPresupuesto: {
+        include: {
+          poa: {
+            include: {
+              estructura: {
+                include: { partida: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
   planificaciones: true,
   hospedajes: true,
   personasExternas: true,

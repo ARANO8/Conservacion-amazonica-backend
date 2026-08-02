@@ -149,3 +149,31 @@ export function calcularMontosHospedaje(
     montoPresupuestado: redondear(costoTotal.add(iva).add(it)),
   };
 }
+
+/**
+ * Calcula el bruto de un gasto de compra / contrato de consultoría a partir del
+ * líquido. Sólo el RECIBO retiene: 13% RC-IVA + 3% IT (factor 0.84). Con FACTURA
+ * el proveedor ya declara sus impuestos, así que bruto = líquido.
+ */
+export function calcularMontosCompra(
+  total: Prisma.Decimal,
+  tipoDocumento: TipoDocumento,
+) {
+  if (tipoDocumento !== TipoDocumento.RECIBO) {
+    return {
+      iva: new Prisma.Decimal(0),
+      it: new Prisma.Decimal(0),
+      montoPresupuestado: redondear(total),
+    };
+  }
+
+  // Grossing Up: Total = Neto / 0.84
+  const montoPresupuestado = redondear(total.div(0.84));
+  const totalTax = redondear(montoPresupuestado.sub(total));
+
+  // 13% RC-IVA, 3% IT sobre la base bruta (tasa efectiva 16%)
+  const iva = redondear(totalTax.mul(13).div(16));
+  const it = redondear(totalTax.sub(iva)); // Para evitar errores de redondeo
+
+  return { iva, it, montoPresupuestado };
+}

@@ -60,8 +60,12 @@ export class SolicitudPresupuestoService {
       );
 
       // 4b. Sumamos gastos de compra (COMPRA_SERVICIO)
-      const sumGastosCompra = p.gastosCompra.reduce(
+      const sumGastosCompraNeto = p.gastosCompra.reduce(
         (acc, gc) => acc.add(gc.total),
+        new Prisma.Decimal(0),
+      );
+      const sumGastosCompraPresupuestado = p.gastosCompra.reduce(
+        (acc, gc) => acc.add(gc.montoPresupuestado),
         new Prisma.Decimal(0),
       );
 
@@ -84,11 +88,11 @@ export class SolicitudPresupuestoService {
 
       const subtotalP = sumViaticosPresupuestado
         .add(sumGastosPresupuestado)
-        .add(sumGastosCompra)
+        .add(sumGastosCompraPresupuestado)
         .add(sumHospedajesPresupuestado);
       const subtotalN = sumViaticosNeto
         .add(sumGastosNeto)
-        .add(sumGastosCompra)
+        .add(sumGastosCompraNeto)
         .add(sumHospedajesNeto);
 
       // 6. Actualizamos el presupuesto

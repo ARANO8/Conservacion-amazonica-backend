@@ -23,10 +23,12 @@ import {
   Prisma,
   TipoAccionHistorial,
   TipoSolicitud,
+  TipoDocumento,
 } from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
 import {
+  calcularMontosCompra,
   calcularMontosGastos,
   calcularMontosHospedaje,
   calcularMontosViaticos,
@@ -305,9 +307,29 @@ export class SolicitudesService {
       const cantidad = new Prisma.Decimal(gcDto.cantidad);
       const costoUnitario = new Prisma.Decimal(gcDto.costoUnitario);
       const total = cantidad.mul(costoUnitario);
+      const tipoDocumento = gcDto.tipoDocumento ?? TipoDocumento.FACTURA;
 
-      montoTotalPresupuestado = montoTotalPresupuestado.add(total);
+      const { iva, it, montoPresupuestado } = calcularMontosCompra(
+        total,
+        tipoDocumento,
+      );
+
+      // El POA se afecta por el bruto; el líquido es lo que recibe el proveedor
+      montoTotalPresupuestado = montoTotalPresupuestado.add(montoPresupuestado);
       montoTotalNeto = montoTotalNeto.add(total);
+
+      const pagos = gcDto.pagos ?? [];
+      if (pagos.length > 0) {
+        const sumaPagos = pagos.reduce(
+          (acc, p) => acc.add(new Prisma.Decimal(p.monto)),
+          new Prisma.Decimal(0),
+        );
+        if (sumaPagos.sub(total).abs().gt(0.01)) {
+          throw new BadRequestException(
+            `La suma de los pagos parciales (${sumaPagos.toFixed(2)}) no coincide con el total del gasto (${total.toFixed(2)})`,
+          );
+        }
+      }
 
       gastosCompraData.push({
         poaId: gcDto.poaId,
@@ -317,6 +339,20 @@ export class SolicitudesService {
           uso: gcDto.uso?.trim() || null,
           costoUnitario,
           total,
+          tipoDocumento,
+          montoPresupuestado,
+          iva,
+          it,
+          ...(pagos.length > 0 && {
+            pagos: {
+              create: pagos.map((p, idx) => ({
+                numero: idx + 1,
+                monto: new Prisma.Decimal(p.monto),
+                fechaPago: new Date(p.fechaPago),
+                descripcion: p.descripcion?.trim() || null,
+              })),
+            },
+          }),
         },
       });
     }
@@ -609,7 +645,10 @@ export class SolicitudesService {
     }
     for (const gc of detalles.gastosCompraData) {
       const prev = montosByPoa.get(gc.poaId) ?? new Prisma.Decimal(0);
-      montosByPoa.set(gc.poaId, prev.add(gc.data.total as Prisma.Decimal));
+      montosByPoa.set(
+        gc.poaId,
+        prev.add(gc.data.montoPresupuestado as Prisma.Decimal),
+      );
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -1089,6 +1128,14 @@ export class SolicitudesService {
           if (!poaIdSet.has(hospedaje.poaId)) {
             throw new BadRequestException(
               `El hospedaje referencia la partida POA ${hospedaje.poaId} que no está incluida en poaIds`,
+            );
+          }
+        }
+
+        for (const gastoCompra of detalles.gastosCompraData) {
+          if (!poaIdSet.has(gastoCompra.poaId)) {
+            throw new BadRequestException(
+              `El gasto de compra referencia la partida POA ${gastoCompra.poaId} que no está incluida en poaIds`,
             );
           }
         }

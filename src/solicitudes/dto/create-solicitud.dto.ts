@@ -231,6 +231,29 @@ export class CreateNominaDto {
   planificacionIndex?: number;
 }
 
+export class CreatePagoParcialDto {
+  @ApiProperty({
+    example: 3000,
+    minimum: 0,
+    description: 'Monto líquido del pago',
+  })
+  @IsNumber()
+  @Min(0)
+  monto: number;
+
+  @ApiProperty({ example: '2026-09-15T00:00:00Z' })
+  @IsDateString()
+  fechaPago: string;
+
+  @ApiPropertyOptional({
+    example: 'Entrega del primer producto',
+    description: 'Producto o hito asociado al pago',
+  })
+  @IsOptional()
+  @IsString()
+  descripcion?: string;
+}
+
 export class CreateGastoCompraDto {
   @ApiProperty({ example: 2, description: 'Cantidad de unidades' })
   @IsNumber()
@@ -263,6 +286,26 @@ export class CreateGastoCompraDto {
   @IsInt()
   @Min(1)
   poaId: number;
+
+  @ApiPropertyOptional({
+    enum: TipoDocumento,
+    default: TipoDocumento.FACTURA,
+    description: 'RECIBO aplica retención (13% RC-IVA + 3% IT); FACTURA no',
+  })
+  @IsOptional()
+  @IsEnum(TipoDocumento)
+  tipoDocumento?: TipoDocumento;
+
+  @ApiPropertyOptional({
+    type: [CreatePagoParcialDto],
+    description:
+      'Cronograma de pagos parciales (consultorías). La suma debe igualar cantidad * costoUnitario',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreatePagoParcialDto)
+  pagos?: CreatePagoParcialDto[];
 }
 
 export class CreateSolicitudDto {

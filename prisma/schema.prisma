@@ -520,7 +520,12 @@ model GastoCompra {
   descripcion   String  @db.VarChar(500)
   uso           String? @db.VarChar(100)
   costoUnitario Decimal @db.Decimal(10, 2)
-  total         Decimal @db.Decimal(10, 2)
+  total         Decimal @db.Decimal(10, 2) // Líquido: cantidad * costoUnitario
+
+  tipoDocumento      TipoDocumento @default(FACTURA)
+  montoPresupuestado Decimal       @default(0) @db.Decimal(10, 2) // Bruto tras gross-up, es lo que afecta al POA
+  iva                Decimal       @default(0) @db.Decimal(10, 2)
+  it                 Decimal       @default(0) @db.Decimal(10, 2)
 
   solicitudId Int
   solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
@@ -528,11 +533,28 @@ model GastoCompra {
   solicitudPresupuestoId Int
   solicitudPresupuesto   SolicitudPresupuesto @relation(fields: [solicitudPresupuestoId], references: [id], onDelete: Cascade)
 
+  pagos PagoParcial[]
+
   deletedAt DateTime?
 
   @@index([solicitudId])
   @@index([solicitudPresupuestoId])
   @@index([deletedAt])
+}
+
+/// Cronograma de pagos planificado de un contrato de consultoría.
+/// Los montos están expresados en líquido y deben sumar el `total` del GastoCompra.
+model PagoParcial {
+  id          Int      @id @default(autoincrement())
+  numero      Int
+  monto       Decimal  @db.Decimal(10, 2)
+  fechaPago   DateTime
+  descripcion String?  @db.VarChar(500)
+
+  gastoCompraId Int
+  gastoCompra   GastoCompra @relation(fields: [gastoCompraId], references: [id], onDelete: Cascade)
+
+  @@index([gastoCompraId])
 }
 
 

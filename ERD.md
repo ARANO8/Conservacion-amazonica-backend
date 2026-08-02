@@ -365,7 +365,20 @@ APROBADO APROBADO
     String uso "❓"
     Decimal costoUnitario 
     Decimal total 
+    TipoDocumento tipoDocumento 
+    Decimal montoPresupuestado 
+    Decimal iva 
+    Decimal it 
     DateTime deletedAt "❓"
+    }
+  
+
+  "PagoParcial" {
+    Int id "🗝️"
+    Int numero 
+    Decimal monto 
+    DateTime fechaPago 
+    String descripcion "❓"
     }
   
 
@@ -541,8 +554,10 @@ APROBADO APROBADO
     "Gasto" }o--|| "TipoGasto" : "tipoGasto"
     "PersonaExterna" }o--|| "Solicitud" : "solicitud"
     "PersonaExterna" }o--|o "Planificacion" : "planificacion"
+    "GastoCompra" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoCompra" }o--|| "Solicitud" : "solicitud"
     "GastoCompra" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
+    "PagoParcial" }o--|| "GastoCompra" : "gastoCompra"
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" }o--|| "Poa" : "poa"
