@@ -317,9 +317,14 @@ export class CreateSolicitudDto {
   @IsInt({ each: true })
   poaIds: number[];
 
-  @ApiProperty({ example: 2, description: 'ID del usuario aprobador' })
+  @ApiPropertyOptional({
+    example: 2,
+    description:
+      'ID del usuario aprobador. No aplica a contratos de consultoría: esos nacen en ejecución y se aprueba cada cuota por separado',
+  })
+  @IsOptional()
   @IsInt()
-  aprobadorId: number;
+  aprobadorId?: number;
 
   @ApiPropertyOptional({
     enum: TipoSolicitud,

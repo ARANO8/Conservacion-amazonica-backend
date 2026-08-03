@@ -29,6 +29,7 @@ import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
 import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
+import { SolicitarPagoDto } from './dto/solicitar-pago.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -169,6 +170,53 @@ export class SolicitudesController {
       { id: req.user.userId, rol: req.user.rol },
       desembolsarDto,
     );
+  }
+
+  // --- Pagos parciales de contratos de consultoría ---
+
+  @Patch(':id/pagos/:pagoId/solicitar')
+  @ApiOperation({
+    summary:
+      'Solicitar el pago de una cuota (Adquisiciones). PLANIFICADO → SOLICITADO',
+  })
+  solicitarPago(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('pagoId', ParseIntPipe) pagoId: number,
+    @Req() req: RequestWithUser,
+    @Body() solicitarPagoDto: SolicitarPagoDto,
+  ) {
+    return this.solicitudesService.solicitarPago(
+      id,
+      pagoId,
+      req.user.userId,
+      solicitarPagoDto,
+    );
+  }
+
+  @Patch(':id/pagos/:pagoId/aprobar')
+  @ApiOperation({
+    summary: 'Aprobar el pago de una cuota. SOLICITADO → APROBADO',
+  })
+  aprobarPago(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('pagoId', ParseIntPipe) pagoId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.solicitudesService.aprobarPago(id, pagoId, req.user.userId);
+  }
+
+  @Patch(':id/pagos/:pagoId/pagar')
+  @Roles(Rol.TESORERO, Rol.ADMIN, Rol.EJECUTIVO)
+  @ApiOperation({
+    summary:
+      'Registrar el pago de una cuota (Tesorería). APROBADO → PAGADO. La última cierra el contrato',
+  })
+  pagarPago(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('pagoId', ParseIntPipe) pagoId: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.solicitudesService.pagarPago(id, pagoId, req.user.userId);
   }
 
   @SkipThrottle()

@@ -40,7 +40,14 @@ export class UsuariosController {
   }
 
   @Get('lookup/activos')
-  @Roles(Rol.ADMIN, Rol.EJECUTIVO, Rol.TESORERO, Rol.CONTADOR, Rol.USUARIO)
+  @Roles(
+    Rol.ADMIN,
+    Rol.EJECUTIVO,
+    Rol.TESORERO,
+    Rol.CONTADOR,
+    Rol.USUARIO,
+    Rol.VALIDADOR_COMPRAS,
+  )
   @ApiOperation({ summary: 'Obtener listado básico de usuarios activos' })
   getLookup() {
     return this.usuariosService.getLookup();

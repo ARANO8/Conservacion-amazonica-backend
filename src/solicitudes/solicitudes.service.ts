@@ -16,6 +16,7 @@ import { UpdateSolicitudDto } from './dto/update-solicitud.dto';
 import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
+import { SolicitarPagoDto } from './dto/solicitar-pago.dto';
 import {
   Rol,
   EstadoSolicitud,
@@ -24,6 +25,7 @@ import {
   TipoAccionHistorial,
   TipoSolicitud,
   TipoDocumento,
+  EstadoPagoParcial,
 } from '@prisma/client';
 import { SolicitudPresupuestoService } from '../solicitudes-presupuestos/solicitudes-presupuestos.service';
 import { Inject, forwardRef } from '@nestjs/common';
@@ -32,6 +34,7 @@ import {
   calcularMontosGastos,
   calcularMontosHospedaje,
   calcularMontosViaticos,
+  esConsultoria,
   validarLimitesViatico,
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
@@ -531,24 +534,34 @@ export class SolicitudesService {
       `[create] INICIO — usuarioId=${usuarioId}, aprobadorId=${aprobadorId}, poaIds=${JSON.stringify(poaIds)}`,
     );
 
-    // VALIDACIÓN: Evitar Auto-Aprobación
-    if (aprobadorId === usuarioId) {
-      throw new BadRequestException(
-        'No puedes asignarte a ti mismo como aprobador inicial',
+    // Un contrato de consultoría no se aprueba como un todo: nace en ejecución
+    // y lo que se aprueba es cada cuota del cronograma por separado.
+    const esContratoConsultoria = esConsultoria(createSolicitudDto);
+
+    if (!esContratoConsultoria) {
+      // VALIDACIÓN: Evitar Auto-Aprobación
+      if (aprobadorId === usuarioId) {
+        throw new BadRequestException(
+          'No puedes asignarte a ti mismo como aprobador inicial',
+        );
+      }
+
+      // VALIDACIÓN: El aprobador no debe ser un usuario eliminado (soft-delete guard)
+      const aprobador = await this.prisma.usuario.findFirst({
+        where: { id: aprobadorId, deletedAt: null },
+      });
+      if (!aprobador) {
+        throw new NotFoundException(
+          `El aprobador con ID ${aprobadorId} no existe o ha sido eliminado del sistema`,
+        );
+      }
+
+      this.logger.log(`[create] Aprobador validado OK (id=${aprobadorId})`);
+    } else {
+      this.logger.log(
+        `[create] Contrato de consultoría: nace EN_EJECUCION, sin aprobador`,
       );
     }
-
-    // VALIDACIÓN: El aprobador no debe ser un usuario eliminado (soft-delete guard)
-    const aprobador = await this.prisma.usuario.findFirst({
-      where: { id: aprobadorId, deletedAt: null },
-    });
-    if (!aprobador) {
-      throw new NotFoundException(
-        `El aprobador con ID ${aprobadorId} no existe o ha sido eliminado del sistema`,
-      );
-    }
-
-    this.logger.log(`[create] Aprobador validado OK (id=${aprobadorId})`);
 
     const detalles = await this.prepararInsertAnidado(createSolicitudDto);
 
@@ -707,9 +720,13 @@ export class SolicitudesService {
           urlCotizaciones: urlCotizaciones ?? [],
           fechaInicio: minDate,
           fechaFin: maxDate,
-          estado: EstadoSolicitud.PENDIENTE,
+          estado: esContratoConsultoria
+            ? EstadoSolicitud.EN_EJECUCION
+            : EstadoSolicitud.PENDIENTE,
           usuarioEmisor: { connect: { id: usuarioId } },
-          aprobador: { connect: { id: aprobadorId } },
+          ...(esContratoConsultoria
+            ? {}
+            : { aprobador: { connect: { id: aprobadorId } } }),
           usuarioBeneficiado: { connect: { id: usuarioId } },
         },
       });
@@ -765,16 +782,19 @@ export class SolicitudesService {
       throw new BadRequestException('Fallo al crear la solicitud');
     }
 
-    // Crear notificación para el aprobador asignado (fire-and-forget seguro)
+    // Crear notificación para el aprobador asignado (fire-and-forget seguro).
+    // Los contratos de consultoría no tienen aprobador: se notifica por cuota.
     try {
-      await this.notificacionesService.crearNotificacion({
-        titulo: 'Nueva solicitud asignada',
-        mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
-        tipo: 'SOLICITUD_ASIGNADA',
-        usuarioId: aprobadorId,
-        solicitudId: result.id,
-        urlDestino: `/app/aprobaciones/${result.id}`,
-      });
+      if (!esContratoConsultoria && aprobadorId !== undefined) {
+        await this.notificacionesService.crearNotificacion({
+          titulo: 'Nueva solicitud asignada',
+          mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
+          tipo: 'SOLICITUD_ASIGNADA',
+          usuarioId: aprobadorId,
+          solicitudId: result.id,
+          urlDestino: `/app/aprobaciones/${result.id}`,
+        });
+      }
     } catch (error) {
       const normalizedError =
         error instanceof Error ? error : new Error(String(error));
@@ -1017,8 +1037,25 @@ export class SolicitudesService {
       );
     }
 
-    // REGLA: Solo si está OBSERVADO
-    if (solicitud.estado !== EstadoSolicitud.OBSERVADO) {
+    // REGLA: Solo si está OBSERVADO. Un contrato de consultoría nunca pasa por
+    // OBSERVADO (nace en ejecución), así que se admite corregirlo mientras
+    // ninguna cuota haya arrancado su ciclo de pago.
+    const esContratoEnEjecucion =
+      solicitud.estado === EstadoSolicitud.EN_EJECUCION;
+
+    if (esContratoEnEjecucion) {
+      const enCurso = await this.prisma.pagoParcial.count({
+        where: {
+          gastoCompra: { solicitudId: id, deletedAt: null },
+          estado: { not: EstadoPagoParcial.PLANIFICADO },
+        },
+      });
+      if (enCurso > 0) {
+        throw new BadRequestException(
+          'No se puede editar el contrato: ya hay pagos solicitados o realizados',
+        );
+      }
+    } else if (solicitud.estado !== EstadoSolicitud.OBSERVADO) {
       throw new BadRequestException(
         'Solo se pueden editar solicitudes en estado OBSERVADO',
       );
@@ -1216,9 +1253,15 @@ export class SolicitudesService {
           montoTotalNeto: finalMontoTotalNeto,
           fechaInicio: finalFechaInicio,
           fechaFin: finalFechaFin,
-          estado: EstadoSolicitud.PENDIENTE,
+          // Un contrato de consultoría corregido sigue en ejecución: no vuelve
+          // a una bandeja de aprobación porque nunca tuvo una.
+          estado: esContratoEnEjecucion
+            ? EstadoSolicitud.EN_EJECUCION
+            : EstadoSolicitud.PENDIENTE,
           observacion: null,
-          aprobador: { connect: { id: aprobadorId } },
+          ...(esContratoEnEjecucion
+            ? {}
+            : { aprobador: { connect: { id: aprobadorId } } }),
         },
         include: SOLICITUD_INCLUDE,
       });
@@ -1268,6 +1311,21 @@ export class SolicitudesService {
       throw new BadRequestException(
         'No se puede eliminar una solicitud que ya ha sido desembolsada',
       );
+    }
+
+    // Un contrato de consultoría con pagos en curso ya movió dinero
+    if (solicitud.estado === EstadoSolicitud.EN_EJECUCION) {
+      const enCurso = await this.prisma.pagoParcial.count({
+        where: {
+          gastoCompra: { solicitudId: id, deletedAt: null },
+          estado: { not: EstadoPagoParcial.PLANIFICADO },
+        },
+      });
+      if (enCurso > 0) {
+        throw new BadRequestException(
+          'No se puede eliminar el contrato: ya hay pagos solicitados o realizados',
+        );
+      }
     }
 
     return this.prisma.solicitud.update({
@@ -1503,5 +1561,218 @@ export class SolicitudesService {
     }
 
     return solicitudActualizada;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Pagos parciales de contratos de consultoría
+  //
+  // El presupuesto ya quedó comprometido al crearse el contrato, así que estas
+  // transiciones NO vuelven a tocar el POA. La única excepción es el pago de la
+  // última cuota, que cierra el contrato y convierte el compromiso en ejecución.
+  // ---------------------------------------------------------------------------
+
+  /** Localiza una cuota validando que pertenezca a un contrato en ejecución. */
+  private async findPagoParcial(solicitudId: number, pagoId: number) {
+    const pago = await this.prisma.pagoParcial.findFirst({
+      where: {
+        id: pagoId,
+        gastoCompra: { solicitudId, deletedAt: null },
+      },
+      include: {
+        gastoCompra: { select: { solicitudId: true } },
+      },
+    });
+
+    if (!pago) {
+      throw new NotFoundException(
+        `El pago ${pagoId} no existe o no pertenece a la solicitud ${solicitudId}`,
+      );
+    }
+
+    const solicitud = await this.prisma.solicitud.findFirst({
+      where: { id: solicitudId, deletedAt: null },
+      select: {
+        id: true,
+        estado: true,
+        codigoSolicitud: true,
+        usuarioEmisorId: true,
+        montoTotalPresupuestado: true,
+      },
+    });
+
+    if (!solicitud) {
+      throw new NotFoundException(
+        `Solicitud con ID ${solicitudId} no encontrada`,
+      );
+    }
+
+    if (solicitud.estado !== EstadoSolicitud.EN_EJECUCION) {
+      throw new BadRequestException(
+        'Solo se pueden gestionar pagos de un contrato en ejecución',
+      );
+    }
+
+    return { pago, solicitud };
+  }
+
+  async solicitarPago(
+    solicitudId: number,
+    pagoId: number,
+    usuarioId: number,
+    dto: SolicitarPagoDto,
+  ) {
+    const { pago, solicitud } = await this.findPagoParcial(solicitudId, pagoId);
+
+    if (pago.estado !== EstadoPagoParcial.PLANIFICADO) {
+      throw new BadRequestException(
+        `El pago ${pago.numero} ya fue solicitado (estado actual: ${pago.estado})`,
+      );
+    }
+
+    if (dto.aprobadorId === usuarioId) {
+      throw new BadRequestException(
+        'No puedes asignarte a ti mismo como aprobador del pago',
+      );
+    }
+
+    const aprobador = await this.prisma.usuario.findFirst({
+      where: { id: dto.aprobadorId, deletedAt: null },
+    });
+    if (!aprobador) {
+      throw new NotFoundException(
+        `El aprobador con ID ${dto.aprobadorId} no existe o ha sido eliminado del sistema`,
+      );
+    }
+
+    const actualizado = await this.prisma.pagoParcial.update({
+      where: { id: pagoId },
+      data: {
+        estado: EstadoPagoParcial.SOLICITADO,
+        urlComprobante: dto.urlComprobante,
+        urlInforme: dto.urlInforme ?? null,
+        solicitadoPorId: usuarioId,
+        aprobadorId: dto.aprobadorId,
+      },
+    });
+
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Pago de consultoría por aprobar',
+        mensaje: `El pago ${pago.numero} del contrato ${solicitud.codigoSolicitud} requiere tu aprobación`,
+        tipo: 'PAGO_PENDIENTE_APROBACION',
+        usuarioId: dto.aprobadorId,
+        solicitudId,
+        urlDestino: `/app/solicitudes-compra/${solicitudId}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al notificar solicitud de pago ${pagoId}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return actualizado;
+  }
+
+  async aprobarPago(solicitudId: number, pagoId: number, usuarioId: number) {
+    const { pago } = await this.findPagoParcial(solicitudId, pagoId);
+
+    if (pago.estado !== EstadoPagoParcial.SOLICITADO) {
+      throw new BadRequestException(
+        `Solo se pueden aprobar pagos en estado SOLICITADO (estado actual: ${pago.estado})`,
+      );
+    }
+
+    if (pago.aprobadorId !== usuarioId) {
+      throw new ForbiddenException(
+        'No tienes permiso para aprobar este pago, no eres el aprobador asignado',
+      );
+    }
+
+    return this.prisma.pagoParcial.update({
+      where: { id: pagoId },
+      data: { estado: EstadoPagoParcial.APROBADO },
+    });
+  }
+
+  async pagarPago(solicitudId: number, pagoId: number, usuarioId: number) {
+    const { pago, solicitud } = await this.findPagoParcial(solicitudId, pagoId);
+
+    if (pago.estado !== EstadoPagoParcial.APROBADO) {
+      throw new BadRequestException(
+        `Solo se pueden pagar cuotas aprobadas (estado actual: ${pago.estado})`,
+      );
+    }
+
+    const resultado = await this.prisma.$transaction(async (tx) => {
+      const actualizado = await tx.pagoParcial.update({
+        where: { id: pagoId },
+        data: {
+          estado: EstadoPagoParcial.PAGADO,
+          pagadoPorId: usuarioId,
+          fechaPagoReal: new Date(),
+        },
+      });
+
+      // ¿Queda alguna cuota sin pagar en todo el contrato?
+      const pendientes = await tx.pagoParcial.count({
+        where: {
+          gastoCompra: { solicitudId, deletedAt: null },
+          estado: { not: EstadoPagoParcial.PAGADO },
+        },
+      });
+
+      if (pendientes === 0) {
+        // Última cuota: el contrato se cierra y el compromiso presupuestario
+        // se convierte en ejecución real, igual que hace la aprobación de una
+        // rendición para las solicitudes de viaje.
+        await tx.solicitud.update({
+          where: { id: solicitudId },
+          data: { estado: EstadoSolicitud.EJECUTADO },
+        });
+
+        const presupuestos = await tx.solicitudPresupuesto.findMany({
+          where: { solicitudId },
+          select: { poaId: true, subtotalPresupuestado: true },
+        });
+
+        for (const p of presupuestos) {
+          await tx.poa.update({
+            where: { id: p.poaId },
+            data: { montoEjecutado: { increment: p.subtotalPresupuestado } },
+          });
+        }
+
+        this.logger.log(
+          `[pagarPago] Contrato ${solicitud.codigoSolicitud} EJECUTADO; POA actualizado`,
+        );
+      }
+
+      return { actualizado, contratoCerrado: pendientes === 0 };
+    });
+
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Pago de consultoría registrado',
+        mensaje: `Se registró el pago ${pago.numero} del contrato ${solicitud.codigoSolicitud}${
+          resultado.contratoCerrado ? '. El contrato quedó ejecutado.' : ''
+        }`,
+        tipo: 'PAGO_REALIZADO',
+        usuarioId: solicitud.usuarioEmisorId,
+        solicitudId,
+        urlDestino: `/app/solicitudes-compra/${solicitudId}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al notificar pago ${pagoId}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return resultado.actualizado;
   }
 }

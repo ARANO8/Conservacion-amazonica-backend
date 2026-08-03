@@ -1,7 +1,8 @@
-import { Prisma, TipoDocumento } from '@prisma/client';
+import { Prisma, TipoDocumento, TipoSolicitud } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 import {
   CreatePlanificacionDto,
+  CreateSolicitudDto,
   CreateViaticoDto,
 } from './dto/create-solicitud.dto';
 
@@ -148,6 +149,18 @@ export function calcularMontosHospedaje(
     it,
     montoPresupuestado: redondear(costoTotal.add(iva).add(it)),
   };
+}
+
+/**
+ * Un contrato de consultoría es una solicitud COMPRA_SERVICIO cuyo gasto trae
+ * cronograma de pagos parciales. No se aprueba como un todo: nace en ejecución
+ * y lo que se aprueba y paga es cada cuota por separado.
+ */
+export function esConsultoria(
+  dto: Pick<CreateSolicitudDto, 'tipo' | 'gastosCompra'>,
+): boolean {
+  if (dto.tipo !== TipoSolicitud.COMPRA_SERVICIO) return false;
+  return (dto.gastosCompra ?? []).some((gc) => (gc.pagos ?? []).length > 0);
 }
 
 /**

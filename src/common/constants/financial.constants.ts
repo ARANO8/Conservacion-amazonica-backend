@@ -16,4 +16,7 @@ export const LOCALE_DEFAULT = 'es-BO';
 export const ESTADOS_COMPROMISO_ACTIVO: EstadoSolicitud[] = [
   EstadoSolicitud.PENDIENTE,
   EstadoSolicitud.DESEMBOLSADO,
+  // Un contrato de consultoría compromete su presupuesto desde que nace y hasta
+  // que se paga la última cuota; recién ahí pasa a EJECUTADO y suma a montoEjecutado.
+  EstadoSolicitud.EN_EJECUCION,
 ];

@@ -11,7 +11,9 @@ export type TipoNotificacion =
   | 'CUADRO_PENDIENTE_VALIDACION'
   | 'CUADRO_PENDIENTE_REVISION'
   | 'CUADRO_OBSERVADO'
-  | 'CUADRO_APROBADO';
+  | 'CUADRO_APROBADO'
+  | 'PAGO_PENDIENTE_APROBACION'
+  | 'PAGO_REALIZADO';
 
 @Injectable()
 export class NotificacionesService {

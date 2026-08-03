@@ -22,7 +22,17 @@ enum EstadoSolicitud {
   PENDIENTE
   OBSERVADO
   DESEMBOLSADO
+  /// Contrato de consultoría vivo: se paga por cuotas, no de una sola vez
+  EN_EJECUCION
   EJECUTADO
+}
+
+/// Ciclo de vida de una cuota del cronograma de un contrato de consultoría
+enum EstadoPagoParcial {
+  PLANIFICADO
+  SOLICITADO
+  APROBADO
+  PAGADO
 }
 
 enum TipoSolicitud {
@@ -80,6 +90,8 @@ enum TipoNotificacion {
   CUADRO_PENDIENTE_REVISION
   CUADRO_OBSERVADO
   CUADRO_APROBADO
+  PAGO_PENDIENTE_APROBACION
+  PAGO_REALIZADO
 }
 
 // --- MODELOS ---
@@ -105,6 +117,9 @@ model Usuario {
   cotizacionesEmitidas    Cotizacion[]          @relation("CotizacionesEmitidas")
   cuadrosEmitidos         CuadroComparativo[]   @relation("CuadrosEmitidos")
   ordenesEmitidas         OrdenCompra[]         @relation("OrdenesEmitidas")
+  pagosSolicitados        PagoParcial[]         @relation("PagoSolicitante")
+  pagosPorAprobar         PagoParcial[]         @relation("PagoAprobador")
+  pagosRegistrados        PagoParcial[]         @relation("PagoTesorero")
 }
 
 model Proyecto {
@@ -548,13 +563,32 @@ model PagoParcial {
   id          Int      @id @default(autoincrement())
   numero      Int
   monto       Decimal  @db.Decimal(10, 2)
-  fechaPago   DateTime
+  fechaPago   DateTime // Fecha planificada en el cronograma
   descripcion String?  @db.VarChar(500)
+
+  estado         EstadoPagoParcial @default(PLANIFICADO)
+  urlComprobante String? // Factura o recibo del consultor
+  urlInforme     String? // Informe o producto entregado que habilita el pago
+  fechaPagoReal  DateTime? // Se sella al registrarse el pago
+
+  solicitadoPorId Int?
+  solicitadoPor   Usuario? @relation("PagoSolicitante", fields: [solicitadoPorId], references: [id])
+
+  aprobadorId Int?
+  aprobador   Usuario? @relation("PagoAprobador", fields: [aprobadorId], references: [id])
+
+  pagadoPorId Int?
+  pagadoPor   Usuario? @relation("PagoTesorero", fields: [pagadoPorId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   gastoCompraId Int
   gastoCompra   GastoCompra @relation(fields: [gastoCompraId], references: [id], onDelete: Cascade)
 
   @@index([gastoCompraId])
+  @@index([estado])
+  @@index([aprobadorId])
 }
 
 

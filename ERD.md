@@ -16,7 +16,17 @@ VALIDADOR_COMPRAS VALIDADOR_COMPRAS
             PENDIENTE PENDIENTE
 OBSERVADO OBSERVADO
 DESEMBOLSADO DESEMBOLSADO
+EN_EJECUCION EN_EJECUCION
 EJECUTADO EJECUTADO
+        }
+    
+
+
+        EstadoPagoParcial {
+            PLANIFICADO PLANIFICADO
+SOLICITADO SOLICITADO
+APROBADO APROBADO
+PAGADO PAGADO
         }
     
 
@@ -88,6 +98,8 @@ CUADRO_PENDIENTE_VALIDACION CUADRO_PENDIENTE_VALIDACION
 CUADRO_PENDIENTE_REVISION CUADRO_PENDIENTE_REVISION
 CUADRO_OBSERVADO CUADRO_OBSERVADO
 CUADRO_APROBADO CUADRO_APROBADO
+PAGO_PENDIENTE_APROBACION PAGO_PENDIENTE_APROBACION
+PAGO_REALIZADO PAGO_REALIZADO
         }
     
 
@@ -379,6 +391,12 @@ APROBADO APROBADO
     Decimal monto 
     DateTime fechaPago 
     String descripcion "❓"
+    EstadoPagoParcial estado 
+    String urlComprobante "❓"
+    String urlInforme "❓"
+    DateTime fechaPagoReal "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
     }
   
 
@@ -557,6 +575,10 @@ APROBADO APROBADO
     "GastoCompra" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoCompra" }o--|| "Solicitud" : "solicitud"
     "GastoCompra" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
+    "PagoParcial" |o--|| "EstadoPagoParcial" : "enum:estado"
+    "PagoParcial" }o--|o "Usuario" : "solicitadoPor"
+    "PagoParcial" }o--|o "Usuario" : "aprobador"
+    "PagoParcial" }o--|o "Usuario" : "pagadoPor"
     "PagoParcial" }o--|| "GastoCompra" : "gastoCompra"
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Hospedaje" }o--|| "Solicitud" : "solicitud"
