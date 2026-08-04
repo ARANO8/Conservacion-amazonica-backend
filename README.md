@@ -42,7 +42,7 @@ Se aplican reglas estrictas de integridad antes de persistir cualquier solicitud
 ## 🛠️ Setup Rápido
 
 ### Requisitos
-- Node.js (v18+)
+- Node.js (v20.9+)
 - pnpm
 
 ### Instalación
@@ -55,7 +55,7 @@ $ pnpm install
 $ npx prisma migrate dev
 
 # 4. (Opcional) Cargar datos iniciales
-$ pnpm run seed
+$ npx prisma db seed
 ```
 
 ### Ejecución
@@ -67,6 +67,15 @@ $ pnpm run start:dev
 $ pnpm run build
 $ pnpm run start:prod
 ```
+
+## 🚀 Despliegue
+
+El despliegue en el VPS está automatizado: cada push a `main` construye la
+imagen en GitHub Actions, la publica en GHCR y actualiza el servidor por SSH.
+`develop` es la rama de desarrollo y no despliega nada.
+
+Los manifiestos (compose, Nginx) y el procedimiento de puesta en marcha están
+en [`deploy/README.md`](./deploy/README.md).
 
 ## 📄 Licencia
 Este proyecto es propiedad privada de Conservación Amazónica - ACEAA.

@@ -1,0 +1,5 @@
+# Los scripts de shell deben conservar finales de línea LF aunque se editen en
+# Windows: con CRLF el kernel no encuentra el intérprete y el contenedor muere
+# con "bad interpreter".
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf

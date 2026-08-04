@@ -1,0 +1,80 @@
+# Despliegue del VPS de pruebas.
+#
+# Este archivo se copia al VPS como /opt/amzdesk/docker-compose.yml y lee sus
+# valores de /opt/amzdesk/.env (permisos 600, fuera de git).
+#
+# Las imagenes no se construyen aqui: las publica GitHub Actions en GHCR y el
+# VPS solo hace pull de la etiqueta inmutable sha-<commit>.
+#
+# Ningun servicio se expone a la red publica. El backend y el frontend publican
+# solo en 127.0.0.1 y es Nginx, en el host, quien atiende 80/443. PostgreSQL no
+# publica puerto alguno: solo es alcanzable desde la red interna del compose.
+
+name: amzdesk
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: amzdesk_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - amzdesk
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    container_name: amzdesk_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
+      FRONTEND_URL: ${FRONTEND_URL}
+      THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+    ports:
+      - '127.0.0.1:3000:3000'
+    # Docker asigna 64 MB a /dev/shm y Chromium se cae con eso. Pesa aqui mas
+    # de lo normal porque se lanza un navegador nuevo por cada PDF generado.
+    shm_size: 1gb
+    networks:
+      - amzdesk
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: amzdesk_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOSTNAME: 0.0.0.0
+    ports:
+      - '127.0.0.1:3001:3001'
+    networks:
+      - amzdesk
+
+volumes:
+  db_data:
+
+networks:
+  amzdesk:
+    driver: bridge

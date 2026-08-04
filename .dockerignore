@@ -37,6 +37,14 @@ README.md
 ERD.md
 *.sql
 
+# Local maintenance scripts: never belong in a production image
+prisma/check-data.ts
+prisma/seed-test-data.ts
+prisma/create_test_solicitud.ts
+prisma/reset_passwords.ts
+prisma/_check-rendicion*.ts
+check-poa.js
+
 # Tools and configurations not needed in the production image
 .husky/
 .prettierrc
@@ -47,3 +55,7 @@ commitlint.config.mjs
 Dockerfile
 docker-compose.yml
 .dockerignore
+
+# CI/CD and deployment manifests (they run on the host, not inside the image)
+.github/
+deploy/

@@ -4,6 +4,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-client-exception.filter';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -13,9 +14,17 @@ const DEFAULT_PORT = 3000;
 const logger = new Logger('Bootstrap');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const frontendUrl = process.env.FRONTEND_URL ?? DEFAULT_FRONTEND_URL;
   const port = Number(process.env.PORT ?? DEFAULT_PORT);
+
+  // En producción la API vive detrás de un reverse proxy. Sin confiar en él,
+  // Express reporta la IP del proxy para todas las peticiones y el rate
+  // limiting acabaría aplicándose a un único cubo compartido por todos los
+  // usuarios. Con 'trust proxy' se lee la IP real de X-Forwarded-For.
+  if (process.env.NODE_ENV === 'production') {
+    app.set('trust proxy', 1);
+  }
 
   // Headers de seguridad HTTP. CSP deshabilitado: la API no sirve HTML de la
   // aplicación y así no se rompe Swagger UI. CORP en cross-origin para que el
