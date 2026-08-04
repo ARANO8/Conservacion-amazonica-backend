@@ -30,6 +30,7 @@ import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
 import { SolicitarPagoDto } from './dto/solicitar-pago.dto';
+import { ObservarPagoDto } from './dto/observar-pago.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -177,7 +178,7 @@ export class SolicitudesController {
   @Patch(':id/pagos/:pagoId/solicitar')
   @ApiOperation({
     summary:
-      'Solicitar el pago de una cuota (Adquisiciones). PLANIFICADO → SOLICITADO',
+      'Solicitar el pago de una cuota (Adquisiciones). PLANIFICADO | OBSERVADO → SOLICITADO',
   })
   solicitarPago(
     @Param('id', ParseIntPipe) id: number,
@@ -203,6 +204,25 @@ export class SolicitudesController {
     @Req() req: RequestWithUser,
   ) {
     return this.solicitudesService.aprobarPago(id, pagoId, req.user.userId);
+  }
+
+  @Patch(':id/pagos/:pagoId/observar')
+  @ApiOperation({
+    summary:
+      'Devolver una cuota a Adquisiciones con comentarios. SOLICITADO → OBSERVADO',
+  })
+  observarPago(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('pagoId', ParseIntPipe) pagoId: number,
+    @Req() req: RequestWithUser,
+    @Body() observarPagoDto: ObservarPagoDto,
+  ) {
+    return this.solicitudesService.observarPago(
+      id,
+      pagoId,
+      req.user.userId,
+      observarPagoDto,
+    );
   }
 
   @Patch(':id/pagos/:pagoId/pagar')

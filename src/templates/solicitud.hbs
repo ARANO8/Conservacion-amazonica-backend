@@ -37,7 +37,7 @@
             <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">
               Conservación Amazónica
             </p>
-            <h1 class="text-2xl font-bold">Solicitud de Fondos</h1>
+            <h1 class="text-2xl font-bold">{{tituloDocumento}}</h1>
             <p class="text-xs text-slate-500">Código: {{codigoSolicitud}}</p>
           </div>
         </div>
@@ -64,22 +64,49 @@
           <span class="font-semibold text-slate-700">Aprobador:</span>
           <span>{{aprobadorNombre}}</span>
         </div>
-        <div>
-          <span class="font-semibold text-slate-700">Lugar de viaje:</span>
-          <span>{{lugarViaje}}</span>
-        </div>
-        <div class="col-span-2">
-          <span class="font-semibold text-slate-700">Motivo:</span>
-          <span>{{motivoViaje}}</span>
-        </div>
-        <div>
-          <span class="font-semibold text-slate-700">Fecha inicio:</span>
-          <span>{{fechaInicio}}</span>
-        </div>
-        <div>
-          <span class="font-semibold text-slate-700">Fecha fin:</span>
-          <span>{{fechaFin}}</span>
-        </div>
+
+        {{#if esCompra}}
+          {{#if proyecto}}
+            <div>
+              <span class="font-semibold text-slate-700">Proyecto:</span>
+              <span>{{proyecto}}</span>
+            </div>
+          {{/if}}
+          <div class="col-span-2">
+            <span class="font-semibold text-slate-700">Motivo:</span>
+            <span>{{motivoViaje}}</span>
+          </div>
+          {{#if codigoActividad}}
+            <div class="col-span-2">
+              <span class="font-semibold text-slate-700">Código de actividad:</span>
+              <span>{{codigoActividad}}</span>
+            </div>
+          {{/if}}
+          {{#if chequeANombreDe}}
+            <div class="col-span-2">
+              <span class="font-semibold text-slate-700">Cheque a nombre de:</span>
+              <span>{{chequeANombreDe}}</span>
+            </div>
+          {{/if}}
+        {{else}}
+          <div>
+            <span class="font-semibold text-slate-700">Lugar de viaje:</span>
+            <span>{{lugarViaje}}</span>
+          </div>
+          <div class="col-span-2">
+            <span class="font-semibold text-slate-700">Motivo:</span>
+            <span>{{motivoViaje}}</span>
+          </div>
+          <div>
+            <span class="font-semibold text-slate-700">Fecha inicio:</span>
+            <span>{{fechaInicio}}</span>
+          </div>
+          <div>
+            <span class="font-semibold text-slate-700">Fecha fin:</span>
+            <span>{{fechaFin}}</span>
+          </div>
+        {{/if}}
+
         <div class="col-span-2">
           <span class="font-semibold text-slate-700">Cuenta Bancaria:</span>
           {{#if cuentaBancaria}}
@@ -187,6 +214,42 @@
         </tbody>
       </table>
     </section>
+
+    {{#if cronograma.length}}
+      <section class="mb-4 rounded-lg border border-slate-200 p-4">
+        <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-slate-700">
+          Cronograma de Pagos
+        </h2>
+
+        <table class="w-full border-collapse text-[10px]">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700">
+              <th class="border border-slate-300 px-2 py-2 text-left">Pago</th>
+              <th class="border border-slate-300 px-2 py-2 text-left">Producto / Hito</th>
+              <th class="border border-slate-300 px-2 py-2 text-left">Fecha prevista</th>
+              <th class="border border-slate-300 px-2 py-2 text-left">Estado</th>
+              <th class="border border-slate-300 px-2 py-2 text-right">Monto</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each cronograma}}
+              <tr>
+                <td class="border border-slate-300 px-2 py-2">{{numero}}</td>
+                <td class="border border-slate-300 px-2 py-2">{{descripcion}}</td>
+                <td class="border border-slate-300 px-2 py-2">
+                  {{fechaPago}}
+                  {{#if fechaPagoReal}}
+                    <span class="block text-slate-500">Pagado: {{fechaPagoReal}}</span>
+                  {{/if}}
+                </td>
+                <td class="border border-slate-300 px-2 py-2">{{estado}}</td>
+                <td class="border border-slate-300 px-2 py-2 text-right">{{monto}}</td>
+              </tr>
+            {{/each}}
+          </tbody>
+        </table>
+      </section>
+    {{/if}}
 
     <section class="mt-10 grid grid-cols-3 gap-8 text-center text-xs">
       <div>

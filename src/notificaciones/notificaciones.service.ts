@@ -13,6 +13,7 @@ export type TipoNotificacion =
   | 'CUADRO_OBSERVADO'
   | 'CUADRO_APROBADO'
   | 'PAGO_PENDIENTE_APROBACION'
+  | 'PAGO_OBSERVADO'
   | 'PAGO_REALIZADO';
 
 @Injectable()
@@ -31,6 +32,8 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            // El frontend enruta la notificación según el tipo de solicitud
+            tipo: true,
             rendicion: {
               select: {
                 id: true,
@@ -55,6 +58,8 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            // El frontend enruta la notificación según el tipo de solicitud
+            tipo: true,
             rendicion: {
               select: {
                 id: true,
@@ -129,6 +134,8 @@ export class NotificacionesService {
             id: true,
             codigoSolicitud: true,
             estado: true,
+            // El frontend enruta la notificación según el tipo de solicitud
+            tipo: true,
             rendicion: {
               select: {
                 id: true,

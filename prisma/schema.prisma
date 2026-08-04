@@ -31,6 +31,8 @@ enum EstadoSolicitud {
 enum EstadoPagoParcial {
   PLANIFICADO
   SOLICITADO
+  /// Devuelta a Adquisiciones con comentarios: se corrige y se vuelve a solicitar
+  OBSERVADO
   APROBADO
   PAGADO
 }
@@ -91,6 +93,7 @@ enum TipoNotificacion {
   CUADRO_OBSERVADO
   CUADRO_APROBADO
   PAGO_PENDIENTE_APROBACION
+  PAGO_OBSERVADO
   PAGO_REALIZADO
 }
 
@@ -570,6 +573,7 @@ model PagoParcial {
   urlComprobante String? // Factura o recibo del consultor
   urlInforme     String? // Informe o producto entregado que habilita el pago
   fechaPagoReal  DateTime? // Se sella al registrarse el pago
+  observacion    String?           @db.VarChar(500) // Motivo de la última devolución
 
   solicitadoPorId Int?
   solicitadoPor   Usuario? @relation("PagoSolicitante", fields: [solicitadoPorId], references: [id])

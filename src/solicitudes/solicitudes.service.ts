@@ -17,6 +17,7 @@ import { AprobarSolicitudDto } from './dto/aprobar-solicitud.dto';
 import { ObservarSolicitudDto } from './dto/observar-solicitud.dto';
 import { DesembolsarSolicitudDto } from './dto/desembolsar-solicitud.dto';
 import { SolicitarPagoDto } from './dto/solicitar-pago.dto';
+import { ObservarPagoDto } from './dto/observar-pago.dto';
 import {
   Rol,
   EstadoSolicitud,
@@ -929,7 +930,42 @@ export class SolicitudesService {
         cantidad: `${hospedaje.noches} noches`,
         montoNeto: this.formatCurrency(Number(hospedaje.costoTotal ?? 0)),
       })),
+      // Las compras y servicios viven en GastoCompra: sin esto el PDF de una
+      // solicitud de compra sale con el detalle vacío.
+      ...(solicitud.gastosCompra ?? []).map((gc) => ({
+        categoria: gc.uso?.trim() ? `Compra — ${gc.uso}` : 'Compra',
+        descripcion: gc.descripcion,
+        cantidad: `${Number(gc.cantidad)} x ${this.formatCurrency(Number(gc.costoUnitario ?? 0))}`,
+        montoNeto: this.formatCurrency(Number(gc.total ?? 0)),
+      })),
     ];
+
+    const esCompra = solicitud.tipo === TipoSolicitud.COMPRA_SERVICIO;
+
+    // Un contrato de consultoría es el gasto de compra que trae cronograma
+    const contrato = (solicitud.gastosCompra ?? []).find(
+      (gc) => (gc.pagos ?? []).length > 0,
+    );
+
+    const cronograma = [...(contrato?.pagos ?? [])]
+      .sort((a, b) => a.numero - b.numero)
+      .map((pago) => ({
+        numero: pago.numero,
+        descripcion: pago.descripcion?.trim() || '-',
+        fechaPago: this.formatDate(pago.fechaPago),
+        monto: this.formatCurrency(Number(pago.monto ?? 0)),
+        estado: pago.estado,
+        fechaPagoReal: pago.fechaPagoReal
+          ? this.formatDate(pago.fechaPagoReal)
+          : null,
+      }));
+
+    const poa = solicitud.presupuestos?.[0]?.poa;
+    const codigoActividad = poa
+      ? [poa.codigoPoa, poa.actividad?.detalleDescripcion]
+          .filter(Boolean)
+          .join(' — ')
+      : null;
 
     return this.pdfService.generatePdf('solicitud.hbs', {
       ...solicitud,
@@ -953,6 +989,16 @@ export class SolicitudesService {
       },
       motivoViaje: solicitud.motivoViaje ?? 'Sin motivo registrado',
       lugarViaje: solicitud.lugarViaje ?? 'Sin lugar registrado',
+      // Una compra no tiene lugar ni fechas de viaje: mostrar esos campos
+      // vacíos daba la impresión de que el PDF salía sin datos.
+      esCompra,
+      tituloDocumento: esCompra
+        ? 'Solicitud de Fondos — Compras y Servicios'
+        : 'Solicitud de Fondos',
+      chequeANombreDe: solicitud.chequeANombreDe ?? null,
+      proyecto: solicitud.proyecto ?? null,
+      codigoActividad,
+      cronograma,
       cuentaBancaria: cuentaBancaria
         ? {
             banco: cuentaBancaria.banco ?? 'Banco no asignado',
@@ -1467,6 +1513,13 @@ export class SolicitudesService {
       return updated;
     });
 
+    // Cada tipo se corrige en su propio formulario: mandar una compra al wizard
+    // de viajes deja al emisor frente a un formulario de viáticos vacío.
+    const rutaEdicion =
+      solicitud.tipo === TipoSolicitud.COMPRA_SERVICIO
+        ? `/app/solicitudes-compra/${id}/editar`
+        : `/app/solicitudes/${id}/editar`;
+
     try {
       // Crear notificación para el usuario emisor
       await this.notificacionesService.crearNotificacion({
@@ -1475,7 +1528,7 @@ export class SolicitudesService {
         tipo: 'SOLICITUD_OBSERVADA',
         usuarioId: solicitud.usuarioEmisorId,
         solicitudId: solicitudActualizada.id,
-        urlDestino: `/app/solicitudes/${id}/editar`,
+        urlDestino: rutaEdicion,
       });
     } catch (error) {
       const normalizedError =
@@ -1623,7 +1676,14 @@ export class SolicitudesService {
   ) {
     const { pago, solicitud } = await this.findPagoParcial(solicitudId, pagoId);
 
-    if (pago.estado !== EstadoPagoParcial.PLANIFICADO) {
+    // Una cuota observada vuelve a este punto: se corrige el respaldo y se
+    // solicita de nuevo, eventualmente a otro aprobador.
+    const ORIGENES_VALIDOS: EstadoPagoParcial[] = [
+      EstadoPagoParcial.PLANIFICADO,
+      EstadoPagoParcial.OBSERVADO,
+    ];
+
+    if (!ORIGENES_VALIDOS.includes(pago.estado)) {
       throw new BadRequestException(
         `El pago ${pago.numero} ya fue solicitado (estado actual: ${pago.estado})`,
       );
@@ -1652,6 +1712,8 @@ export class SolicitudesService {
         urlInforme: dto.urlInforme ?? null,
         solicitadoPorId: usuarioId,
         aprobadorId: dto.aprobadorId,
+        // La observación anterior deja de aplicar al reenviar el respaldo
+        observacion: null,
       },
     });
 
@@ -1695,6 +1757,63 @@ export class SolicitudesService {
       where: { id: pagoId },
       data: { estado: EstadoPagoParcial.APROBADO },
     });
+  }
+
+  /**
+   * Devuelve una cuota a Adquisiciones con comentarios. No toca el POA: el
+   * presupuesto sigue comprometido por el contrato mientras se corrige.
+   */
+  async observarPago(
+    solicitudId: number,
+    pagoId: number,
+    usuarioId: number,
+    dto: ObservarPagoDto,
+  ) {
+    const { pago, solicitud } = await this.findPagoParcial(solicitudId, pagoId);
+
+    if (pago.estado !== EstadoPagoParcial.SOLICITADO) {
+      throw new BadRequestException(
+        `Solo se pueden observar pagos en estado SOLICITADO (estado actual: ${pago.estado})`,
+      );
+    }
+
+    if (pago.aprobadorId !== usuarioId) {
+      throw new ForbiddenException(
+        'No tienes permiso para observar este pago, no eres el aprobador asignado',
+      );
+    }
+
+    const actualizado = await this.prisma.pagoParcial.update({
+      where: { id: pagoId },
+      data: {
+        estado: EstadoPagoParcial.OBSERVADO,
+        observacion: dto.observacion,
+      },
+    });
+
+    // Quien solicitó el pago es quien debe corregirlo; si por alguna razón no
+    // quedó registrado, se avisa al emisor del contrato.
+    const destinatarioId = pago.solicitadoPorId ?? solicitud.usuarioEmisorId;
+
+    try {
+      await this.notificacionesService.crearNotificacion({
+        titulo: 'Pago de consultoría observado',
+        mensaje: `El pago ${pago.numero} del contrato ${solicitud.codigoSolicitud} fue devuelto: ${dto.observacion}`,
+        tipo: 'PAGO_OBSERVADO',
+        usuarioId: destinatarioId,
+        solicitudId,
+        urlDestino: `/app/solicitudes-compra/${solicitudId}`,
+      });
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+      this.logger.error(
+        `[SolicitudesService] Error al notificar observación del pago ${pagoId}: ${normalizedError.message}`,
+        normalizedError.stack,
+      );
+    }
+
+    return actualizado;
   }
 
   async pagarPago(solicitudId: number, pagoId: number, usuarioId: number) {
