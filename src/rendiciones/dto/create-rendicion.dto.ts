@@ -1,7 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
-  ArrayMinSize,
   IsArray,
   IsDate,
   IsEnum,
@@ -144,59 +143,6 @@ export class CreateGastoRendicionDto {
   tipoRetencion?: TipoRetencionDto;
 }
 
-export class CreateActividadInformeDto {
-  @ApiProperty({
-    example: '2026-03-12T00:00:00.000Z',
-    description: 'Fecha de la actividad',
-  })
-  @Type(() => Date)
-  @IsDate()
-  fecha: Date;
-
-  @ApiProperty({ example: 'Cobija' })
-  @IsString()
-  @IsNotEmpty()
-  lugar: string;
-
-  @ApiProperty({ example: 'Gobierno Autónomo Municipal de Cobija' })
-  @IsString()
-  @IsNotEmpty()
-  personaInstitucion: string;
-
-  @ApiProperty({
-    example:
-      'Reunión de coordinación con actores locales y validación de agenda.',
-  })
-  @IsString()
-  @IsNotEmpty()
-  actividadesRealizadas: string;
-}
-
-export class CreateInformeGastosDto {
-  @ApiProperty({
-    example: '2026-03-10T00:00:00.000Z',
-    description: 'Fecha de inicio del viaje',
-  })
-  @Type(() => Date)
-  @IsDate()
-  fechaInicio: Date;
-
-  @ApiProperty({
-    example: '2026-03-14T00:00:00.000Z',
-    description: 'Fecha de fin del viaje',
-  })
-  @Type(() => Date)
-  @IsDate()
-  fechaFin: Date;
-
-  @ApiProperty({ type: [CreateActividadInformeDto] })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ValidateNested({ each: true })
-  @Type(() => CreateActividadInformeDto)
-  actividades: CreateActividadInformeDto[];
-}
-
 export class CreateRendicionDto {
   @ApiProperty({ example: 123 })
   @Type(() => Number)
@@ -226,12 +172,6 @@ export class CreateRendicionDto {
   @ValidateNested({ each: true })
   @Type(() => CreateGastoRendicionDto)
   gastos: CreateGastoRendicionDto[];
-
-  @ApiPropertyOptional({ type: CreateInformeGastosDto })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => CreateInformeGastosDto)
-  informeGastos?: CreateInformeGastosDto;
 
   @ApiPropertyOptional({
     example: 'Observaciones adicionales del responsable de la rendición',

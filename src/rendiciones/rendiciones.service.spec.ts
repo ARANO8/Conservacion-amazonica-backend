@@ -336,11 +336,6 @@ describe('RendicionesService', () => {
             monto: new Prisma.Decimal(5),
           },
         ],
-        informeGastos: {
-          fechaInicio: new Date('2026-06-21'),
-          fechaFin: new Date('2026-06-24'),
-          actividades: [],
-        },
         historialAprobaciones: [],
       };
 

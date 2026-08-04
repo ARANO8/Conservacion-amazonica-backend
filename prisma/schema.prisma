@@ -123,6 +123,7 @@ model Usuario {
   pagosSolicitados        PagoParcial[]         @relation("PagoSolicitante")
   pagosPorAprobar         PagoParcial[]         @relation("PagoAprobador")
   pagosRegistrados        PagoParcial[]         @relation("PagoTesorero")
+  informesActividades     InformeActividades[]
 }
 
 model Proyecto {
@@ -346,7 +347,6 @@ model Rendicion {
 
   aprobadorActual Usuario? @relation("RendicionAprobador", fields: [aprobadorActualId], references: [id])
 
-  informeGastos         InformeGastos?
   gastosRendicion       GastoRendicion[]
   declaracionesJuradas  DeclaracionJurada[]
   historialAprobaciones HistorialAprobacion[] @relation("RendicionHistorial")
@@ -354,27 +354,37 @@ model Rendicion {
   @@index([deletedAt])
 }
 
-model InformeGastos {
-  id          Int       @id @default(autoincrement())
-  rendicionId Int       @unique
-  rendicion   Rendicion @relation(fields: [rendicionId], references: [id], onDelete: Cascade)
-  fechaInicio DateTime
-  fechaFin    DateTime
+/// Bitácora de actividades de un viaje (ANEXO 7). Es independiente: no cuelga
+/// de una rendición ni de una solicitud, sólo de su autor.
+model InformeActividades {
+  id            Int      @id @default(autoincrement())
+  codigoInforme String   @unique
+  fechaInicio   DateTime
+  fechaFin      DateTime
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
 
   actividades ActividadInforme[]
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([usuarioId])
+  @@index([deletedAt])
 }
 
 model ActividadInforme {
-  id                    Int           @id @default(autoincrement())
+  id                    Int                @id @default(autoincrement())
   informeId             Int
-  informe               InformeGastos @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  informe               InformeActividades @relation(fields: [informeId], references: [id], onDelete: Cascade)
   fecha                 DateTime
   lugar                 String
   personaInstitucion    String
   actividadesRealizadas String
+
+  @@index([informeId])
 }
 
 model GastoRendicion {

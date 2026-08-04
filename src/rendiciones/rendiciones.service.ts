@@ -90,11 +90,6 @@ const RENDICION_INCLUDE = {
       },
     },
   },
-  informeGastos: {
-    include: {
-      actividades: true,
-    },
-  },
   historialAprobaciones: {
     include: {
       usuario: {
@@ -505,7 +500,6 @@ export class RendicionesService {
       },
       transacciones,
       resumenContable,
-      informeGastos: this.buildInformeTexto(rendicion.informeGastos),
       generatedAt: this.formatDate(new Date()),
     });
   }
@@ -614,30 +608,9 @@ export class RendicionesService {
               montoNeto: new Prisma.Decimal(gasto.montoNeto),
             })),
           },
-          informeGastos: dto.informeGastos
-            ? {
-                create: {
-                  fechaInicio: dto.informeGastos.fechaInicio,
-                  fechaFin: dto.informeGastos.fechaFin,
-                  actividades: {
-                    create: dto.informeGastos.actividades.map((actividad) => ({
-                      fecha: actividad.fecha,
-                      lugar: actividad.lugar,
-                      personaInstitucion: actividad.personaInstitucion,
-                      actividadesRealizadas: actividad.actividadesRealizadas,
-                    })),
-                  },
-                },
-              }
-            : undefined,
         },
         include: {
           gastosRendicion: true,
-          informeGastos: {
-            include: {
-              actividades: true,
-            },
-          },
         },
       });
 
@@ -708,11 +681,6 @@ export class RendicionesService {
             },
           },
           gastosRendicion: true,
-          informeGastos: {
-            include: {
-              actividades: true,
-            },
-          },
         },
       });
 
@@ -786,19 +754,10 @@ export class RendicionesService {
         }
       }
 
-      // 7. Eliminar gastos e informe anteriores
+      // 7. Eliminar gastos anteriores
       await tx.gastoRendicion.deleteMany({
         where: { rendicionId: id },
       });
-
-      if (rendicion.informeGastos) {
-        await tx.actividadInforme.deleteMany({
-          where: { informeId: rendicion.informeGastos.id },
-        });
-        await tx.informeGastos.delete({
-          where: { id: rendicion.informeGastos.id },
-        });
-      }
 
       // 8. Calcular nuevos totales
       const fechaRendicion = dto.fechaRendicion ?? rendicion.fechaRendicion;
@@ -850,22 +809,6 @@ export class RendicionesService {
               montoNeto: new Prisma.Decimal(gasto.montoNeto),
             })),
           },
-          informeGastos: dto.informeGastos
-            ? {
-                create: {
-                  fechaInicio: dto.informeGastos.fechaInicio,
-                  fechaFin: dto.informeGastos.fechaFin,
-                  actividades: {
-                    create: dto.informeGastos.actividades.map((actividad) => ({
-                      fecha: actividad.fecha,
-                      lugar: actividad.lugar,
-                      personaInstitucion: actividad.personaInstitucion,
-                      actividadesRealizadas: actividad.actividadesRealizadas,
-                    })),
-                  },
-                },
-              }
-            : undefined,
         },
         include: RENDICION_INCLUDE,
       });
@@ -1487,34 +1430,6 @@ export class RendicionesService {
       month: '2-digit',
       year: 'numeric',
     }).format(date);
-  }
-
-  private buildInformeTexto(
-    informe:
-      | {
-          fechaInicio: Date;
-          fechaFin: Date;
-          actividades?: {
-            fecha: Date;
-            lugar: string;
-            personaInstitucion: string;
-            actividadesRealizadas: string;
-          }[];
-        }
-      | null
-      | undefined,
-  ): string {
-    if (!informe) {
-      return 'Sin informe registrado.';
-    }
-
-    const encabezado = `Periodo: ${this.formatDate(informe.fechaInicio)} - ${this.formatDate(informe.fechaFin)}`;
-    const actividades = (informe.actividades ?? []).map(
-      (actividad, index) =>
-        `Actividad ${index + 1}:\nFecha: ${this.formatDate(actividad.fecha)}\nLugar: ${actividad.lugar}\nPersona / Institución: ${actividad.personaInstitucion}\nDetalle: ${actividad.actividadesRealizadas}`,
-    );
-
-    return [encabezado, ...actividades].join('\n\n');
   }
 
   async updateGastoPartidaContable(

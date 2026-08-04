@@ -11,7 +11,6 @@ import {
 import {
   CreateRendicionDto,
   CreateGastoRendicionDto,
-  CreateInformeGastosDto,
 } from './create-rendicion.dto';
 
 /**
@@ -43,10 +42,4 @@ export class UpdateRendicionDto extends PartialType(CreateRendicionDto) {
   @ValidateNested({ each: true })
   @Type(() => CreateGastoRendicionDto)
   gastos?: CreateGastoRendicionDto[];
-
-  @ApiPropertyOptional({ type: CreateInformeGastosDto })
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => CreateInformeGastosDto)
-  informeGastos?: CreateInformeGastosDto;
 }

@@ -263,12 +263,14 @@ APROBADO APROBADO
     }
   
 
-  "InformeGastos" {
+  "InformeActividades" {
     Int id "🗝️"
+    String codigoInforme 
     DateTime fechaInicio 
     DateTime fechaFin 
     DateTime createdAt 
     DateTime updatedAt 
+    DateTime deletedAt "❓"
     }
   
 
@@ -555,8 +557,8 @@ APROBADO APROBADO
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
     "Rendicion" }o--|o "Usuario" : "aprobadorActual"
-    "InformeGastos" |o--|| "Rendicion" : "rendicion"
-    "ActividadInforme" }o--|| "InformeGastos" : "informe"
+    "InformeActividades" }o--|| "Usuario" : "usuario"
+    "ActividadInforme" }o--|| "InformeActividades" : "informe"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoRendicion" }o--|| "Rendicion" : "rendicion"
     "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"
