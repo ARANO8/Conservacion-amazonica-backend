@@ -1,14 +1,15 @@
-# Despliegue del VPS de pruebas.
+# Stack de la aplicacion en el VPS.
 #
-# Este archivo se copia al VPS como /opt/amzdesk/docker-compose.yml y lee sus
-# valores de /opt/amzdesk/.env (permisos 600, fuera de git).
+# Se copia al VPS como /opt/amzdesk/docker-compose.yml y lee sus valores de
+# /opt/amzdesk/.env (permisos 600, fuera de git).
 #
 # Las imagenes no se construyen aqui: las publica GitHub Actions en GHCR y el
 # VPS solo hace pull de la etiqueta inmutable sha-<commit>.
 #
-# Ningun servicio se expone a la red publica. El backend y el frontend publican
-# solo en 127.0.0.1 y es Nginx, en el host, quien atiende 80/443. PostgreSQL no
-# publica puerto alguno: solo es alcanzable desde la red interna del compose.
+# NINGUN servicio publica puertos. El unico que escucha en el host es el nginx
+# del stack `edge`, que alcanza a estos contenedores por la red compartida del
+# mismo nombre. PostgreSQL ni siquiera esta en esa red: solo es visible desde
+# la red interna.
 
 name: amzdesk
 
@@ -30,7 +31,7 @@ services:
       retries: 5
       start_period: 20s
     networks:
-      - amzdesk
+      - interna
 
   backend:
     image: ${BACKEND_IMAGE}
@@ -46,16 +47,20 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
       FRONTEND_URL: ${FRONTEND_URL}
+      # El dominio aloja varios sistemas: la cookie se acota a este prefijo
+      # para que el JWT no viaje a las aplicaciones vecinas.
+      COOKIE_PATH: ${COOKIE_PATH:-/amzdesk}
       THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-100}
       PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
-    ports:
-      - '127.0.0.1:3000:3000'
+      SEED_PASSWORD: ${SEED_PASSWORD:-}
     # Docker asigna 64 MB a /dev/shm y Chromium se cae con eso. Pesa aqui mas
     # de lo normal porque se lanza un navegador nuevo por cada PDF generado.
-    shm_size: 1gb
+    # 512 MB y no mas: el VPS tiene 2 GB de RAM en total.
+    shm_size: 512m
     networks:
-      - amzdesk
+      - interna
+      - edge
 
   frontend:
     image: ${FRONTEND_IMAGE}
@@ -67,14 +72,16 @@ services:
       NODE_ENV: production
       PORT: 3001
       HOSTNAME: 0.0.0.0
-    ports:
-      - '127.0.0.1:3001:3001'
     networks:
-      - amzdesk
+      - edge
 
 volumes:
   db_data:
 
 networks:
-  amzdesk:
+  interna:
     driver: bridge
+  # La crea el stack `edge`. Aqui solo se referencia.
+  edge:
+    external: true
+    name: edge

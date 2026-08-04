@@ -1,0 +1,33 @@
+# Proxy compartido del VPS.
+#
+# Se copia al VPS como /opt/edge/docker-compose.yml y es el UNICO contenedor que
+# publica un puerto en el host. El HTTPS lo termina un proxy anterior al VPS,
+# asi que aqui solo se escucha HTTP en el 80.
+#
+# Va aparte del stack de la aplicacion a proposito: reparte el dominio entre el
+# portfolio, /amzdesk y los sistemas que se agreguen despues. Si viviera dentro
+# del compose de amzdesk, cada despliegue de la aplicacion reiniciaria el proxy
+# de todos los demas sitios.
+#
+# La red `edge` se declara aqui y los demas stacks la referencian como externa,
+# por lo que este debe levantarse primero.
+
+name: edge
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: edge_nginx
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./html:/var/www/html:ro
+    networks:
+      - edge
+
+networks:
+  edge:
+    name: edge
+    driver: bridge

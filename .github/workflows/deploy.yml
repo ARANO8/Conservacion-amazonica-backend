@@ -101,12 +101,12 @@ jobs:
       - name: Smoke test
         run: |
           for intento in $(seq 1 12); do
-            if curl -fsS "${{ secrets.APP_URL }}/api/health" > /dev/null; then
-              echo "La API responde correctamente en /api/health"
+            if curl -fsS "${{ secrets.APP_URL }}/amzdesk/api/health" > /dev/null; then
+              echo "La API responde correctamente en /amzdesk/api/health"
               exit 0
             fi
             echo "Intento $intento: la API aun no responde, reintentando en 5s..."
             sleep 5
           done
-          echo "::error::La API no respondio a /api/health tras 60 segundos"
+          echo "::error::La API no respondio a /amzdesk/api/health tras 60 segundos"
           exit 1

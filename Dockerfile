@@ -83,6 +83,12 @@ RUN npx prisma generate --generator client
 COPY --from=builder /app/dist ./dist
 COPY logo.png ./logo.png
 
+# El seed compilado resuelve sus datos con path.join(__dirname, 'seeds', ...),
+# es decir dist/prisma/seeds. Los CSV viven en prisma/seeds, asi que se copian
+# a esa ruta para poder sembrar una base nueva sin devDependencies ni ts-node:
+#   docker compose run --rm backend node dist/prisma/seed.js
+COPY prisma/seeds ./dist/prisma/seeds
+
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
