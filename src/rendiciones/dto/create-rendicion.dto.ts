@@ -10,6 +10,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -239,4 +240,12 @@ export class CreateRendicionDto {
   @IsString()
   @IsNotEmpty()
   observaciones?: string;
+
+  @ApiPropertyOptional({
+    example: 'https://drive.google.com/drive/folders/xxx',
+    description: 'Carpeta o enlace con los comprobantes digitales',
+  })
+  @IsOptional()
+  @IsUrl({}, { message: 'El enlace de comprobantes no es una URL válida' })
+  comprobanteUrl?: string;
 }

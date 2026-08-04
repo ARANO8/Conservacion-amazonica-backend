@@ -335,6 +335,8 @@ model Rendicion {
   estado            EstadoRendicion @default(PENDIENTE)
   aprobadorActualId Int?
   observaciones     String?
+  /// Carpeta o enlace con los comprobantes digitales de la rendición
+  comprobanteUrl    String?
   deletedAt         DateTime?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt

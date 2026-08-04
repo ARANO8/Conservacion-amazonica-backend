@@ -256,6 +256,7 @@ APROBADO APROBADO
     Decimal saldoLiquido 
     EstadoRendicion estado 
     String observaciones "❓"
+    String comprobanteUrl "❓"
     DateTime deletedAt "❓"
     DateTime createdAt 
     DateTime updatedAt 

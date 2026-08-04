@@ -369,9 +369,30 @@ describe('RendicionesService', () => {
       expect(params.totalEfectivoPagado).toContain('125,00'); // (100 + 20 + 5)
       expect(params.totalImpuestosRetenidos).toContain('3,81');
 
-      // Saldo líquido final (1000 - 128.81 = 871.19)
-      expect(params.saldoLiquidoFormat).toContain('871,19');
+      // La liquidación de caja va sobre el efectivo, no sobre el bruto:
+      // 1000 - 125.00 = 875.00 (el bruto 128.81 sigue siendo la cifra del POA)
+      expect(params.saldoLiquidoFormat).toContain('875,00');
+      expect(params.saldoEfectivo).toContain('875,00');
       expect(params.saldoEsDevolucion).toBe(true);
+
+      // Sobró plata: el saldo va a favor del proyecto
+      expect(params.aFavorProyecto).toContain('875,00');
+      expect(params.aFavorEmpleado).toBeNull();
+
+      // Conteo de documentos: 1 factura y 2 no-facturas (recibo + DJ)
+      expect(params.conteoDocumentos).toMatchObject({
+        facturasCantidad: 1,
+        recibosCantidad: 2,
+        totalCantidad: 3,
+      });
+      expect(params.conteoDocumentos.facturasMonto).toContain('100,00');
+      expect(params.conteoDocumentos.recibosMonto).toContain('25,00');
+
+      // El recibo de servicio reparte sus 3.81 en RC-IVA 13% + IT 3%
+      const recibo = params.transacciones[2];
+      expect(recibo.totalImpuestos).toContain('3,81');
+      expect(recibo.rcIva).toContain('3,10');
+      expect(recibo.it).toContain('0,71');
 
       // Resumen contable agrupado por partida (Combustibles/POA-001 y S/P)
       expect(params.resumenContable).toHaveLength(2);

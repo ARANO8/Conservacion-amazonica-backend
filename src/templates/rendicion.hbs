@@ -118,9 +118,15 @@
             <th class="border border-slate-300 px-1.5 py-1 text-center w-[50px]">Partida</th>
             <th class="border border-slate-300 px-1.5 py-1 text-left">Concepto / Actividad</th>
             <th class="border border-slate-300 px-1.5 py-1 text-left w-[120px]">Proveedor / Beneficiario</th>
-            <th class="border border-slate-300 px-1.5 py-1 text-right w-[65px]">Ingreso (+)</th>
-            <th class="border border-slate-300 px-1.5 py-1 text-right w-[65px]">Egreso (-)</th>
-            <th class="border border-slate-300 px-1.5 py-1 text-right w-[70px]">Saldo</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[60px]">Ingreso (+)</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[60px]">Egreso (-)</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[60px]">Saldo</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[60px]">Total</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[55px]">RC-IVA 13%</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[50px]">IUE 5%</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[50px]">IT 3%</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[60px]">Total imp.</th>
+            <th class="border border-slate-300 px-1.5 py-1 text-right w-[60px]">Neto</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-200">
@@ -134,10 +140,95 @@
               <td class="border border-slate-300 px-1.5 py-1 text-right font-mono text-emerald-700 font-semibold">{{ingreso}}</td>
               <td class="border border-slate-300 px-1.5 py-1 text-right font-mono text-red-700 font-semibold">{{egreso}}</td>
               <td class="border border-slate-300 px-1.5 py-1 text-right font-mono font-bold text-slate-900">{{saldo}}</td>
+              <td class="border border-slate-300 px-1.5 py-1 text-right font-mono text-slate-700">{{total}}</td>
+              <td class="border border-slate-300 px-1.5 py-1 text-right font-mono text-slate-600">{{rcIva}}</td>
+              <td class="border border-slate-300 px-1.5 py-1 text-right font-mono text-slate-600">{{iue}}</td>
+              <td class="border border-slate-300 px-1.5 py-1 text-right font-mono text-slate-600">{{it}}</td>
+              <td class="border border-slate-300 px-1.5 py-1 text-right font-mono font-semibold text-slate-700">{{totalImpuestos}}</td>
+              <td class="border border-slate-300 px-1.5 py-1 text-right font-mono font-bold text-slate-900">{{neto}}</td>
             </tr>
           {{/each}}
+          <tr class="bg-slate-100 font-bold uppercase text-[8px]">
+            <td colspan="5" class="border border-slate-300 px-1.5 py-1 text-right">Totales</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono text-emerald-700">{{totalesTransacciones.ingreso}}</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono text-red-700">{{totalesTransacciones.egreso}}</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono">{{totalesTransacciones.saldo}}</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono">{{totalesTransacciones.total}}</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono">{{totalesTransacciones.rcIva}}</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono">{{totalesTransacciones.iue}}</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono">{{totalesTransacciones.it}}</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono">{{totalesTransacciones.totalImpuestos}}</td>
+            <td class="border border-slate-300 px-1.5 py-1 text-right font-mono">{{totalesTransacciones.neto}}</td>
+          </tr>
         </tbody>
       </table>
+    </section>
+
+    <!-- Liquidación de caja y conteo de documentos (ANEXO 4) -->
+    <section class="mb-4 no-break">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="rounded-md border border-slate-200 p-3">
+          <h2 class="mb-2 text-[9px] font-extrabold uppercase tracking-wider text-slate-800">
+            Liquidación de Caja
+          </h2>
+          <div class="space-y-1 text-[9px]">
+            <div class="flex justify-between">
+              <span class="text-slate-600">Importe recibido:</span>
+              <span class="font-mono font-semibold">{{montoRecibido}}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-slate-600">Total gastado (efectivo):</span>
+              <span class="font-mono font-semibold">{{totalEfectivoPagado}}</span>
+            </div>
+            <div class="flex justify-between border-t border-slate-200 pt-1">
+              <span class="font-bold text-slate-700">Saldo:</span>
+              <span class="font-mono font-bold">{{saldoEfectivo}}</span>
+            </div>
+          </div>
+          <div class="mt-2 grid grid-cols-2 gap-2">
+            <div class="rounded border {{#if aFavorEmpleado}}border-amber-300 bg-amber-50{{else}}border-dashed border-slate-200{{/if}} px-2 py-1.5">
+              <p class="text-[7.5px] font-bold uppercase text-slate-600">A favor del empleado</p>
+              <p class="font-mono text-[10px] font-extrabold">{{#if aFavorEmpleado}}{{aFavorEmpleado}}{{else}}—{{/if}}</p>
+            </div>
+            <div class="rounded border {{#if aFavorProyecto}}border-emerald-300 bg-emerald-50{{else}}border-dashed border-slate-200{{/if}} px-2 py-1.5">
+              <p class="text-[7.5px] font-bold uppercase text-slate-600">A favor del proyecto</p>
+              <p class="font-mono text-[10px] font-extrabold">{{#if aFavorProyecto}}{{aFavorProyecto}}{{else}}—{{/if}}</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-md border border-slate-200 p-3">
+          <h2 class="mb-2 text-[9px] font-extrabold uppercase tracking-wider text-slate-800">
+            Documentos de Respaldo
+          </h2>
+          <table class="w-full border-collapse text-[8.5px]">
+            <thead>
+              <tr class="bg-slate-100 text-slate-700 text-[8px] uppercase">
+                <th class="border border-slate-300 px-2 py-1 text-left">Documentos</th>
+                <th class="border border-slate-300 px-2 py-1 text-center w-[50px]">Cant.</th>
+                <th class="border border-slate-300 px-2 py-1 text-right w-[80px]">Monto Bs</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="border border-slate-300 px-2 py-1">Facturas</td>
+                <td class="border border-slate-300 px-2 py-1 text-center font-mono">{{conteoDocumentos.facturasCantidad}}</td>
+                <td class="border border-slate-300 px-2 py-1 text-right font-mono">{{conteoDocumentos.facturasMonto}}</td>
+              </tr>
+              <tr>
+                <td class="border border-slate-300 px-2 py-1">Recibos y otros</td>
+                <td class="border border-slate-300 px-2 py-1 text-center font-mono">{{conteoDocumentos.recibosCantidad}}</td>
+                <td class="border border-slate-300 px-2 py-1 text-right font-mono">{{conteoDocumentos.recibosMonto}}</td>
+              </tr>
+              <tr class="bg-slate-100 font-bold">
+                <td class="border border-slate-300 px-2 py-1">TOTAL</td>
+                <td class="border border-slate-300 px-2 py-1 text-center font-mono">{{conteoDocumentos.totalCantidad}}</td>
+                <td class="border border-slate-300 px-2 py-1 text-right font-mono">{{conteoDocumentos.totalMonto}}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
     <!-- Resumen Contable por Partida (Presupuestario) -->

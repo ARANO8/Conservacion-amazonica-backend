@@ -22,6 +22,7 @@ import { UpdateGastoPartidaContableDto } from './dto/update-gasto-partida-contab
 import { UpdateGastoPartidaPresupuestariaDto } from './dto/update-gasto-partida-presupuestaria.dto';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
+import { desglosarRetenciones } from './rendiciones.helper';
 
 const RENDICION_INCLUDE = {
   solicitud: {
@@ -274,16 +275,27 @@ export class RendicionesService {
         g.partida?.poa?.estructura?.partida?.nombre ??
         g.partida?.poa?.codigoPoa ??
         'S/P';
+      const desglose = desglosarRetenciones(
+        g.montoImpuestos ?? 0,
+        g.tipoDocumento,
+        g.tipoRetencion,
+        g.partida?.poa?.estructura?.partida?.nombre,
+      );
+
       return {
         date: g.fecha ? new Date(g.fecha) : new Date(rendicion.fechaRendicion),
         fechaStr: this.formatDate(g.fecha),
         comprobante: `${g.tipoDocumento} ${g.nroDocumento}`,
+        tipoDocumento: String(g.tipoDocumento),
         partida: partidaCod,
         concepto: g.concepto || g.detalle || 'Gasto con respaldo',
         proveedor: g.proveedor || 'S/P',
         montoBruto: Number(g.montoBruto ?? g.monto ?? 0),
         montoImpuestos: Number(g.montoImpuestos ?? 0),
         montoNeto: Number(g.montoNeto ?? 0),
+        rcIva: desglose.rcIva.toNumber(),
+        iue: desglose.iue.toNumber(),
+        it: desglose.it.toNumber(),
       };
     });
 
@@ -298,9 +310,13 @@ export class RendicionesService {
           partida: 'S/P',
           concepto: dj.detalle || 'Gasto sin respaldo',
           proveedor: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
+          tipoDocumento: 'DJ',
           montoBruto: Number(dj.monto ?? 0),
           montoImpuestos: 0,
           montoNeto: Number(dj.monto ?? 0),
+          rcIva: 0,
+          iue: 0,
+          it: 0,
         };
       },
     );
@@ -313,14 +329,37 @@ export class RendicionesService {
     let totalEfectivoPagado = 0;
     let totalImpuestosRetenidos = 0;
     let totalPresupuestado = 0;
+    let totalRcIva = 0;
+    let totalIue = 0;
+    let totalIt = 0;
+
+    // Conteo de documentos de respaldo (ANEXO 4): factura vs. el resto
+    const conteo = {
+      facturasCantidad: 0,
+      facturasMonto: 0,
+      recibosCantidad: 0,
+      recibosMonto: 0,
+    };
 
     for (const g of sortedGastos) {
-      const outflow = g.montoBruto; // Se descuenta el bruto (total afectado al presupuesto)
-      runningBalance -= outflow;
+      // El saldo de caja sigue el efectivo desembolsado, no el bruto que se
+      // carga al POA: es la plata que se devuelve o se reembolsa al liquidar.
+      runningBalance -= g.montoNeto;
 
       totalEfectivoPagado += g.montoNeto;
       totalImpuestosRetenidos += g.montoImpuestos;
       totalPresupuestado += g.montoBruto;
+      totalRcIva += g.rcIva;
+      totalIue += g.iue;
+      totalIt += g.it;
+
+      if (g.tipoDocumento === 'FACTURA') {
+        conteo.facturasCantidad += 1;
+        conteo.facturasMonto += g.montoNeto;
+      } else {
+        conteo.recibosCantidad += 1;
+        conteo.recibosMonto += g.montoNeto;
+      }
 
       transacciones.push({
         fecha: g.fechaStr,
@@ -329,14 +368,23 @@ export class RendicionesService {
         concepto: g.concepto,
         proveedor: g.proveedor,
         ingreso: '—',
-        egreso: this.formatCurrency(outflow),
+        egreso: this.formatCurrency(g.montoNeto),
         saldo: this.formatCurrency(runningBalance),
+        total: this.formatCurrency(g.montoBruto),
+        rcIva: g.rcIva > 0 ? this.formatCurrency(g.rcIva) : '—',
+        iue: g.iue > 0 ? this.formatCurrency(g.iue) : '—',
+        it: g.it > 0 ? this.formatCurrency(g.it) : '—',
+        totalImpuestos:
+          g.montoImpuestos > 0 ? this.formatCurrency(g.montoImpuestos) : '—',
+        neto: this.formatCurrency(g.montoNeto),
       });
     }
 
-    const finalSaldoLiquido = Number(
-      (montoRecibido - totalPresupuestado).toFixed(2),
+    // Liquidación de caja: recibido menos el efectivo gastado
+    const saldoEfectivo = Number(
+      (montoRecibido - totalEfectivoPagado).toFixed(2),
     );
+    const finalSaldoLiquido = saldoEfectivo;
 
     // Resumen Contable por Partida
     const agrupadoPartidasMap = new Map<
@@ -416,10 +464,40 @@ export class RendicionesService {
       saldoLiquido: Math.abs(finalSaldoLiquido),
       saldoLiquidoFormat: this.formatCurrency(Math.abs(finalSaldoLiquido)),
       saldoEsDevolucion: finalSaldoLiquido >= 0,
+      // Liquidación de caja del ANEXO 4 (sobre el efectivo, no sobre el bruto)
+      saldoEfectivo: this.formatCurrency(saldoEfectivo),
+      aFavorEmpleado:
+        saldoEfectivo < 0 ? this.formatCurrency(Math.abs(saldoEfectivo)) : null,
+      aFavorProyecto:
+        saldoEfectivo > 0 ? this.formatCurrency(saldoEfectivo) : null,
+      conteoDocumentos: {
+        facturasCantidad: conteo.facturasCantidad,
+        facturasMonto: this.formatCurrency(conteo.facturasMonto),
+        recibosCantidad: conteo.recibosCantidad,
+        recibosMonto: this.formatCurrency(conteo.recibosMonto),
+        totalCantidad: conteo.facturasCantidad + conteo.recibosCantidad,
+        totalMonto: this.formatCurrency(
+          conteo.facturasMonto + conteo.recibosMonto,
+        ),
+      },
+      totalesTransacciones: {
+        ingreso: this.formatCurrency(montoRecibido),
+        egreso: this.formatCurrency(totalEfectivoPagado),
+        saldo: this.formatCurrency(saldoEfectivo),
+        total: this.formatCurrency(totalPresupuestado),
+        rcIva: totalRcIva > 0 ? this.formatCurrency(totalRcIva) : '—',
+        iue: totalIue > 0 ? this.formatCurrency(totalIue) : '—',
+        it: totalIt > 0 ? this.formatCurrency(totalIt) : '—',
+        totalImpuestos:
+          totalImpuestosRetenidos > 0
+            ? this.formatCurrency(totalImpuestosRetenidos)
+            : '—',
+        neto: this.formatCurrency(totalEfectivoPagado),
+      },
       saldoStatus:
         finalSaldoLiquido >= 0
-          ? 'A Devolver (Caja Chica / Banco)'
-          : 'A Reembolsar (Reembolso al Beneficiario)',
+          ? 'A favor del Proyecto (a devolver)'
+          : 'A favor del empleado (a reembolsar)',
       firmas: {
         emitidoPor: emisor,
         directorProyecto,
@@ -517,6 +595,7 @@ export class RendicionesService {
           estado: EstadoRendicion.PENDIENTE,
           aprobadorActualId: dto.aprobadorActualId,
           observaciones: dto.observaciones,
+          comprobanteUrl: dto.comprobanteUrl,
           montoRespaldado: totalRespaldado,
           saldoLiquido,
           gastosRendicion: {
@@ -749,6 +828,10 @@ export class RendicionesService {
           estado: EstadoRendicion.PENDIENTE,
           aprobadorActualId: dto.aprobadorActualId,
           observaciones: dto.observaciones,
+          // Sólo se pisa si viene en el payload de corrección
+          ...(dto.comprobanteUrl !== undefined
+            ? { comprobanteUrl: dto.comprobanteUrl }
+            : {}),
           montoRespaldado: totalRespaldado,
           saldoLiquido,
           gastosRendicion: {
