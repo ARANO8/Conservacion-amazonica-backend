@@ -111,14 +111,17 @@ export class CreateCuadroComparativoDto {
 
   @ApiProperty({ type: [CuadroCotizacionDto] })
   @IsArray()
-  @ArrayMinSize(1)
+  // Un cuadro comparativo compara: con una sola cotización no hay comparación
+  @ArrayMinSize(2, {
+    message: 'Selecciona al menos 2 cotizaciones para comparar',
+  })
   @ValidateNested({ each: true })
   @Type(() => CuadroCotizacionDto)
   cotizaciones: CuadroCotizacionDto[];
 
   @ApiProperty({ type: [CuadroItemDto] })
   @IsArray()
-  @ArrayMinSize(1)
+  @ArrayMinSize(1, { message: 'Agrega al menos un ítem para comparar' })
   @ValidateNested({ each: true })
   @Type(() => CuadroItemDto)
   items: CuadroItemDto[];
