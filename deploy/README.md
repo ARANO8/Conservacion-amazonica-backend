@@ -105,8 +105,15 @@ variables > Actions > New repository secret):
 | `VPS_HOST` | IP o dominio del VPS |
 | `VPS_USER` | usuario con acceso a Docker (`root` segun el diagnostico) |
 | `VPS_SSH_KEY` | contenido completo de `~/.ssh/github_deploy`, incluidas las lineas BEGIN y END |
-| `VPS_PORT` | `22` |
-| `APP_URL` | `https://tu-subdominio.tudominio.com`, **sin barra final** |
+| `VPS_PORT` | puerto SSH del VPS |
+
+> El proxy que esta delante del VPS responde **403 a las peticiones que llegan
+> desde GitHub Actions** (bloquea IPs de centro de datos), aunque las de un
+> navegador pasen sin problema. Por eso la comprobacion posterior al despliegue
+> se ejecuta **dentro del VPS**, por la misma sesion SSH, contra
+> `http://127.0.0.1/amzdesk/...`. Atraviesa igualmente el proxy `edge`, asi que
+> prueba el mismo camino que un navegador, pero sin depender de un intermediario
+> que no controlamos. No hace falta ningun secreto con la URL publica.
 
 ---
 

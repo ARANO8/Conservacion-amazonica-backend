@@ -81,7 +81,7 @@ jobs:
     needs: build-push
     runs-on: ubuntu-latest
     steps:
-      - name: Actualizar el servicio backend
+      - name: Actualizar el servicio backend y comprobarlo
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
@@ -96,22 +96,28 @@ jobs:
             docker compose up -d backend
             docker image prune -f
 
-      # Las migraciones corren en el entrypoint del contenedor, asi que el
-      # arranque puede tardar. Se reintenta hasta un minuto antes de fallar.
-      - name: Smoke test
-        run: |
-          URL="${{ secrets.APP_URL }}/amzdesk/api/health"
-          for intento in $(seq 1 12); do
-            # Se captura cuerpo y codigo por separado: sin el codigo, un 403 del
-            # proxy y un 502 por backend caido se ven exactamente igual.
-            CUERPO=$(curl -sS -m 10 -w '\n%{http_code}' "$URL" 2>&1) || true
-            CODIGO=$(printf '%s' "$CUERPO" | tail -1)
-            if [ "$CODIGO" = "200" ]; then
-              echo "La API responde correctamente en /amzdesk/api/health"
-              exit 0
-            fi
-            echo "Intento $intento: HTTP ${CODIGO:-sin respuesta} — $(printf '%s' "$CUERPO" | head -1)"
-            sleep 5
-          done
-          echo "::error::La API no respondio 200 en /amzdesk/api/health tras 60 segundos (ultimo codigo: ${CODIGO:-sin respuesta})"
-          exit 1
+            # El smoke test corre AQUI DENTRO y no desde el runner a proposito:
+            # el proxy que esta delante del VPS responde 403 a las peticiones
+            # que llegan desde GitHub Actions, asi que una comprobacion externa
+            # fallaria siempre sin decir nada sobre el estado real del servicio.
+            #
+            # La peticion sale por el puerto 80 del host, o sea que atraviesa el
+            # proxy `edge`: comprueba el mismo camino que usa un navegador, no
+            # solo que el contenedor este vivo.
+            #
+            # Se reintenta hasta 2 minutos porque el entrypoint aplica las
+            # migraciones antes de levantar la API.
+            echo "Esperando a que la API responda..."
+            for intento in $(seq 1 24); do
+              CODIGO=$(curl -s -o /dev/null -w '%{http_code}' -m 10 http://127.0.0.1/amzdesk/api/health || true)
+              if [ "$CODIGO" = "200" ]; then
+                echo "La API responde 200 en /amzdesk/api/health"
+                exit 0
+              fi
+              echo "Intento $intento: HTTP ${CODIGO:-sin respuesta}"
+              sleep 5
+            done
+
+            echo "La API no llego a responder 200. Ultimos registros:"
+            docker compose logs --tail 50 backend
+            exit 1
