@@ -253,6 +253,19 @@ cd /opt/amzdesk
 docker compose exec db pg_dump -U amzdesk amazonica_db > ~/respaldo-$(date +%F).sql
 ```
 
+### Cambiar la configuracion del proxy
+
+**El stack `edge` no se despliega solo.** Los workflows actualizan unicamente
+los contenedores de la aplicacion, asi que cualquier cambio en
+`deploy/edge/nginx.conf` hay que copiarlo a mano:
+
+```bash
+# en tu maquina
+scp -P PUERTO deploy/edge/nginx.conf usuario@TU_VPS:/opt/edge/nginx.conf
+# en el VPS
+cd /opt/edge && docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload
+```
+
 ### Agregar otro sistema al dominio
 
 Edita `/opt/edge/nginx.conf`, copia los bloques `location` de `/amzdesk`
