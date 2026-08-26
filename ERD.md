@@ -283,6 +283,35 @@ APROBADO APROBADO
     }
   
 
+  "DeclaracionMovilidad" {
+    Int id "🗝️"
+    String codigoDeclaracion 
+    String cargo 
+    String motivoActividad 
+    String proyectoPartida 
+    String lugarEmision 
+    DateTime fechaEmision 
+    Decimal totalBruto 
+    Decimal retencion 
+    Decimal totalLiquido 
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
+  "DetalleMovilidad" {
+    Int id "🗝️"
+    Int orden 
+    DateTime fecha 
+    String origen 
+    String destino 
+    String motivo 
+    Decimal montoGastado 
+    Decimal monto 
+    }
+  
+
   "GastoRendicion" {
     Int id "🗝️"
     TipoDocumento tipoDocumento 
@@ -559,6 +588,8 @@ APROBADO APROBADO
     "Rendicion" }o--|o "Usuario" : "aprobadorActual"
     "InformeActividades" }o--|| "Usuario" : "usuario"
     "ActividadInforme" }o--|| "InformeActividades" : "informe"
+    "DeclaracionMovilidad" }o--|| "Usuario" : "usuario"
+    "DetalleMovilidad" }o--|| "DeclaracionMovilidad" : "declaracion"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoRendicion" }o--|| "Rendicion" : "rendicion"
     "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"

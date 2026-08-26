@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Declaración Jurada de Movilidad — {{codigoDeclaracion}}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @page {
+        size: A4;
+        margin: 12mm 14mm;
+      }
+      body {
+        font-family: 'Times New Roman', Georgia, serif;
+        color: #111827;
+      }
+      .no-break {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+      /* La planilla original es una grilla de bordes finos y continuos. */
+      table.anexo,
+      table.anexo th,
+      table.anexo td {
+        border: 1px solid #111827;
+        border-collapse: collapse;
+      }
+    </style>
+  </head>
+  <body class="bg-white text-[11px] leading-normal">
+    <!-- Encabezado: ANEXO 6 centrado, como en la planilla -->
+    <p class="mb-3 text-center text-[13px] font-bold">ANEXO 6</p>
+
+    <header class="mb-4 flex items-end gap-4">
+      {{#if logoBase64}}
+        <img
+          src="data:image/png;base64,{{logoBase64}}"
+          alt="Conservación Amazónica"
+          class="h-12 w-auto object-contain"
+        />
+      {{/if}}
+      <div>
+        <h1 class="text-[15px] font-bold tracking-wide uppercase">
+          Declaración Jurada de Movilidad
+        </h1>
+        <p class="text-[11px] font-bold">(Expresado en Bolivianos)</p>
+      </div>
+    </header>
+
+    <!-- Cabecera: cuatro filas etiqueta / valor sobre línea, igual al Excel -->
+    <section class="mb-4 no-break">
+      <table class="w-full text-[11px]">
+        <tbody>
+          <tr>
+            <td class="w-[190px] py-1 align-bottom font-bold">NOMBRE</td>
+            <td class="border-b border-gray-900 py-1 align-bottom">{{nombre}}</td>
+          </tr>
+          <tr>
+            <td class="py-1 align-bottom font-bold">CARGO</td>
+            <td class="border-b border-gray-900 py-1 align-bottom">{{cargo}}</td>
+          </tr>
+          <tr>
+            <td class="py-1 align-bottom font-bold">MOTIVO/ACTIVIDAD</td>
+            <td class="border-b border-gray-900 py-1 align-bottom">{{motivoActividad}}</td>
+          </tr>
+          <tr>
+            <td class="py-1 align-bottom font-bold">PROYECTO/PARTIDA PPTAL</td>
+            <td class="border-b border-gray-900 py-1 align-bottom">{{proyectoPartida}}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <p class="mb-3 text-justify text-[10.5px]">
+      De conformidad a las instrucciones impartidas por la institución
+      <strong><em>DECLARO BAJO JURAMENTO</em></strong>
+      haber realizado los gastos de movilidad que a continuación detallo:
+    </p>
+
+    <!-- Detalle: la grilla del anexo. Sin la columna auxiliar de captura. -->
+    <section class="no-break">
+      <table class="anexo w-full text-[10.5px]">
+        <thead>
+          <tr class="bg-gray-100">
+            <th class="w-[16%] px-2 py-1 text-center font-bold">FECHA</th>
+            <th class="w-[19%] px-2 py-1 text-center font-bold">ORIGEN</th>
+            <th class="w-[19%] px-2 py-1 text-center font-bold">DESTINO</th>
+            <th class="px-2 py-1 text-center font-bold">MOTIVO</th>
+            <th class="w-[17%] px-2 py-1 text-center font-bold">MONTO Bs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each detalles}}
+            <tr>
+              <td class="px-2 py-1 text-center">{{this.fecha}}</td>
+              <td class="px-2 py-1">{{this.origen}}</td>
+              <td class="px-2 py-1">{{this.destino}}</td>
+              <td class="px-2 py-1">{{this.motivo}}</td>
+              <td class="px-2 py-1 text-right tabular-nums">{{this.monto}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+        <tfoot>
+          <tr class="bg-gray-100 font-bold">
+            <td colspan="4" class="px-2 py-1 text-center">TOTAL</td>
+            <td class="px-2 py-1 text-right tabular-nums">{{totalBruto}}</td>
+          </tr>
+          <tr class="bg-gray-100 font-bold">
+            <td colspan="4" class="px-2 py-1 text-center">
+              Menos retención impositiva por servicios 15.5%
+            </td>
+            <td class="px-2 py-1 text-right tabular-nums">{{retencion}}</td>
+          </tr>
+          <tr class="bg-gray-100 font-bold">
+            <td colspan="4" class="px-2 py-1 text-center">TOTAL</td>
+            <td class="px-2 py-1 text-right tabular-nums">{{totalLiquido}}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </section>
+
+    <!-- Lugar y fecha de emisión -->
+    <p class="mt-8 text-center text-[11px]">
+      <em>{{lugarEmision}},</em>
+      <span class="ml-2 border-b border-dotted border-gray-900 px-16">{{fechaEmision}}</span>
+    </p>
+
+    <!-- Firmas: PREPARADO POR / REVISADO POR / APROBADO POR -->
+    <section class="mt-16 no-break">
+      <div class="grid grid-cols-3 gap-8 text-center text-[10px]">
+        <div>
+          <div class="mx-auto w-40 border-b border-gray-900"></div>
+          <p class="mt-1 font-bold">PREPARADO POR</p>
+          <p class="text-[9.5px]">{{nombre}}</p>
+        </div>
+        <div>
+          <div class="mx-auto w-40 border-b border-gray-900"></div>
+          <p class="mt-1 font-bold">REVISADO POR</p>
+        </div>
+        <div>
+          <div class="mx-auto w-40 border-b border-gray-900"></div>
+          <p class="mt-1 font-bold">APROBADO POR</p>
+        </div>
+      </div>
+    </section>
+
+    <p class="mt-10 text-right text-[8px] text-gray-400">
+      {{codigoDeclaracion}} · Generado: {{generatedAt}}
+    </p>
+  </body>
+</html>

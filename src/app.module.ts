@@ -25,6 +25,7 @@ import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
 import { CuadrosComparativosModule } from './cuadros-comparativos/cuadros-comparativos.module';
 import { OrdenesCompraModule } from './ordenes-compra/ordenes-compra.module';
 import { InformesActividadesModule } from './informes-actividades/informes-actividades.module';
+import { DeclaracionesMovilidadModule } from './declaraciones-movilidad/declaraciones-movilidad.module';
 import { HealthModule } from './health/health.module';
 
 const DEFAULT_THROTTLE_TTL_MS = 60000;
@@ -85,6 +86,7 @@ function getPositiveIntFromEnv(
     CuadrosComparativosModule,
     OrdenesCompraModule,
     InformesActividadesModule,
+    DeclaracionesMovilidadModule,
     HealthModule,
   ],
   providers: [

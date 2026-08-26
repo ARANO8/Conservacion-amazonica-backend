@@ -110,20 +110,21 @@ model Usuario {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  solicitudesEmitidas     Solicitud[]           @relation("Emisor")
-  solicitudesPorAprobar   Solicitud[]           @relation("AprobadorSolicitud")
-  solicitudesBeneficiadas Solicitud[]           @relation("Beneficiario")
-  historialesCreados      HistorialAprobacion[] @relation("ActorHistorial")
-  historialesRecibidos    HistorialAprobacion[] @relation("DestinatarioHistorial")
-  rendicionesPorAprobar   Rendicion[]           @relation("RendicionAprobador")
+  solicitudesEmitidas     Solicitud[]            @relation("Emisor")
+  solicitudesPorAprobar   Solicitud[]            @relation("AprobadorSolicitud")
+  solicitudesBeneficiadas Solicitud[]            @relation("Beneficiario")
+  historialesCreados      HistorialAprobacion[]  @relation("ActorHistorial")
+  historialesRecibidos    HistorialAprobacion[]  @relation("DestinatarioHistorial")
+  rendicionesPorAprobar   Rendicion[]            @relation("RendicionAprobador")
   notificaciones          Notificacion[]
-  cotizacionesEmitidas    Cotizacion[]          @relation("CotizacionesEmitidas")
-  cuadrosEmitidos         CuadroComparativo[]   @relation("CuadrosEmitidos")
-  ordenesEmitidas         OrdenCompra[]         @relation("OrdenesEmitidas")
-  pagosSolicitados        PagoParcial[]         @relation("PagoSolicitante")
-  pagosPorAprobar         PagoParcial[]         @relation("PagoAprobador")
-  pagosRegistrados        PagoParcial[]         @relation("PagoTesorero")
+  cotizacionesEmitidas    Cotizacion[]           @relation("CotizacionesEmitidas")
+  cuadrosEmitidos         CuadroComparativo[]    @relation("CuadrosEmitidos")
+  ordenesEmitidas         OrdenCompra[]          @relation("OrdenesEmitidas")
+  pagosSolicitados        PagoParcial[]          @relation("PagoSolicitante")
+  pagosPorAprobar         PagoParcial[]          @relation("PagoAprobador")
+  pagosRegistrados        PagoParcial[]          @relation("PagoTesorero")
   informesActividades     InformeActividades[]
+  declaracionesMovilidad  DeclaracionMovilidad[]
 }
 
 model Proyecto {
@@ -262,7 +263,6 @@ model Solicitud {
 
   planificaciones Planificacion[]
 
-
   historialAprobaciones HistorialAprobacion[] @relation("SolicitudHistorial")
   notificaciones        Notificacion[]
   rendicion             Rendicion?
@@ -385,6 +385,59 @@ model ActividadInforme {
   actividadesRealizadas String
 
   @@index([informeId])
+}
+
+/// Declaración Jurada de Movilidad (ANEXO 6). Es independiente: no cuelga de una
+/// rendición ni de una solicitud, sólo de su autor. No confundir con
+/// `DeclaracionJurada`, que es un respaldo dentro de una rendición (ANEXO 4).
+model DeclaracionMovilidad {
+  id                Int      @id @default(autoincrement())
+  codigoDeclaracion String   @unique
+  /// Snapshot del cargo al momento de declarar: un documento firmado no debe
+  /// cambiar si la persona cambia de puesto.
+  cargo             String
+  motivoActividad   String
+  proyectoPartida   String
+  lugarEmision      String   @default("La Paz")
+  fechaEmision      DateTime
+
+  /// Suma de DetalleMovilidad.monto (los montos ya llevan los impuestos).
+  totalBruto   Decimal @default(0) @db.Decimal(12, 2)
+  /// totalBruto * 15.5% (IUE 12.5% + IT 3%).
+  retencion    Decimal @default(0) @db.Decimal(12, 2)
+  /// totalBruto - retencion: lo que el declarante recibe en limpio.
+  totalLiquido Decimal @default(0) @db.Decimal(12, 2)
+
+  usuarioId Int
+  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+
+  detalles DetalleMovilidad[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([usuarioId])
+  @@index([deletedAt])
+}
+
+model DetalleMovilidad {
+  id            Int                  @id @default(autoincrement())
+  declaracionId Int
+  declaracion   DeclaracionMovilidad @relation(fields: [declaracionId], references: [id], onDelete: Cascade)
+  /// Preserva el orden de captura de las filas del formulario.
+  orden         Int
+  fecha         DateTime
+  origen        String
+  destino       String
+  motivo        String
+  /// Lo que el declarante gastó de su bolsillo. Es dato de captura: no se
+  /// muestra ni en el detalle ni en el PDF, sólo repuebla el formulario.
+  montoGastado  Decimal              @db.Decimal(12, 2)
+  /// montoGastado / 0.845 — el monto con impuestos que va impreso en el anexo.
+  monto         Decimal              @db.Decimal(12, 2)
+
+  @@index([declaracionId])
 }
 
 model GastoRendicion {
@@ -606,7 +659,6 @@ model PagoParcial {
   @@index([estado])
   @@index([aprobadorId])
 }
-
 
 model CuentaBancaria {
   id           Int    @id @default(autoincrement())
