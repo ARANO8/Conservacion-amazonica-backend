@@ -53,22 +53,37 @@ Commit messages must follow **Conventional Commits** enforced by commitlint:
 src/
 ├── app.module.ts
 ├── main.ts
-├── auth/               # JWT + Passport, RolesGuard, @Roles decorator
-├── catalogos/          # Read-only reference data (proyectos, grupos, partidas, …)
-├── common/constants/   # Shared constants (e.g. financial.constants.ts)
-├── poa/                # Plan Operativo Anual CRUD + budget calculations
-├── prisma/             # @Global PrismaModule + PrismaService
-├── reports/            # PDF/CSV report generation (pdfmake, pdfkit)
-├── shared/utils/       # Pure utility functions (formatters.util.ts)
-├── solicitudes/        # Core domain: fund requests + financial state machine
-├── solicitudes-presupuestos/  # Budget allocation per solicitud
-└── usuarios/           # User management
+├── auth/                      # JWT + Passport, RolesGuard, @Auth/@Roles decorators
+├── catalogos/                 # Reference data, 8 sub-modules:
+│                              #   codigos-presupuestarios, conceptos, cuentas-bancarias,
+│                              #   grupos, partidas, partidas-contables, proyectos, tipo-gastos
+├── common/                    # Global exception filters + constants (financial.constants.ts)
+├── cotizaciones/              # Supplier quotes (procurement sub-flow)
+├── cuadros-comparativos/      # Comparative quote tables + their state machine
+├── dashboard/                 # Aggregated metrics for the frontend home
+├── declaraciones-movilidad/   # ANEXO 6 — sworn mobility statement
+├── health/                    # Liveness/readiness probes
+├── informes-actividades/      # Activity reports attached to a trip
+├── notificaciones/            # Cross-cutting; called directly by other services
+├── ordenes-compra/            # Purchase orders (closes the procurement flow)
+├── pdf/                       # PDF generation from Handlebars templates
+├── poa/                       # Plan Operativo Anual: budget lines + calculations
+├── prisma/                    # @Global PrismaModule + PrismaService
+├── rendiciones/               # Accountability reports, 1:1 with a disbursed solicitud
+├── scripts/                   # One-off maintenance scripts (not a Nest module)
+├── shared/utils/              # Pure helpers (formatters.util.ts, letras.util.ts)
+├── solicitudes/               # Core domain: requests + financial state machine + tax helper
+├── solicitudes-presupuestos/  # Budget allocation per solicitud (forwardRef with solicitudes)
+├── templates/                 # Handlebars templates consumed by pdf/
+└── usuarios/                  # User management
 prisma/
 ├── schema.prisma
 ├── seed.ts
 └── seeds/
-test/                   # E2E tests (app.e2e-spec.ts)
+test/                          # E2E tests (app.e2e-spec.ts)
 ```
+
+> There is **no `reports/` module** — it was removed and replaced by `pdf/` (see `CHANGELOG.md`).
 
 ---
 
@@ -144,12 +159,30 @@ test/                   # E2E tests (app.e2e-spec.ts)
 
 ### Bolivian Tax Calculations
 
-Tax logic lives in `src/solicitudes/solicitudes.helper.ts`:
+Tax logic lives in `src/solicitudes/solicitudes.helper.ts`; the rates and factors are
+constants in `src/common/constants/financial.constants.ts`.
 
-- **IVA**: 13% — `iva = total - (total / 1.13)`
-- **IT**: 3% on gross amount
-- **IUE**: 5% on net — grossed-up formula `total = neto / factor`
-- Always use `Prisma.Decimal` operations (`.plus()`, `.times()`, `.div()`) for all tax math.
+**Retention is not a flat percentage — it is a grossing-up factor that depends on the
+document type and the expense type.** `FACTURA` never retains (the provider declares its
+own taxes); only `RECIBO` does.
+
+| Case | Factor | Retention | Split |
+|---|---|---|---|
+| Any `FACTURA` | `1.00` | none | — |
+| `RECIBO` + `COMPRA` | `0.92` | 8% | IUE 5% + IT 3% |
+| `RECIBO` + `SERVICIO` / `ALQUILER` | `0.84` | 16% | IVA (RC-IVA) 13% + IT 3% |
+| `RECIBO` + `PEAJE` / `AUTO_COMPRA` | `1.00` | none | — |
+| Compra / consultancy contract, `RECIBO` | `0.84` | 16% | RC-IVA 13% + IT 3% |
+| Viático `INSTITUCIONAL` | `0.87` | 13% | all RC-IVA, no IT |
+| Viático `TERCEROS` | `0.84` | 16% | RC-IVA 13% + IT 3% |
+| Movilidad (ANEXO 6) | `FACTOR_MOVILIDAD` = `0.845` | 15.5% | IUE 12.5% + IT 3% |
+
+Grossing up is always `montoPresupuestado = neto / factor`; the tax total is the difference,
+and it is split proportionally (`totalTax * 13/16`, `totalTax * 5/8`, …) with the **last
+component computed as a subtraction** to absorb rounding.
+
+- Always use `Prisma.Decimal` operations (`.plus()`, `.times()`, `.div()`) — never native numbers.
+- The frontend mirrors these exact rules in `lib/tax-calculator.ts`. **Change one, change both.**
 
 ### Error Handling
 

@@ -1,8 +1,8 @@
 # Changelog
 
-> Periodo: 26-May-2026 → 16-Jul-2026
-> Frontend: `Conservacion-amazonica-frontend` (HEAD `8abc2ee`)
-> Backend: `Conservacion-amazonica-backend` (HEAD `b51cf24`)
+> Periodo: 26-May-2026 → 26-Ago-2026
+> Frontend: `Conservacion-amazonica-frontend` (HEAD `f55cd60`)
+> Backend: `Conservacion-amazonica-backend` (HEAD `44ec7e4`)
 
 ---
 
@@ -72,3 +72,48 @@
 - **Frontend:** Validación Zod con `z.preprocess` para null
 - **Frontend:** URL obligatoria en desembolso
 - **Backend:** Fix import dinámico de Handlebars en PDF service
+
+## Estabilización del PDF y auditoría (21-27 Jul)
+
+- **Backend:** Handlebars por export por defecto en el import dinámico ESM; sintaxis corregida en la plantilla de rendición
+- **Backend:** Los endpoints de PDF quedan fuera del throttle; errores visibles en vez de silenciosos
+- **Backend:** `@Res` vuelve a no-passthrough para la respuesta binaria del PDF
+- **Backend:** Sección de desembolso en la plantilla PDF de solicitud
+- **Backend:** URL de comprobante de transferencia obligatoria al desembolsar
+- **Backend:** Plan de cuentas, centro de auditoría completo y orden de eliminación del seed del POA
+- **Frontend:** Descarga de PDF unificada, validando `content-type`
+- **Frontend:** Columna `codigoDesembolso` en solicitudes, monitor, solicitudes de compra y detalle de aprobaciones
+- **Frontend:** Fin del bucle infinito al elegir Recibo/Boleta en la tabla de gastos
+
+## Compras, consultorías y retenciones (1-4 Ago)
+
+- **Backend:** Retención impositiva y pagos parciales en gastos de compra
+- **Backend:** Ciclo completo de solicitud, aprobación y pago **por cuota** en contratos de consultoría — nace el estado `EstadoSolicitud.EN_EJECUCION` y el enum `EstadoPagoParcial`
+- **Backend:** Personas externas vinculadas a su planificación de origen
+- **Backend:** ANEXO 4 en rendiciones y arreglo del enlace de comprobantes
+- **Backend:** `informes-actividades` pasa a ser un módulo propio, fuera de rendiciones
+- **Backend:** Corrección de cálculos en solicitudes de compra y servicio, y del cuadro comparativo
+- **Frontend:** Sección de consultoría en solicitudes de compra + cronograma de pagos accionable
+- **Frontend:** Parte impositiva en la tabla de gastos y bloques del ANEXO 4
+- **Frontend:** Autogeneración de tarjetas de terceros según el conteo del paso 1
+- **Frontend:** Informe de actividades como pantalla propia en Viajes y Viáticos
+- **Frontend:** Se retiran las dependencias de Prisma del frontend
+
+## Despliegue continuo en VPS (4-17 Ago)
+
+- **Ambos:** Imagen Docker standalone y despliegue automatizado en el VPS con GitHub Actions, disparado por push a `main`
+- **Ambos:** La aplicación se sirve bajo el prefijo `/amzdesk`; `exbmail` queda en su propia subruta del dominio
+- **Ambos:** Smoke test ejecutado dentro del VPS (no desde el runner) y entrando por la raíz, para detectar bucles de redirección
+- **Backend:** Eliminado el bucle de redirecciones en la entrada a `/amzdesk`; logs del proxy y código HTTP visibles
+- **Frontend:** El prefijo de la aplicación se aplica también al logo
+- **Docs:** El proxy edge se actualiza a mano; el límite de 25 m no es el tope real
+
+## Declaración Jurada de Movilidad — ANEXO 6 (26 Ago)
+
+- **Backend:** Módulo `declaraciones-movilidad`. Retención propia del anexo: IUE 12.5% + IT 3% (`RETENCION_MOVILIDAD_RATE` 15.5%, `FACTOR_MOVILIDAD` 0.845). La planilla Excel rotula 15.5% pero su celda arrastra un `*16%`; aquí se usa la tasa correcta, que es la que hace cerrar el líquido contra lo gastado
+- **Frontend:** Formulario de declaración jurada de movilidad en `app/app/declaracion-movilidad/`
+
+---
+
+> Estado al cierre de este changelog: backend `44ec7e4`, frontend `f55cd60` (26-Ago-2026).
+> A partir de aquí el trabajo se planifica en `specs/` (ver `CLAUDE.md`, *Flujo de trabajo*).
