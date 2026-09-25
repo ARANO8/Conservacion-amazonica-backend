@@ -12,7 +12,7 @@ function round2(valor: Prisma.Decimal): Prisma.Decimal {
 /**
  * Grossing-up del ANEXO 6: el declarante escribe lo que gastó de su bolsillo y
  * el monto que va impreso en el anexo es ese gasto más los impuestos que la
- * institución retiene (columna E = F / 0.845 en el Excel).
+ * institución retiene (columna E = F / 0.84 en el Excel).
  */
 export function calcularMonto(
   montoGastado: Prisma.Decimal.Value,
@@ -27,7 +27,7 @@ export interface ResumenMovilidad {
 }
 
 /**
- * Pie del ANEXO 6: TOTAL, "menos retención impositiva por servicios 15.5%" y
+ * Pie del ANEXO 6: TOTAL, "menos retención impositiva por servicios 16%" y
  * TOTAL líquido.
  */
 export function resumirDeclaracion(montos: Prisma.Decimal[]): ResumenMovilidad {

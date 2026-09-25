@@ -6,17 +6,16 @@ export const IUE_COMPRA_RATE = new Prisma.Decimal(0.05);
 
 /**
  * Retención impositiva por servicios del ANEXO 6 (Declaración Jurada de
- * Movilidad): IUE 12.5% + IT 3%. La planilla en Excel rotula 15.5% pero la
- * celda de retención arrastra un `*16%`; aquí se usa la tasa correcta, que es
- * la que hace cerrar el total líquido contra lo que el declarante gastó.
+ * Movilidad): 16%. El total líquido cierra contra lo que el declarante gastó
+ * porque el divisor de grossing-up es 1 - esta tasa.
  */
-export const RETENCION_MOVILIDAD_RATE = new Prisma.Decimal(0.155);
+export const RETENCION_MOVILIDAD_RATE = new Prisma.Decimal(0.16);
 
 /**
  * Divisor de grossing-up del ANEXO 6 (celda F14 del Excel, "no tocar este
  * valor"): 1 - RETENCION_MOVILIDAD_RATE.
  */
-export const FACTOR_MOVILIDAD = new Prisma.Decimal(0.845);
+export const FACTOR_MOVILIDAD = new Prisma.Decimal(0.84);
 
 /**
  * Divisor de grossing-up de los viáticos (RC-IVA 13%), institucionales y de

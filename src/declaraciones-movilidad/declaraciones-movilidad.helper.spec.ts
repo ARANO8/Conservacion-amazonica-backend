@@ -5,10 +5,10 @@ import {
 
 describe('declaraciones-movilidad.helper', () => {
   describe('calcularMonto', () => {
-    // Caso real de la planilla: F16=500 y F17=200 con el divisor 0.845.
+    // Caso real de la planilla: F16=500 y F17=200 con el divisor 0.84.
     it('aplica el grossing-up de la columna F del ANEXO 6', () => {
-      expect(calcularMonto(500).toFixed(2)).toBe('591.72');
-      expect(calcularMonto(200).toFixed(2)).toBe('236.69');
+      expect(calcularMonto(500).toFixed(2)).toBe('595.24');
+      expect(calcularMonto(200).toFixed(2)).toBe('238.10');
     });
 
     it('devuelve cero cuando la fila está vacía', () => {
@@ -17,12 +17,12 @@ describe('declaraciones-movilidad.helper', () => {
   });
 
   describe('resumirDeclaracion', () => {
-    it('reproduce el pie del ANEXO 6 con la retención correcta de 15.5%', () => {
+    it('reproduce el pie del ANEXO 6 con la retención correcta de 16%', () => {
       const montos = [calcularMonto(500), calcularMonto(200)];
       const resumen = resumirDeclaracion(montos);
 
-      expect(resumen.totalBruto.toFixed(2)).toBe('828.41');
-      expect(resumen.retencion.toFixed(2)).toBe('128.40');
+      expect(resumen.totalBruto.toFixed(2)).toBe('833.34');
+      expect(resumen.retencion.toFixed(2)).toBe('133.33');
       // El líquido debe volver a lo que el declarante gastó de su bolsillo.
       expect(resumen.totalLiquido.toFixed(2)).toBe('700.01');
     });
