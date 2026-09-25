@@ -1,4 +1,8 @@
-import { Prisma, TipoDestino } from '@prisma/client';
+import { Moneda, Prisma, TipoDestino } from '@prisma/client';
+import {
+  FACTOR_RETENCION_VIATICOS,
+  tarifaEnBolivianos,
+} from '../common/constants/financial.constants';
 
 /**
  * ANEXO 2 — Solicitud de Fondos para Viajes.
@@ -61,6 +65,7 @@ interface ConceptoCatalogo {
   nombre: string;
   precioInstitucional: Decimalish;
   precioTerceros: Decimalish;
+  moneda: Moneda;
 }
 
 interface ViaticoFuente {
@@ -107,9 +112,9 @@ export interface Anexo2Fuente {
   }[];
 }
 
-// Factores de retención con los que el sistema "grossea" el líquido
-const FACTOR_INSTITUCIONAL = 0.87;
-const FACTOR_TERCEROS = 0.84;
+// Factor con el que el sistema "grossea" el líquido: RC-IVA 13% para
+// institucionales y terceros (Instructivo de Viaje y Viáticos, 03/08/2026)
+const FACTOR_VIATICOS = Number(FACTOR_RETENCION_VIATICOS);
 
 const INSTITUCIONALES: { codigo: string; etiqueta: string }[] = [
   { codigo: 'CIUDADES_PRINCIPALES', etiqueta: 'Viáticos para Ciudad' },
@@ -228,6 +233,27 @@ function filaVacia(etiqueta: string, tarifa: number | null): Anexo2FilaViatico {
   };
 }
 
+/** Conceptos que el formulario no trae impresos (internacionales, exterior). */
+const ETIQUETAS_ADICIONALES: Record<string, string> = {
+  PAISES_SUDAMERICA: 'Viáticos para países de Sudamérica',
+  PAISES_NORTEAMERICA_EUROPA: 'Viáticos para países de Norteamérica - Europa',
+  PAISES_LIMITROFES:
+    'Viáticos para países limítrofes (Brasil, Perú, Chile, Argentina)',
+  EXTERIOR: 'Viáticos para el exterior',
+};
+
+function etiquetaAdicional(
+  nombre: string | undefined,
+  tipo: TipoDestino,
+): string {
+  const base =
+    (nombre && ETIQUETAS_ADICIONALES[nombre]) ??
+    `Viáticos — ${nombre ?? 'Otro destino'}`;
+  return tipo === TipoDestino.TERCEROS
+    ? base.replace('Viáticos para', 'Viáticos para Terceros en')
+    : base;
+}
+
 /**
  * Una fila fija por concepto, como en el formulario. Si hay varios viáticos
  * del mismo concepto (actividades con distinto número de días o personas),
@@ -240,8 +266,7 @@ function seccionViaticos(
   catalogo: ConceptoCatalogo[],
   tipo: TipoDestino,
 ): Anexo2FilaViatico[] {
-  const factor =
-    tipo === TipoDestino.TERCEROS ? FACTOR_TERCEROS : FACTOR_INSTITUCIONAL;
+  const factor = FACTOR_VIATICOS;
   const filas: Anexo2FilaViatico[] = [];
   const usados = new Set<ViaticoFuente>();
 
@@ -253,9 +278,14 @@ function seccionViaticos(
       const concepto = catalogo.find((c) => c.nombre === codigo);
       const precio = concepto
         ? num(
-            tipo === TipoDestino.TERCEROS
-              ? concepto.precioTerceros
-              : concepto.precioInstitucional,
+            tarifaEnBolivianos(
+              num(
+                tipo === TipoDestino.TERCEROS
+                  ? concepto.precioTerceros
+                  : concepto.precioInstitucional,
+              ),
+              concepto.moneda,
+            ),
           )
         : 0;
       filas.push(filaVacia(etiqueta, precio > 0 ? precio / factor : null));
@@ -268,9 +298,7 @@ function seccionViaticos(
   viaticos
     .filter((v) => !usados.has(v))
     .forEach((v) =>
-      filas.push(
-        filaViatico(`Viáticos — ${v.concepto?.nombre ?? 'Otro destino'}`, v),
-      ),
+      filas.push(filaViatico(etiquetaAdicional(v.concepto?.nombre, tipo), v)),
     );
 
   return filas;

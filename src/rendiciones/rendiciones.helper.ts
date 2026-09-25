@@ -67,9 +67,12 @@ export function desglosarRetenciones(
 
   const categoria = categoriaDePartida(nombrePartida);
 
-  // Factor 0.87 — sólo RC-IVA 13%
+  // Factor 0.87 — sólo RC-IVA 13%. Incluye la planilla de viáticos de
+  // terceros (PVT): desde el instructivo del 03/08/2026 los viáticos de
+  // terceros retienen igual que los institucionales.
   if (
     tipoDocumento === 'LV' ||
+    tipoDocumento === 'PVT' ||
     (tipoDocumento === 'RECIBO' && categoria === 'VIATICO')
   ) {
     return { ...CERO(), rcIva: redondear(total) };

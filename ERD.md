@@ -66,6 +66,13 @@ TERCEROS TERCEROS
     
 
 
+        Moneda {
+            BOB BOB
+USD USD
+        }
+    
+
+
         TipoDocumento {
             FACTURA FACTURA
 RECIBO RECIBO
@@ -360,6 +367,7 @@ APROBADO APROBADO
     String nombre 
     Decimal precioInstitucional 
     Decimal precioTerceros 
+    Moneda moneda 
     }
   
 
@@ -447,6 +455,7 @@ APROBADO APROBADO
     Int id "🗝️"
     String region 
     String destino 
+    TipoDestino tipoPersonal 
     TipoDocumento tipoDocumento 
     Int personas 
     Int noches 
@@ -600,6 +609,7 @@ APROBADO APROBADO
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
     "Planificacion" }o--|| "Solicitud" : "solicitud"
     "Planificacion" o{--}o "Viatico" : ""
+    "Concepto" |o--|| "Moneda" : "enum:moneda"
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"
     "Viatico" }o--|| "Solicitud" : "solicitud"
     "Viatico" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
@@ -618,6 +628,7 @@ APROBADO APROBADO
     "PagoParcial" }o--|o "Usuario" : "aprobador"
     "PagoParcial" }o--|o "Usuario" : "pagadoPor"
     "PagoParcial" }o--|| "GastoCompra" : "gastoCompra"
+    "Hospedaje" |o--|| "TipoDestino" : "enum:tipoPersonal"
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" }o--|| "Poa" : "poa"

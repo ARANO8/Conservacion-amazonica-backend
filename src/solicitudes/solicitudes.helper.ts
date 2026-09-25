@@ -5,6 +5,7 @@ import {
   CreateSolicitudDto,
   CreateViaticoDto,
 } from './dto/create-solicitud.dto';
+import { FACTOR_RETENCION_VIATICOS } from '../common/constants/financial.constants';
 
 function redondear(valor: Prisma.Decimal): Prisma.Decimal {
   return valor.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
@@ -24,36 +25,29 @@ export function validarLimitesViatico(
   }
 }
 
+/**
+ * Retención de viáticos: RC-IVA 13% (bruto = líquido / 0,87), tanto para el
+ * personal institucional como para terceros, según el Instructivo de Viaje y
+ * Viáticos del 03/08/2026. `tipoDestino` se conserva en la firma porque los
+ * llamadores lo envían y la regla podría volver a separarse.
+ */
 export function calcularMontosViaticos(
   montoNetoUnitario: Prisma.Decimal,
   dias: number,
   personas: number,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   tipoDestino: 'INSTITUCIONAL' | 'TERCEROS' = 'INSTITUCIONAL',
 ) {
   const subtotalNeto = redondear(montoNetoUnitario.mul(dias).mul(personas));
 
-  const factor = tipoDestino === 'TERCEROS' ? 0.84 : 0.87;
-
   // Grossing Up: montoTotal = montoNeto / factor
-  const montoPresupuestado = redondear(subtotalNeto.div(factor));
+  const montoPresupuestado = redondear(
+    subtotalNeto.div(FACTOR_RETENCION_VIATICOS),
+  );
 
-  // El impuesto total es la diferencia
-  const totalImpuestos = redondear(montoPresupuestado.sub(subtotalNeto));
-
-  let iva = new Prisma.Decimal(0);
-  let it = new Prisma.Decimal(0);
-
-  if (tipoDestino === 'TERCEROS') {
-    // 13% IVA, 3% IT del Bruto (Tasa efectiva 16% / 0.84)
-    // iva = Total * 0.13 = totalImpuestos * (13/16)
-    // it = Total * 0.03 = totalImpuestos * (3/16)
-    iva = redondear(totalImpuestos.mul(13).div(16));
-    it = redondear(totalImpuestos.sub(iva));
-  } else {
-    // INSTITUCIONAL: Tasa efectiva 13% / 0.87. Todo va a IVA (RC-IVA)
-    iva = totalImpuestos;
-    it = new Prisma.Decimal(0);
-  }
+  // Todo el impuesto es RC-IVA; no hay IT en viáticos
+  const iva = redondear(montoPresupuestado.sub(subtotalNeto));
+  const it = new Prisma.Decimal(0);
 
   return {
     subtotalNeto,

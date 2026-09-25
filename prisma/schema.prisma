@@ -63,6 +63,11 @@ enum TipoDestino {
   TERCEROS
 }
 
+enum Moneda {
+  BOB
+  USD
+}
+
 enum TipoDocumento {
   FACTURA
   RECIBO
@@ -524,8 +529,11 @@ model Planificacion {
 model Concepto {
   id                  Int       @id @default(autoincrement())
   nombre              String    @unique
+  // Tarifa líquida diaria, expresada en `moneda`. Las internacionales van en
+  // USD y se convierten a Bs con el tipo de cambio vigente.
   precioInstitucional Decimal   @db.Decimal(10, 2)
   precioTerceros      Decimal   @db.Decimal(10, 2)
+  moneda              Moneda    @default(BOB)
   viaticos            Viatico[]
 }
 
@@ -680,8 +688,10 @@ generator erd {
 
 model Hospedaje {
   id               Int           @id @default(autoincrement())
-  region           String // "Eje troncal", "Ciudades Intermedias", "Bolivia Norte", "Pueblos"
+  region           String // "Eje troncal", "Ciudades Intermedias", "Bolivia Norte", "Otras localidades"
   destino          String // Ej: "La Paz", "Sucre", "Rurrenabaque"
+  // Los rangos de tarifa difieren entre personal institucional y socios
+  tipoPersonal     TipoDestino   @default(INSTITUCIONAL)
   tipoDocumento    TipoDocumento @default(RECIBO)
   personas         Int
   noches           Int

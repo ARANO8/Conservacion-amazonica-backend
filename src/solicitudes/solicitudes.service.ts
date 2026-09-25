@@ -39,7 +39,10 @@ import {
   validarLimitesViatico,
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
-import { ESTADOS_COMPROMISO_ACTIVO } from '../common/constants/financial.constants';
+import {
+  ESTADOS_COMPROMISO_ACTIVO,
+  tarifaEnBolivianos,
+} from '../common/constants/financial.constants';
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PdfService } from '../pdf/pdf.service';
@@ -218,10 +221,12 @@ export class SolicitudesService {
         validarLimitesViatico(vDto, planificaciones[idx]);
       }
 
-      const precioCatalogo =
+      const precioCatalogo = tarifaEnBolivianos(
         vDto.tipoDestino === 'INSTITUCIONAL'
           ? concepto.precioInstitucional
-          : concepto.precioTerceros;
+          : concepto.precioTerceros,
+        concepto.moneda,
+      );
 
       // montoNeto (si se provee) es el VALOR TOTAL (días * personas * unitario).
       // Derivamos el precio unitario para los cálculos de impuestos y almacenamiento.

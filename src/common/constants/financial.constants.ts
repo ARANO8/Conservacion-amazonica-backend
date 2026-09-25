@@ -1,4 +1,4 @@
-import { EstadoSolicitud, Prisma } from '@prisma/client';
+import { EstadoSolicitud, Moneda, Prisma } from '@prisma/client';
 
 export const IVA_RATE = new Prisma.Decimal(0.13);
 export const IT_RATE = new Prisma.Decimal(0.03);
@@ -17,6 +17,30 @@ export const RETENCION_MOVILIDAD_RATE = new Prisma.Decimal(0.155);
  * valor"): 1 - RETENCION_MOVILIDAD_RATE.
  */
 export const FACTOR_MOVILIDAD = new Prisma.Decimal(0.845);
+
+/**
+ * Divisor de grossing-up de los viáticos (RC-IVA 13%), institucionales y de
+ * terceros por igual según el Instructivo de Viaje y Viáticos (03/08/2026).
+ */
+export const FACTOR_RETENCION_VIATICOS = new Prisma.Decimal(0.87);
+
+/**
+ * Tipo de cambio oficial USD → Bs para los viáticos internacionales (Nota 1
+ * del Instructivo de Viaje y Viáticos). Fijo por ahora: cuando el ADMIN pueda
+ * editarlo, este es el único punto que debe pasar a leerse de la base.
+ */
+export const TIPO_CAMBIO_USD_BOB = new Prisma.Decimal(6.96);
+
+/** Tarifa de catálogo expresada en Bs, sea cual sea su moneda de origen. */
+export function tarifaEnBolivianos(
+  precio: Prisma.Decimal | number | string,
+  moneda: Moneda,
+): Prisma.Decimal {
+  const valor = new Prisma.Decimal(precio);
+  return moneda === Moneda.USD
+    ? valor.mul(TIPO_CAMBIO_USD_BOB).toDecimalPlaces(2)
+    : valor;
+}
 
 export const MONEDA_DEFAULT = 'Bs';
 export const LOCALE_DEFAULT = 'es-BO';

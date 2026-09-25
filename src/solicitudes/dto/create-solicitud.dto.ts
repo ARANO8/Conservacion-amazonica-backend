@@ -179,6 +179,16 @@ export class CreateHospedajeDto {
   @IsNotEmpty()
   destino: string;
 
+  @ApiPropertyOptional({
+    enum: TipoDestino,
+    default: TipoDestino.INSTITUCIONAL,
+    description:
+      'Personal institucional o socio (TERCEROS): cada uno tiene su rango de tarifas',
+  })
+  @IsOptional()
+  @IsEnum(TipoDestino)
+  tipoPersonal?: TipoDestino;
+
   @ApiProperty({
     enum: TipoDocumento,
     example: TipoDocumento.RECIBO,
