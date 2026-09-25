@@ -11,6 +11,7 @@ export const USER_SAFE_SELECT = {
 export const SOLICITUD_INCLUDE = {
   usuarioEmisor: { select: USER_SAFE_SELECT },
   aprobador: { select: USER_SAFE_SELECT },
+  directorPrograma: { select: USER_SAFE_SELECT },
   usuarioBeneficiado: { select: USER_SAFE_SELECT },
   historialAprobaciones: {
     include: {

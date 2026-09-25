@@ -582,6 +582,7 @@ APROBADO APROBADO
     "Solicitud" |o--|| "TipoSolicitud" : "enum:tipo"
     "Solicitud" }o--|| "Usuario" : "usuarioEmisor"
     "Solicitud" }o--|o "Usuario" : "aprobador"
+    "Solicitud" }o--|o "Usuario" : "directorPrograma"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
     "HistorialAprobacion" |o--|| "TipoAccionHistorial" : "enum:accion"
     "HistorialAprobacion" }o--|| "Usuario" : "usuario"

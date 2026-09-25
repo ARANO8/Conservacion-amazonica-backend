@@ -615,6 +615,10 @@ export class SolicitudesService {
         );
       }
 
+      if ((tipo ?? TipoSolicitud.VIAJE) === TipoSolicitud.VIAJE) {
+        this.validarDirectorPrograma(aprobador);
+      }
+
       this.logger.log(`[create] Aprobador validado OK (id=${aprobadorId})`);
     } else {
       this.logger.log(
@@ -785,7 +789,11 @@ export class SolicitudesService {
           usuarioEmisor: { connect: { id: usuarioId } },
           ...(esContratoConsultoria
             ? {}
-            : { aprobador: { connect: { id: aprobadorId } } }),
+            : {
+                aprobador: { connect: { id: aprobadorId } },
+                // Quien la recibe primero es el Director de Programa
+                directorPrograma: { connect: { id: aprobadorId } },
+              }),
           usuarioBeneficiado: { connect: { id: usuarioId } },
         },
       });
@@ -847,7 +855,7 @@ export class SolicitudesService {
       if (!esContratoConsultoria && aprobadorId !== undefined) {
         await this.notificacionesService.crearNotificacion({
           titulo: 'Nueva solicitud asignada',
-          mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
+          mensaje: `Se te asignó la solicitud ${result.codigoSolicitud} para tu revisión como Director de Programa`,
           tipo: 'SOLICITUD_ASIGNADA',
           usuarioId: aprobadorId,
           solicitudId: result.id,
@@ -1199,7 +1207,7 @@ export class SolicitudesService {
     }
 
     const {
-      aprobadorId,
+      aprobadorId: aprobadorIdDto,
       lugarViaje,
       motivoViaje,
       descripcion,
@@ -1215,6 +1223,15 @@ export class SolicitudesService {
       proyecto,
       chequeANombreDe,
     } = updateSolicitudDto;
+
+    // En un viaje el Director de Programa se designa una sola vez: al subsanar,
+    // la solicitud vuelve a él aunque el cliente envíe otro aprobador. Las
+    // solicitudes anteriores al campo usan el que venga en el DTO.
+    const esViaje = solicitud.tipo === TipoSolicitud.VIAJE;
+    const aprobadorId =
+      esViaje && solicitud.directorProgramaId
+        ? solicitud.directorProgramaId
+        : aprobadorIdDto;
 
     // VALIDACIÓN 2: Mandatory Approver on Subsanación
     if (aprobadorId === undefined) {
@@ -1238,6 +1255,9 @@ export class SolicitudesService {
       throw new NotFoundException(
         `El aprobador con ID ${aprobadorId} no existe o ha sido eliminado del sistema`,
       );
+    }
+    if (esViaje) {
+      this.validarDirectorPrograma(aprobadorUpdate);
     }
 
     const debeReemplazarRelacionesAnidadas =
@@ -1398,7 +1418,11 @@ export class SolicitudesService {
           observacion: null,
           ...(esContratoEnEjecucion
             ? {}
-            : { aprobador: { connect: { id: aprobadorId } } }),
+            : {
+                aprobador: { connect: { id: aprobadorId } },
+                // Quien la recibe primero es el Director de Programa
+                directorPrograma: { connect: { id: aprobadorId } },
+              }),
         },
         include: SOLICITUD_INCLUDE,
       });
@@ -1486,6 +1510,63 @@ export class SolicitudesService {
     });
   }
 
+  /**
+   * Dirección Financiera (rol TESORERO) aprueba los viajes: quien tiene ese rol
+   * no puede además revisarlos como Director de Programa.
+   */
+  private validarDirectorPrograma(usuario: { rol: Rol }): void {
+    if (usuario.rol === Rol.TESORERO) {
+      throw new BadRequestException(
+        'Dirección Financiera aprueba la solicitud: no puede ser designada como Director de Programa',
+      );
+    }
+  }
+
+  /**
+   * Flujo de un viaje: emisor -> Director de Programa -> Dirección Financiera.
+   * Solo el Director de Programa envía, y siempre a un Tesorero; en Dirección
+   * Financiera ya no se deriva: se aprueba (desembolsa) u observa.
+   */
+  private async destinoRevisionDirector(
+    solicitud: { directorProgramaId: number | null },
+    usuarioId: number,
+    solicitado?: number,
+  ): Promise<number> {
+    // Solicitudes anteriores al campo: quien la tiene hace de director
+    const directorId = solicitud.directorProgramaId ?? usuarioId;
+    if (usuarioId !== directorId) {
+      throw new ForbiddenException(
+        'En Dirección Financiera la solicitud solo se aprueba u observa; ya no se deriva',
+      );
+    }
+
+    const tesoreros = await this.prisma.usuario.findMany({
+      where: { rol: Rol.TESORERO, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (solicitado !== undefined) {
+      if (!tesoreros.some((t) => t.id === solicitado)) {
+        throw new BadRequestException(
+          'El Director de Programa solo puede enviar la solicitud a Dirección Financiera',
+        );
+      }
+      return solicitado;
+    }
+
+    if (tesoreros.length === 0) {
+      throw new BadRequestException(
+        'No hay un usuario activo de Dirección Financiera (Tesorero) para recibir la solicitud',
+      );
+    }
+    if (tesoreros.length > 1) {
+      throw new BadRequestException(
+        'Hay más de un usuario de Dirección Financiera: indica a cuál enviar la solicitud',
+      );
+    }
+    return tesoreros[0].id;
+  }
+
   async aprobar(
     id: number,
     usuarioId: number,
@@ -1505,7 +1586,20 @@ export class SolicitudesService {
       );
     }
 
-    const { nuevoAprobadorId } = aprobarDto;
+    const nuevoAprobadorId =
+      solicitud.tipo === TipoSolicitud.VIAJE
+        ? await this.destinoRevisionDirector(
+            solicitud,
+            usuarioId,
+            aprobarDto.nuevoAprobadorId,
+          )
+        : aprobarDto.nuevoAprobadorId;
+
+    if (nuevoAprobadorId === undefined) {
+      throw new BadRequestException(
+        'El ID del nuevo aprobador es obligatorio para derivar',
+      );
+    }
 
     // Verificar que el nuevo aprobador existe y no está eliminado (soft-delete guard)
     const nuevoAprobador = await this.prisma.usuario.findFirst({
@@ -1542,7 +1636,10 @@ export class SolicitudesService {
       // Crear notificación para el nuevo aprobador
       await this.notificacionesService.crearNotificacion({
         titulo: 'Solicitud derivada',
-        mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
+        mensaje:
+          solicitudActualizada.tipo === TipoSolicitud.VIAJE
+            ? `La solicitud ${solicitudActualizada.codigoSolicitud} fue revisada por el Director de Programa y requiere tu aprobación`
+            : `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
         tipo: 'SOLICITUD_DERIVADA',
         usuarioId: nuevoAprobadorId,
         solicitudId: solicitudActualizada.id,
@@ -1654,6 +1751,22 @@ export class SolicitudesService {
       throw new BadRequestException(
         'La solicitud debe estar en estado PENDIENTE para ser desembolsada',
       );
+    }
+
+    // Un viaje pasa por el Director de Programa antes de Dirección Financiera:
+    // no se desembolsa mientras siga en revisión, y solo lo hace quien la
+    // tiene en su bandeja (o un ADMIN).
+    if (solicitud.tipo === TipoSolicitud.VIAJE) {
+      if (solicitud.aprobador?.rol !== Rol.TESORERO) {
+        throw new BadRequestException(
+          'El Director de Programa aún no envió la solicitud a Dirección Financiera',
+        );
+      }
+      if (usuario.rol !== Rol.ADMIN && solicitud.aprobadorId !== usuario.id) {
+        throw new ForbiddenException(
+          'Solo quien tiene la solicitud en Dirección Financiera puede desembolsarla',
+        );
+      }
     }
 
     const solicitudActualizada = await this.prisma.$transaction(async (tx) => {

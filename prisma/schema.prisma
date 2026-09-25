@@ -117,6 +117,7 @@ model Usuario {
 
   solicitudesEmitidas         Solicitud[]            @relation("Emisor")
   solicitudesPorAprobar       Solicitud[]            @relation("AprobadorSolicitud")
+  solicitudesComoDirector     Solicitud[]            @relation("DirectorProgramaSolicitud")
   solicitudesBeneficiadas     Solicitud[]            @relation("Beneficiario")
   historialesCreados          HistorialAprobacion[]  @relation("ActorHistorial")
   historialesRecibidos        HistorialAprobacion[]  @relation("DestinatarioHistorial")
@@ -259,8 +260,15 @@ model Solicitud {
   usuarioEmisorId Int
   usuarioEmisor   Usuario @relation("Emisor", fields: [usuarioEmisorId], references: [id])
 
+  // Quién tiene la solicitud en su bandeja ahora: cambia al derivar y queda
+  // en null al desembolsar
   aprobadorId Int?
   aprobador   Usuario? @relation("AprobadorSolicitud", fields: [aprobadorId], references: [id])
+
+  // Director de Programa elegido por el emisor: revisa la solicitud y la
+  // deriva a Dirección Financiera. No cambia al derivar; firma "Revisado por"
+  directorProgramaId Int?
+  directorPrograma   Usuario? @relation("DirectorProgramaSolicitud", fields: [directorProgramaId], references: [id])
 
   usuarioBeneficiadoId Int?
   usuarioBeneficiado   Usuario? @relation("Beneficiario", fields: [usuarioBeneficiadoId], references: [id])
@@ -280,6 +288,7 @@ model Solicitud {
 
   @@index([usuarioEmisorId])
   @@index([aprobadorId])
+  @@index([directorProgramaId])
   @@index([deletedAt])
 }
 

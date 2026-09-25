@@ -56,6 +56,8 @@ export interface Anexo2 {
   observaciones: string;
   banco: string;
   solicitadoPor: string;
+  /** Director de Programa: revisa la solicitud antes de Dirección Financiera. */
+  revisadoPor: string;
   viajeros: string[];
 }
 
@@ -88,6 +90,7 @@ export interface Anexo2Fuente {
   chequeANombreDe: string | null;
   proyecto: string | null;
   usuarioEmisor: { nombreCompleto: string; cargo: string | null } | null;
+  directorPrograma: { nombreCompleto: string } | null;
   viaticos: ViaticoFuente[];
   gastos: {
     montoNeto: Decimalish;
@@ -443,6 +446,7 @@ export function construirAnexo2(
     observaciones: fuente.descripcion ?? '',
     banco,
     solicitadoPor: emisor,
+    revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
     viajeros: viajeros(fuente),
   };
 }

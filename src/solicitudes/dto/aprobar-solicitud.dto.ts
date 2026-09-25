@@ -1,14 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsInt, IsNotEmpty } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsInt, IsOptional } from 'class-validator';
 
 export class AprobarSolicitudDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 3,
-    description: 'ID del nuevo usuario para derivar la solicitud (Obligatorio)',
+    description:
+      'ID del usuario al que se deriva. En un viaje es opcional: el Director de Programa la envía a Dirección Financiera (Tesorero). En las demás solicitudes es obligatorio',
   })
-  @IsNotEmpty({
-    message: 'El ID del nuevo aprobador es obligatorio para derivar',
-  })
+  @IsOptional()
   @IsInt()
-  nuevoAprobadorId: number;
+  nuevoAprobadorId?: number;
 }
