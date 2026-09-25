@@ -40,6 +40,7 @@ import {
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
 import {
+  DESTINATARIO_ANEXOS,
   ESTADOS_COMPROMISO_ACTIVO,
   tarifaEnBolivianos,
 } from '../common/constants/financial.constants';
@@ -48,7 +49,7 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
 import { PdfService } from '../pdf/pdf.service';
 import { Anexo2, construirAnexo2 } from './anexo2.builder';
 
-/** Destinatario del ANEXO 2 y aprobador final que firma los PDF. */
+/** Aprobador final que firma los PDF de compras. */
 const DIRECTOR_EJECUTIVO = {
   nombre: 'Marcos Fernando Terán Valenzuela',
   cargo: 'Director Ejecutivo',
@@ -976,7 +977,7 @@ export class SolicitudesService {
     solicitud: SolicitudConRelaciones,
   ): Promise<Anexo2> {
     const catalogo = await this.prisma.concepto.findMany();
-    return construirAnexo2(solicitud, catalogo, DIRECTOR_EJECUTIVO.nombre);
+    return construirAnexo2(solicitud, catalogo, DESTINATARIO_ANEXOS);
   }
 
   async generatePdf(

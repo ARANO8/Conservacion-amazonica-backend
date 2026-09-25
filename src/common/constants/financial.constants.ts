@@ -42,6 +42,12 @@ export function tarifaEnBolivianos(
     : valor;
 }
 
+/**
+ * Campo "A:" de los anexos: todos los documentos van dirigidos al Director
+ * Ejecutivo, escrito tal como lo pide ACEAA.
+ */
+export const DESTINATARIO_ANEXOS = 'Marcos F. Terán Valenzuela';
+
 export const MONEDA_DEFAULT = 'Bs';
 export const LOCALE_DEFAULT = 'es-BO';
 

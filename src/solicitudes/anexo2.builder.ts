@@ -413,7 +413,9 @@ export function construirAnexo2(
   return {
     codigoSolicitud: fuente.codigoSolicitud,
     a: destinatario,
-    de: emisor,
+    // DE: el Director de Programa, que revisa y presenta la solicitud. Las
+    // solicitudes sin director (compras, datos antiguos) caen al emisor.
+    de: fuente.directorPrograma?.nombreCompleto ?? emisor,
     proyecto: fuente.proyecto?.trim() || proyectos.join(', '),
     actividad: [...new Set(poas.map((poa) => poa.codigoPoa))].join(', '),
     chequeANombreDe: fuente.chequeANombreDe?.trim() || emisor,
