@@ -82,6 +82,7 @@ RUN npx prisma generate --generator client
 # por lo que el proceso debe arrancar con /app como directorio de trabajo.
 COPY --from=builder /app/dist ./dist
 COPY logo.png ./logo.png
+COPY logo-aceaa.jpg ./logo-aceaa.jpg
 
 # El seed compilado resuelve sus datos con path.join(__dirname, 'seeds', ...),
 # es decir dist/prisma/seeds. Los CSV viven en prisma/seeds, asi que se copian

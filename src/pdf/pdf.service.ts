@@ -11,22 +11,33 @@ import type { Browser, LaunchOptions } from 'puppeteer';
 export class PdfService {
   private readonly logger = new Logger(PdfService.name);
 
-  async generatePdf(
-    templateName: string,
-    data: any,
-    options?: { landscape?: boolean },
-  ): Promise<Buffer> {
-    // Dynamic imports para evitar cargar puppeteer y handlebars en startup
+  /**
+   * Compila la plantilla a HTML. Lo usa el propio PDF y las vistas que deben
+   * verse idénticas al documento impreso (p. ej. el ANEXO 2 en el detalle).
+   */
+  async renderHtml(templateName: string, data: any): Promise<string> {
+    // Import dinámico para no cargar handlebars en startup
     const handlebars = await import('handlebars');
-    const puppeteer = await import('puppeteer');
 
     const templateFile = this.readTemplate(templateName);
     const template = handlebars.default.compile(templateFile);
-    const logoBase64 = this.readLogoBase64();
-    const html = template({
+    return template({
       ...data,
-      logoBase64,
+      logoBase64: this.readLogoBase64('logo.png'),
+      // Logo institucional de ACEAA, el que llevan los formularios oficiales
+      logoAceaaBase64: this.readLogoBase64('logo-aceaa.jpg'),
     });
+  }
+
+  async generatePdf(
+    templateName: string,
+    data: any,
+    options?: { landscape?: boolean; marginMm?: number },
+  ): Promise<Buffer> {
+    // Dynamic import para evitar cargar puppeteer en startup
+    const puppeteer = await import('puppeteer');
+
+    const html = await this.renderHtml(templateName, data);
 
     let browser: Browser | null = null;
 
@@ -56,10 +67,10 @@ export class PdfService {
         landscape: options?.landscape ?? false,
         printBackground: true,
         margin: {
-          top: '20mm',
-          bottom: '20mm',
-          left: '20mm',
-          right: '20mm',
+          top: `${options?.marginMm ?? 20}mm`,
+          bottom: `${options?.marginMm ?? 20}mm`,
+          left: `${options?.marginMm ?? 20}mm`,
+          right: `${options?.marginMm ?? 20}mm`,
         },
       });
 
@@ -117,8 +128,8 @@ export class PdfService {
     );
   }
 
-  private readLogoBase64(): string | null {
-    const logoPath = join(process.cwd(), 'logo.png');
+  private readLogoBase64(fileName: string): string | null {
+    const logoPath = join(process.cwd(), fileName);
 
     if (!fs.existsSync(logoPath)) {
       this.logger.warn(`Logo no encontrado en ruta: ${logoPath}`);

@@ -43,6 +43,13 @@ import { ESTADOS_COMPROMISO_ACTIVO } from '../common/constants/financial.constan
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { PdfService } from '../pdf/pdf.service';
+import { Anexo2, construirAnexo2 } from './anexo2.builder';
+
+/** Destinatario del ANEXO 2 y aprobador final que firma los PDF. */
+const DIRECTOR_EJECUTIVO = {
+  nombre: 'Marcos Fernando Terán Valenzuela',
+  cargo: 'Director Ejecutivo',
+};
 
 type DetalleSolicitud = {
   montoTotalPresupuestado: Prisma.Decimal;
@@ -932,11 +939,47 @@ export class SolicitudesService {
     }
   }
 
+  /**
+   * ANEXO 2 en HTML, generado con la misma plantilla que el PDF para que la
+   * vista de detalle y el documento impreso sean idénticos.
+   */
+  async getAnexo2Html(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<string> {
+    const solicitud = await this.findOne(id, usuario);
+    if (solicitud.tipo !== TipoSolicitud.VIAJE) {
+      throw new BadRequestException(
+        'El ANEXO 2 solo aplica a solicitudes de viaje',
+      );
+    }
+    return this.pdfService.renderHtml(
+      'anexo2.hbs',
+      await this.armarAnexo2(solicitud),
+    );
+  }
+
+  private async armarAnexo2(
+    solicitud: SolicitudConRelaciones,
+  ): Promise<Anexo2> {
+    const catalogo = await this.prisma.concepto.findMany();
+    return construirAnexo2(solicitud, catalogo, DIRECTOR_EJECUTIVO.nombre);
+  }
+
   async generatePdf(
     id: number,
     usuario?: { id: number; rol: Rol },
   ): Promise<Buffer> {
     const solicitud = await this.findOne(id, usuario);
+
+    if (solicitud.tipo === TipoSolicitud.VIAJE) {
+      // Márgenes estrechos, como el formulario original: cabe en una hoja
+      return this.pdfService.generatePdf(
+        'anexo2.hbs',
+        await this.armarAnexo2(solicitud),
+        { marginMm: 12 },
+      );
+    }
     const cuentaBancaria =
       solicitud.presupuestos?.[0]?.poa?.estructura?.proyecto?.cuentaBancaria;
 
@@ -952,10 +995,7 @@ export class SolicitudesService {
       solicitud.aprobador?.cargo,
     );
 
-    const aprobadorFinal = {
-      nombre: 'Marcos Fernando Terán Valenzuela',
-      cargo: 'Director Ejecutivo',
-    };
+    const aprobadorFinal = DIRECTOR_EJECUTIVO;
 
     const detalle = [
       ...(solicitud.viaticos ?? []).map((viatico) => ({

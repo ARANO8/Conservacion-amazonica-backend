@@ -13,6 +13,7 @@ import {
   Logger,
   Query,
   BadRequestException,
+  Header,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -98,6 +99,23 @@ export class SolicitudesController {
   @ApiOperation({ summary: 'Obtener detalle de una solicitud' })
   findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
     return this.solicitudesService.findOne(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  @Get(':id/anexo2')
+  @ApiOperation({
+    summary:
+      'ANEXO 2 de una solicitud de viaje en HTML (misma plantilla que el PDF)',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  getAnexo2(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ): Promise<string> {
+    return this.solicitudesService.getAnexo2Html(id, {
       id: req.user.userId,
       rol: req.user.rol,
     });

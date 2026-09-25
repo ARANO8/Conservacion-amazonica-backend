@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ANEXO 2 {{codigoSolicitud}}</title>
+    <style>
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+        color: #000000;
+      }
+
+      body {
+        font-family: 'Bookman Old Style', 'Bookman', Georgia, serif;
+        font-size: 8.5pt;
+      }
+
+      /* En pantalla la hoja se ve como papel; al imprimir manda @page */
+      @media screen {
+        body {
+          padding: 12px;
+        }
+        .hoja {
+          max-width: 180mm;
+          margin: 0 auto;
+        }
+      }
+
+      .hoja {
+        width: 100%;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      td,
+      th {
+        padding: 1px 3px;
+        vertical-align: middle;
+      }
+
+      .b {
+        font-weight: bold;
+      }
+      .c {
+        text-align: center;
+      }
+      .r {
+        text-align: right;
+      }
+      .borde {
+        border: 1px solid #000000;
+      }
+      .grueso {
+        border: 2px solid #000000;
+      }
+
+      .gris {
+        background: #d9d9d9;
+      }
+      .gris-oscuro {
+        background: #bfbfbf;
+      }
+      .celeste {
+        background: #ccffff;
+      }
+      .verde {
+        background: #ccffcc;
+      }
+
+      /* Encabezado */
+      .encabezado td {
+        padding: 0;
+      }
+      .anexo {
+        text-align: right;
+        font-weight: bold;
+        font-size: 11pt;
+        padding-right: 30px !important;
+      }
+      .titulo {
+        text-align: center;
+        font-weight: bold;
+        font-size: 10.5pt;
+        line-height: 1.25;
+        padding: 3px 0 !important;
+      }
+      .logo {
+        width: 70px;
+        text-align: center;
+      }
+      .logo img {
+        max-height: 58px;
+        max-width: 68px;
+      }
+
+      /* Datos generales */
+      .datos {
+        margin-top: 4px;
+      }
+      .datos td {
+        height: 15px;
+        font-size: 7pt;
+      }
+      .datos .etiqueta {
+        font-weight: bold;
+        white-space: nowrap;
+      }
+      .datos .valor {
+        border: 1px solid #000000;
+        font-size: 7.5pt;
+      }
+      .datos .sombreado {
+        background: #f2f2f2;
+      }
+
+      /* Tablas de viáticos */
+      .viaticos {
+        margin-top: 10px;
+      }
+      .viaticos th {
+        font-size: 7pt;
+        font-weight: bold;
+        border: 1px solid #000000;
+        line-height: 1.1;
+        height: 24px;
+      }
+      .viaticos td {
+        border: 1px solid #000000;
+        height: 20px;
+        font-size: 8pt;
+      }
+      .viaticos td.concepto {
+        text-align: left;
+      }
+      .viaticos td.concepto-largo {
+        font-size: 6.5pt;
+        line-height: 1.1;
+        height: 22px;
+      }
+      .viaticos tr.fina td {
+        height: 16px;
+      }
+      .viaticos col.concepto {
+        width: 41%;
+      }
+      .viaticos col.num {
+        width: 10%;
+      }
+
+      /* Otros gastos */
+      .otros td {
+        border: 1px solid #000000;
+        height: 13px;
+        font-size: 7.5pt;
+        padding-top: 0;
+        padding-bottom: 0;
+      }
+      .otros td.importe {
+        width: 10%;
+        text-align: right;
+      }
+      .otros .detalle {
+        font-size: 6.5pt;
+        color: #333333;
+      }
+      .otros .total-general td {
+        letter-spacing: 4px;
+      }
+
+      /* Pie */
+      .nota {
+        margin-top: 12px;
+        font-size: 7pt;
+        font-weight: bold;
+      }
+      .pie {
+        margin-top: 4px;
+      }
+      .pie td {
+        height: 20px;
+        font-size: 8pt;
+        vertical-align: bottom;
+      }
+      .pie td.arriba {
+        vertical-align: top;
+        padding-top: 4px;
+      }
+      .linea {
+        border-bottom: 1px solid #bfbfbf;
+      }
+
+      .firmas {
+        margin-top: 26px;
+      }
+      /* Si no cabe todo, los renglones de viajeros pasan a la hoja siguiente,
+         pero nunca se parte un renglón ni se separan las firmas */
+      .firmas tr {
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }
+      .firmas .bloque-firmas {
+        page-break-after: avoid;
+        break-after: avoid;
+      }
+      .firmas td {
+        font-size: 8.5pt;
+        text-align: center;
+        vertical-align: top;
+      }
+      .firmas .raya {
+        border-top: 2px solid #000000;
+        padding-top: 2px;
+      }
+      .firmas .solicitante {
+        background: #f2f2f2;
+        height: 26px;
+        font-size: 7.5pt;
+        vertical-align: middle;
+      }
+      .firmas .cabecera {
+        font-weight: bold;
+        font-size: 7pt;
+        padding-top: 10px;
+        padding-bottom: 4px;
+      }
+      .firmas .renglon td {
+        height: 17px;
+        vertical-align: bottom;
+        font-size: 7.5pt;
+      }
+      .firmas .punteado {
+        border-bottom: 1px dotted #000000;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hoja">
+      <table class="encabezado">
+        <tr>
+          <td rowspan="3" class="logo">
+            {{#if logoAceaaBase64}}
+              <img src="data:image/jpeg;base64,{{logoAceaaBase64}}" alt="Conservación Amazónica" />
+            {{/if}}
+          </td>
+          <td class="anexo">ANEXO 2</td>
+        </tr>
+        <tr>
+          <td class="titulo gris">
+            SOLICITUD DE FONDOS PARA VIAJES<br />
+            (Expresado en Bolivianos)
+          </td>
+        </tr>
+        <tr>
+          <td>&nbsp;</td>
+        </tr>
+      </table>
+
+      <table class="datos">
+        <colgroup>
+          <col style="width: 21%" />
+          <col style="width: 23%" />
+          <col style="width: 12%" />
+          <col style="width: 11%" />
+          <col style="width: 12%" />
+          <col style="width: 21%" />
+        </colgroup>
+        <tr>
+          <td class="etiqueta">A:</td>
+          <td class="valor" colspan="5">{{a}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">DE:</td>
+          <td class="valor" colspan="5">{{de}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">PROYECTO:</td>
+          <td class="valor" colspan="5">{{proyecto}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta" colspan="2">ACTIVIDAD N°</td>
+          <td class="valor" colspan="4">{{actividad}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta" colspan="2">CHEQUE A NOMBRE DE:</td>
+          <td class="valor" colspan="4">{{chequeANombreDe}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta" colspan="2">LUGAR DE VIAJE:</td>
+          <td class="valor" colspan="4">{{lugarViaje}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta" colspan="2">MOTIVO DE VIAJE:</td>
+          <td class="valor sombreado" colspan="4">{{motivoViaje}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta" colspan="2">FECHA DE:</td>
+          <td class="valor b c">Salida:</td>
+          <td class="valor c">{{fechaSalida}}</td>
+          <td class="valor b c">Llegada:</td>
+          <td class="valor c">{{fechaLlegada}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta" colspan="2">FECHA DE SOLICITUD:</td>
+          <td class="valor sombreado c" colspan="2">{{fechaSolicitud}}</td>
+          <td colspan="2"></td>
+        </tr>
+      </table>
+
+      <table class="viaticos">
+        <colgroup>
+          <col class="concepto" />
+          <col class="num" />
+          <col class="num" />
+          <col class="num" />
+          <col class="num" />
+          <col class="num" />
+          <col class="num" />
+        </colgroup>
+        <tr class="celeste">
+          <th>CONCEPTO</th>
+          <th># DE DÍAS</th>
+          <th># DE PERSONAS</th>
+          <th>Tarifa x Día (Bs.)</th>
+          <th>TOTAL BRUTO Bs.</th>
+          <th>IVA (13%)</th>
+          <th>IMPORTE NETO Bs.</th>
+        </tr>
+        {{#each viaticosInstitucionales}}
+          <tr>
+            <td class="concepto">{{concepto}}</td>
+            <td class="c">{{dias}}</td>
+            <td class="c">{{personas}}</td>
+            <td class="r">{{tarifa}}</td>
+            <td class="c">{{bruto}}</td>
+            <td class="c">{{iva}}</td>
+            <td class="c">{{neto}}</td>
+          </tr>
+        {{/each}}
+        <tr class="fina">
+          <td class="gris-oscuro b c" colspan="4">SUB TOTAL</td>
+          <td class="gris-oscuro r">{{subtotalInstitucional.bruto}}</td>
+          <td class="gris-oscuro r">{{subtotalInstitucional.iva}}</td>
+          <td class="gris-oscuro r">{{subtotalInstitucional.neto}}</td>
+        </tr>
+        <tr class="celeste">
+          <th>CONCEPTO</th>
+          <th># DE DÍAS</th>
+          <th># DE PERSONAS</th>
+          <th>Tarifa x Día (Bs.)</th>
+          <th>TOTAL BRUTO Bs.</th>
+          <th>IVA (16%)</th>
+          <th>IMPORTE NETO Bs.</th>
+        </tr>
+        {{#each viaticosTerceros}}
+          <tr>
+            <td class="concepto concepto-largo">{{concepto}}</td>
+            <td class="c">{{dias}}</td>
+            <td class="c">{{personas}}</td>
+            <td class="r">{{tarifa}}</td>
+            <td class="c">{{bruto}}</td>
+            <td class="c">{{iva}}</td>
+            <td class="c">{{neto}}</td>
+          </tr>
+        {{/each}}
+        <tr class="fina">
+          <td class="verde b c" colspan="4">TOTAL VIÁTICOS</td>
+          <td class="verde b r">{{totalViaticos.bruto}}</td>
+          <td class="verde b r">{{totalViaticos.iva}}</td>
+          <td class="verde b r">{{totalViaticos.neto}}</td>
+        </tr>
+      </table>
+
+      <table class="otros">
+        <tr>
+          <td class="b" colspan="2">&nbsp;* Otros gastos:</td>
+        </tr>
+        {{#each otrosGastos}}
+          <tr>
+            <td>
+              {{concepto}}
+              {{#if detalle}}<span class="detalle">({{detalle}})</span>{{/if}}
+            </td>
+            <td class="importe">{{importe}}</td>
+          </tr>
+        {{/each}}
+        <tr>
+          <td class="verde b c">Subtotal Otros Gastos</td>
+          <td class="verde b importe">{{subtotalOtrosGastos}}</td>
+        </tr>
+        <tr class="total-general">
+          <td class="gris-oscuro b c grueso">T O T A L &nbsp; G E N E R A L</td>
+          <td class="gris-oscuro b importe grueso">{{totalGeneral}}</td>
+        </tr>
+      </table>
+
+      <p class="nota">* Se deben presentar facturas o recibos por estos gastos</p>
+
+      <table class="pie">
+        <colgroup>
+          <col style="width: 21%" />
+          <col style="width: 30%" />
+          <col style="width: 10%" />
+          <col style="width: 39%" />
+        </colgroup>
+        <tr>
+          <td class="arriba">Observaciones:</td>
+          <td class="linea arriba" colspan="3">{{observaciones}}</td>
+        </tr>
+        <tr>
+          <td>Cheque #</td>
+          <td class="linea"></td>
+          <td class="c">Banco</td>
+          <td class="linea">{{banco}}</td>
+        </tr>
+        <tr>
+          <td>Fecha de emisión:</td>
+          <td class="linea" colspan="2"></td>
+          <td></td>
+        </tr>
+      </table>
+
+      <table class="firmas">
+        <colgroup>
+          <col style="width: 40%" />
+          <col style="width: 9%" />
+          <col style="width: 21%" />
+          <col style="width: 9%" />
+          <col style="width: 21%" />
+        </colgroup>
+        <tr class="bloque-firmas">
+          <td class="raya">Solicitado por:</td>
+          <td></td>
+          <td class="raya">Revisado por:</td>
+          <td></td>
+          <td class="raya">Aprobado por:</td>
+        </tr>
+        <tr class="bloque-firmas">
+          <td class="solicitante">{{solicitadoPor}}</td>
+          <td colspan="4"></td>
+        </tr>
+        <tr>
+          <td class="cabecera">NOMBRE DE LOS VIAJEROS</td>
+          <td></td>
+          <td class="cabecera">FIRMAS</td>
+          <td></td>
+          <td class="cabecera">IMPORTE RECIBIDO</td>
+        </tr>
+        {{#each viajeros}}
+          <tr class="renglon">
+            <td class="punteado">{{this}}</td>
+            <td></td>
+            <td class="punteado"></td>
+            <td></td>
+            <td class="punteado"></td>
+          </tr>
+        {{/each}}
+      </table>
+    </div>
+  </body>
+</html>
