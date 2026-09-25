@@ -38,6 +38,17 @@ export class CreatePlanificacionDto {
   @Min(0)
   cantTerceros: number;
 
+  @ApiPropertyOptional({
+    example: [3, 7],
+    type: [Number],
+    description:
+      'IDs de los usuarios institucionales que participan. Si se envía, su cantidad debe coincidir con cantInstitucional',
+  })
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  participantesInstitucionalesIds?: number[];
+
   @ApiProperty({
     example: 2.5,
     description:

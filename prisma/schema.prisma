@@ -110,21 +110,22 @@ model Usuario {
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  solicitudesEmitidas     Solicitud[]            @relation("Emisor")
-  solicitudesPorAprobar   Solicitud[]            @relation("AprobadorSolicitud")
-  solicitudesBeneficiadas Solicitud[]            @relation("Beneficiario")
-  historialesCreados      HistorialAprobacion[]  @relation("ActorHistorial")
-  historialesRecibidos    HistorialAprobacion[]  @relation("DestinatarioHistorial")
-  rendicionesPorAprobar   Rendicion[]            @relation("RendicionAprobador")
-  notificaciones          Notificacion[]
-  cotizacionesEmitidas    Cotizacion[]           @relation("CotizacionesEmitidas")
-  cuadrosEmitidos         CuadroComparativo[]    @relation("CuadrosEmitidos")
-  ordenesEmitidas         OrdenCompra[]          @relation("OrdenesEmitidas")
-  pagosSolicitados        PagoParcial[]          @relation("PagoSolicitante")
-  pagosPorAprobar         PagoParcial[]          @relation("PagoAprobador")
-  pagosRegistrados        PagoParcial[]          @relation("PagoTesorero")
-  informesActividades     InformeActividades[]
-  declaracionesMovilidad  DeclaracionMovilidad[]
+  solicitudesEmitidas         Solicitud[]            @relation("Emisor")
+  solicitudesPorAprobar       Solicitud[]            @relation("AprobadorSolicitud")
+  solicitudesBeneficiadas     Solicitud[]            @relation("Beneficiario")
+  historialesCreados          HistorialAprobacion[]  @relation("ActorHistorial")
+  historialesRecibidos        HistorialAprobacion[]  @relation("DestinatarioHistorial")
+  rendicionesPorAprobar       Rendicion[]            @relation("RendicionAprobador")
+  notificaciones              Notificacion[]
+  cotizacionesEmitidas        Cotizacion[]           @relation("CotizacionesEmitidas")
+  cuadrosEmitidos             CuadroComparativo[]    @relation("CuadrosEmitidos")
+  ordenesEmitidas             OrdenCompra[]          @relation("OrdenesEmitidas")
+  pagosSolicitados            PagoParcial[]          @relation("PagoSolicitante")
+  pagosPorAprobar             PagoParcial[]          @relation("PagoAprobador")
+  pagosRegistrados            PagoParcial[]          @relation("PagoTesorero")
+  informesActividades         InformeActividades[]
+  declaracionesMovilidad      DeclaracionMovilidad[]
+  planificacionesParticipadas Planificacion[]        @relation("PlanificacionParticipantes")
 }
 
 model Proyecto {
@@ -515,6 +516,9 @@ model Planificacion {
   viaticos    Viatico[]
 
   personasExternas PersonaExterna[]
+
+  // Nómina institucional: usuarios del sistema que participan en la actividad
+  participantesInstitucionales Usuario[] @relation("PlanificacionParticipantes")
 }
 
 model Concepto {

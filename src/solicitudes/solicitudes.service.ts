@@ -106,6 +106,45 @@ export class SolicitudesService {
     return `SOL-${anioActual}-${correlativo}`;
   }
 
+  /**
+   * La nómina institucional es opcional (solicitudes anteriores no la traen),
+   * pero cuando se envía debe cuadrar con el conteo declarado y referir a
+   * usuarios activos, sin repetidos.
+   */
+  private async validarParticipantesInstitucionales(
+    planificaciones: CreatePlanificacionDto[],
+  ): Promise<void> {
+    const todosLosIds = new Set<number>();
+
+    for (const p of planificaciones) {
+      const ids = p.participantesInstitucionalesIds;
+      if (!ids || ids.length === 0) continue;
+
+      if (new Set(ids).size !== ids.length) {
+        throw new BadRequestException(
+          `La actividad "${p.actividad}" repite personal institucional`,
+        );
+      }
+      if (ids.length !== p.cantInstitucional) {
+        throw new BadRequestException(
+          `La actividad "${p.actividad}" declara ${p.cantInstitucional} persona(s) institucional(es) pero selecciona ${ids.length}`,
+        );
+      }
+      ids.forEach((id) => todosLosIds.add(id));
+    }
+
+    if (todosLosIds.size === 0) return;
+
+    const activos = await this.prisma.usuario.count({
+      where: { id: { in: [...todosLosIds] }, deletedAt: null },
+    });
+    if (activos !== todosLosIds.size) {
+      throw new BadRequestException(
+        'Uno o más participantes institucionales no existen o están inactivos',
+      );
+    }
+  }
+
   private async prepararInsertAnidado(
     dto: CreateSolicitudDto | UpdateSolicitudDto,
   ): Promise<DetalleSolicitud> {
@@ -126,6 +165,8 @@ export class SolicitudesService {
 
     const conceptosMap = new Map(conceptosRaw.map((c) => [c.id, c]));
     const tiposGastoMap = new Map(tiposGastoRaw.map((tg) => [tg.id, tg]));
+
+    await this.validarParticipantesInstitucionales(planificaciones);
 
     // 2. CÁLCULOS PREVIOS Y VALIDACIONES
     let montoTotalPresupuestado = new Prisma.Decimal(0);
@@ -415,6 +456,11 @@ export class SolicitudesService {
           cantidadPersonasInstitucional: p.cantInstitucional,
           cantidadPersonasTerceros: p.cantTerceros,
           solicitudId,
+          participantesInstitucionales: {
+            connect: (p.participantesInstitucionalesIds ?? []).map((id) => ({
+              id,
+            })),
+          },
         },
       });
       createdPlanificaciones.push({ id: cp.id });

@@ -72,7 +72,13 @@ export const SOLICITUD_INCLUDE = {
       },
     },
   },
-  planificaciones: true,
+  planificaciones: {
+    include: {
+      participantesInstitucionales: {
+        select: { id: true, nombreCompleto: true, cargo: true },
+      },
+    },
+  },
   hospedajes: true,
   personasExternas: true,
   rendicion: {

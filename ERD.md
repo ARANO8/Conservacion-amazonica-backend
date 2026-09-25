@@ -559,6 +559,7 @@ APROBADO APROBADO
     }
   
     "Usuario" |o--|| "Rol" : "enum:rol"
+    "Usuario" o{--}o "Planificacion" : ""
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
     "PartidaContable" |o--|o "PartidaContable" : "parent"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
