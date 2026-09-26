@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+import * as ExcelJS from 'exceljs';
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import {
@@ -9,6 +9,7 @@ import {
   TipoDocumento,
 } from '@prisma/client';
 import { RendicionesService } from './rendiciones.service';
+import type { Anexo4 } from './anexo4.builder';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
@@ -36,6 +37,7 @@ describe('RendicionesService', () => {
   let prismaMock: {
     $transaction: jest.Mock;
     rendicion: { findFirst: jest.Mock };
+    usuario: { findFirst: jest.Mock };
   };
   let pdfServiceMock: {
     generatePdf: jest.Mock;
@@ -97,6 +99,12 @@ describe('RendicionesService', () => {
         .fn()
         .mockImplementation((cb: (tx: MockTx) => unknown) => cb(mockTx)),
       rendicion: { findFirst: jest.fn() },
+      usuario: {
+        findFirst: jest.fn().mockResolvedValue({
+          nombreCompleto: 'Shirley Ramírez',
+          cargo: 'Director Financiero',
+        }),
+      },
     };
 
     pdfServiceMock = {
@@ -271,6 +279,9 @@ describe('RendicionesService', () => {
           fechaDesembolso: new Date('2026-06-21'),
           codigoDesembolso: 'DES-445',
           proyecto: 'Especies de Amazonía',
+          chequeANombreDe: null,
+          directorPrograma: null,
+          presupuestos: [],
           usuarioEmisor: {
             id: 1,
             nombreCompleto: 'Alan García',
@@ -346,51 +357,81 @@ describe('RendicionesService', () => {
       expect(buffer).toBeDefined();
       expect(pdfServiceMock.generatePdf).toHaveBeenCalledTimes(1);
 
-      const [templateName, params] = pdfServiceMock.generatePdf.mock.calls[0];
-      expect(templateName).toBe('rendicion.hbs');
+      const [templateName, anexo, opciones] = pdfServiceMock.generatePdf.mock
+        .calls[0] as [string, Anexo4, { landscape?: boolean }];
+      expect(templateName).toBe('anexo4.hbs');
+      expect(opciones).toMatchObject({ landscape: true });
 
-      // Debe registrar 4 movimientos: Anticipo, Factura, Recibo, DJ
-      expect(params.transacciones).toHaveLength(4);
+      // Encabezado: A es siempre el Director Ejecutivo; sin Director de
+      // Programa, DE cae al emisor
+      expect(anexo.a).toBe('Marcos F. Terán Valenzuela');
+      expect(anexo.de).toBe('Alan García');
+      expect(anexo.proyecto).toBe('Especies de Amazonía');
+      expect(anexo.chequeNro).toBe('DES-445');
 
-      // Primera transacción es el anticipo de 1000 Bs
-      expect(params.transacciones[0]).toMatchObject({
-        concepto: expect.stringContaining('Anticipo recibido'),
-        ingreso: expect.stringContaining('1.000,00'),
-        saldo: expect.stringContaining('1.000,00'),
+      // 4 movimientos en orden: fondo en avance, factura, recibo, DJ
+      expect(anexo.filas).toHaveLength(4);
+      expect(anexo.filas[0]).toMatchObject({
+        descripcion: 'FONDO EN AVANCE',
+        ingreso: 1000,
+        saldo: 1000,
+        esFondo: true,
       });
+      expect(anexo.filas.map((f) => f.saldo)).toEqual([1000, 900, 880, 875]);
 
-      // El total presupuestado restando brutos (100 + 23.81 + 5 = 128.81)
-      expect(params.totalPresupuestado).toContain('128,81');
-      expect(params.totalEfectivoPagado).toContain('125,00'); // (100 + 20 + 5)
-      expect(params.totalImpuestosRetenidos).toContain('3,81');
+      // TOTAL es el bruto (lo que se carga al POA); EGRESOS, el efectivo
+      expect(anexo.totales.total).toBe(128.81);
+      expect(anexo.totales.egresos).toBe(125);
+      expect(anexo.totales.totalImpuestos).toBe(3.81);
 
-      // La liquidación de caja va sobre el efectivo, no sobre el bruto:
-      // 1000 - 125.00 = 875.00 (el bruto 128.81 sigue siendo la cifra del POA)
-      expect(params.saldoLiquidoFormat).toContain('875,00');
-      expect(params.saldoEfectivo).toContain('875,00');
-      expect(params.saldoEsDevolucion).toBe(true);
-
-      // Sobró plata: el saldo va a favor del proyecto
-      expect(params.aFavorProyecto).toContain('875,00');
-      expect(params.aFavorEmpleado).toBeNull();
+      // La liquidación va sobre el efectivo: 1000 - 125 = 875 a favor del proyecto
+      expect(anexo.liquidacion).toMatchObject({
+        importeRecibido: 1000,
+        totalGastado: 125,
+        saldo: 875,
+        aFavorProyecto: 875,
+        aFavorEmpleado: null,
+      });
 
       // Conteo de documentos: 1 factura y 2 no-facturas (recibo + DJ)
-      expect(params.conteoDocumentos).toMatchObject({
+      expect(anexo.documentos).toMatchObject({
         facturasCantidad: 1,
+        facturasMonto: 100,
         recibosCantidad: 2,
+        recibosMonto: 25,
         totalCantidad: 3,
       });
-      expect(params.conteoDocumentos.facturasMonto).toContain('100,00');
-      expect(params.conteoDocumentos.recibosMonto).toContain('25,00');
 
       // El recibo de servicio reparte sus 3.81 en RC-IVA 13% + IT 3%
-      const recibo = params.transacciones[2];
-      expect(recibo.totalImpuestos).toContain('3,81');
-      expect(recibo.rcIva).toContain('3,10');
-      expect(recibo.it).toContain('0,71');
+      const recibo = anexo.filas[2];
+      expect(recibo.totalImpuestos).toBe(3.81);
+      expect(recibo.rcIva).toBe(3.1);
+      expect(recibo.it).toBe(0.71);
 
-      // Resumen contable agrupado por partida (Combustibles/POA-001 y S/P)
-      expect(params.resumenContable).toHaveLength(2);
+      // Sin partida contable asignada, los gastos se agrupan en un renglón
+      expect(anexo.resumenContable).toHaveLength(1);
+      expect(anexo.resumenContableTotal).toBe(128.81);
+
+      expect(anexo.firmas.revisadoPor.nombre).toBe('Shirley Ramírez');
+      expect(anexo.firmas.aprobadoPor.cargo).toBe('Director Ejecutivo');
+
+      // El Excel lleva la misma grilla con fórmulas de saldo y totales
+      const { buffer: xlsx, nombre } =
+        await service.generateExcel(RENDICION_ID);
+      expect(nombre).toBe('Rendicion-SOL-2026-001.xlsx');
+      const libro = new ExcelJS.Workbook();
+      await libro.xlsx.load(xlsx as unknown as ArrayBuffer);
+      const hoja = libro.getWorksheet('REND. FONDOS BS')!;
+      expect(hoja.getCell('B5').value).toBe('Marcos F. Terán Valenzuela');
+      expect(hoja.getCell('E16').value).toBe('FONDO EN AVANCE');
+      expect(hoja.getCell('H17').value).toMatchObject({
+        formula: 'H16+F17-G17',
+        result: 900,
+      });
+      expect(hoja.getCell('G20').value).toMatchObject({
+        formula: 'SUM(G16:G19)',
+        result: 125,
+      });
     });
   });
 });

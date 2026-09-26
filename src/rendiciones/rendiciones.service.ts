@@ -22,7 +22,9 @@ import { UpdateGastoPartidaContableDto } from './dto/update-gasto-partida-contab
 import { UpdateGastoPartidaPresupuestariaDto } from './dto/update-gasto-partida-presupuestaria.dto';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
-import { desglosarRetenciones } from './rendiciones.helper';
+import { Anexo4, construirAnexo4 } from './anexo4.builder';
+import { generarExcelAnexo4 } from './anexo4.excel';
+import { DESTINATARIO_ANEXOS } from '../common/constants/financial.constants';
 
 const RENDICION_INCLUDE = {
   solicitud: {
@@ -44,13 +46,22 @@ const RENDICION_INCLUDE = {
           rol: true,
         },
       },
+      // Firma "DE:" en el ANEXO 4
+      directorPrograma: {
+        select: {
+          id: true,
+          nombreCompleto: true,
+          cargo: true,
+          rol: true,
+        },
+      },
       presupuestos: {
         include: {
           poa: {
             include: {
               estructura: {
                 include: {
-                  proyecto: true,
+                  proyecto: { include: { cuentaBancaria: true } },
                   grupo: true,
                   partida: true,
                 },
@@ -236,272 +247,68 @@ export class RendicionesService {
     return rendicion;
   }
 
+  /**
+   * Datos del ANEXO 4 (Rendición de Fondos en Avance). Una sola fuente para
+   * el PDF, la vista de detalle y el Excel.
+   */
+  private async armarAnexo4(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<Anexo4> {
+    const rendicion = await this.findOne(id, usuario);
+
+    // Revisa Dirección Financiera; aprueba el Director Ejecutivo
+    const tesorero = await this.prisma.usuario.findFirst({
+      where: { rol: Rol.TESORERO, deletedAt: null },
+      select: { nombreCompleto: true, cargo: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return construirAnexo4(rendicion, {
+      destinatario: DESTINATARIO_ANEXOS,
+      revisadoPor: {
+        nombre: tesorero?.nombreCompleto ?? '',
+        cargo: tesorero?.cargo ?? 'Director Financiero',
+      },
+      aprobadoPor: {
+        nombre: DESTINATARIO_ANEXOS,
+        cargo: 'Director Ejecutivo',
+      },
+    });
+  }
+
   async generatePdf(
     id: number,
     usuario?: { id: number; rol: Rol },
   ): Promise<Buffer> {
-    const rendicion = await this.findOne(id, usuario);
-
-    const montoRecibido = Number(rendicion.solicitud.montoTotalNeto ?? 0);
-    const transacciones: any[] = [];
-    let runningBalance = montoRecibido;
-
-    // Fila 0: Anticipo Recibido
-    transacciones.push({
-      fecha: this.formatDate(
-        rendicion.solicitud.fechaDesembolso ??
-          rendicion.solicitud.fechaSolicitud ??
-          rendicion.createdAt,
-      ),
-      comprobante: rendicion.solicitud.codigoDesembolso
-        ? `COMPROBANTE ${rendicion.solicitud.codigoDesembolso}`
-        : `SOLICITUD ${rendicion.solicitud.codigoSolicitud}`,
-      partida: '—',
-      concepto: `Anticipo recibido para: ${rendicion.solicitud.motivoViaje ?? 'Actividades de viaje'}`,
-      proveedor: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
-      ingreso: this.formatCurrency(montoRecibido),
-      egreso: '—',
-      saldo: this.formatCurrency(runningBalance),
-    });
-
-    // Unificar egresos (gastos con respaldo y declaraciones juradas)
-    const rawGastos = (rendicion.gastosRendicion ?? []).map((g) => {
-      const partidaCod =
-        g.partida?.poa?.estructura?.partida?.nombre ??
-        g.partida?.poa?.codigoPoa ??
-        'S/P';
-      const desglose = desglosarRetenciones(
-        g.montoImpuestos ?? 0,
-        g.tipoDocumento,
-        g.tipoRetencion,
-        g.partida?.poa?.estructura?.partida?.nombre,
-      );
-
-      return {
-        date: g.fecha ? new Date(g.fecha) : new Date(rendicion.fechaRendicion),
-        fechaStr: this.formatDate(g.fecha),
-        comprobante: `${g.tipoDocumento} ${g.nroDocumento}`,
-        tipoDocumento: String(g.tipoDocumento),
-        partida: partidaCod,
-        concepto: g.concepto || g.detalle || 'Gasto con respaldo',
-        proveedor: g.proveedor || 'S/P',
-        montoBruto: Number(g.montoBruto ?? g.monto ?? 0),
-        montoImpuestos: Number(g.montoImpuestos ?? 0),
-        montoNeto: Number(g.montoNeto ?? 0),
-        rcIva: desglose.rcIva.toNumber(),
-        iue: desglose.iue.toNumber(),
-        it: desglose.it.toNumber(),
-      };
-    });
-
-    const rawDeclaraciones = (rendicion.declaracionesJuradas ?? []).map(
-      (dj) => {
-        return {
-          date: dj.fecha
-            ? new Date(dj.fecha)
-            : new Date(rendicion.fechaRendicion),
-          fechaStr: this.formatDate(dj.fecha),
-          comprobante: 'DECLARACIÓN JURADA (DJ)',
-          partida: 'S/P',
-          concepto: dj.detalle || 'Gasto sin respaldo',
-          proveedor: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
-          tipoDocumento: 'DJ',
-          montoBruto: Number(dj.monto ?? 0),
-          montoImpuestos: 0,
-          montoNeto: Number(dj.monto ?? 0),
-          rcIva: 0,
-          iue: 0,
-          it: 0,
-        };
-      },
+    return this.pdfService.generatePdf(
+      'anexo4.hbs',
+      await this.armarAnexo4(id, usuario),
+      { landscape: true, marginMm: 10 },
     );
+  }
 
-    // Ordenar cronológicamente
-    const sortedGastos = [...rawGastos, ...rawDeclaraciones].sort(
-      (a, b) => a.date.getTime() - b.date.getTime(),
+  /** ANEXO 4 en HTML, con la misma plantilla que el PDF. */
+  async getAnexo4Html(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<string> {
+    return this.pdfService.renderHtml(
+      'anexo4.hbs',
+      await this.armarAnexo4(id, usuario),
     );
+  }
 
-    let totalEfectivoPagado = 0;
-    let totalImpuestosRetenidos = 0;
-    let totalPresupuestado = 0;
-    let totalRcIva = 0;
-    let totalIue = 0;
-    let totalIt = 0;
-
-    // Conteo de documentos de respaldo (ANEXO 4): factura vs. el resto
-    const conteo = {
-      facturasCantidad: 0,
-      facturasMonto: 0,
-      recibosCantidad: 0,
-      recibosMonto: 0,
+  /** ANEXO 4 en Excel, con fórmulas para los saldos y totales. */
+  async generateExcel(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<{ buffer: Buffer; nombre: string }> {
+    const anexo = await this.armarAnexo4(id, usuario);
+    return {
+      buffer: await generarExcelAnexo4(anexo),
+      nombre: `Rendicion-${anexo.codigoSolicitud}.xlsx`,
     };
-
-    for (const g of sortedGastos) {
-      // El saldo de caja sigue el efectivo desembolsado, no el bruto que se
-      // carga al POA: es la plata que se devuelve o se reembolsa al liquidar.
-      runningBalance -= g.montoNeto;
-
-      totalEfectivoPagado += g.montoNeto;
-      totalImpuestosRetenidos += g.montoImpuestos;
-      totalPresupuestado += g.montoBruto;
-      totalRcIva += g.rcIva;
-      totalIue += g.iue;
-      totalIt += g.it;
-
-      if (g.tipoDocumento === 'FACTURA') {
-        conteo.facturasCantidad += 1;
-        conteo.facturasMonto += g.montoNeto;
-      } else {
-        conteo.recibosCantidad += 1;
-        conteo.recibosMonto += g.montoNeto;
-      }
-
-      transacciones.push({
-        fecha: g.fechaStr,
-        comprobante: g.comprobante,
-        partida: g.partida,
-        concepto: g.concepto,
-        proveedor: g.proveedor,
-        ingreso: '—',
-        egreso: this.formatCurrency(g.montoNeto),
-        saldo: this.formatCurrency(runningBalance),
-        total: this.formatCurrency(g.montoBruto),
-        rcIva: g.rcIva > 0 ? this.formatCurrency(g.rcIva) : '—',
-        iue: g.iue > 0 ? this.formatCurrency(g.iue) : '—',
-        it: g.it > 0 ? this.formatCurrency(g.it) : '—',
-        totalImpuestos:
-          g.montoImpuestos > 0 ? this.formatCurrency(g.montoImpuestos) : '—',
-        neto: this.formatCurrency(g.montoNeto),
-      });
-    }
-
-    // Liquidación de caja: recibido menos el efectivo gastado
-    const saldoEfectivo = Number(
-      (montoRecibido - totalEfectivoPagado).toFixed(2),
-    );
-    const finalSaldoLiquido = saldoEfectivo;
-
-    // Resumen Contable por Partida
-    const agrupadoPartidasMap = new Map<
-      string,
-      {
-        codigo: string;
-        concepto: string;
-        montoNeto: number;
-        montoImpuestos: number;
-        montoBruto: number;
-      }
-    >();
-
-    for (const g of sortedGastos) {
-      const cod = g.partida;
-      const exist = agrupadoPartidasMap.get(cod);
-      if (exist) {
-        exist.montoNeto += g.montoNeto;
-        exist.montoImpuestos += g.montoImpuestos;
-        exist.montoBruto += g.montoBruto;
-      } else {
-        agrupadoPartidasMap.set(cod, {
-          codigo: cod,
-          concepto: g.concepto,
-          montoNeto: g.montoNeto,
-          montoImpuestos: g.montoImpuestos,
-          montoBruto: g.montoBruto,
-        });
-      }
-    }
-
-    const resumenContable = Array.from(agrupadoPartidasMap.values()).map(
-      (r) => ({
-        codigo: r.codigo,
-        concepto: r.concepto,
-        montoNeto: this.formatCurrency(r.montoNeto),
-        montoImpuestos: this.formatCurrency(r.montoImpuestos),
-        montoBruto: this.formatCurrency(r.montoBruto),
-      }),
-    );
-
-    const emisor = {
-      nombre: rendicion.solicitud.usuarioEmisor?.nombreCompleto ?? 'N/A',
-      cargo: rendicion.solicitud.usuarioEmisor?.cargo ?? 'N/A',
-    };
-
-    const directorProyecto = this.obtenerDirectorProyecto(
-      rendicion.historialAprobaciones ?? [],
-      Rol.CONTADOR,
-      rendicion.aprobadorActual?.nombreCompleto,
-      rendicion.aprobadorActual?.cargo,
-    );
-
-    const aprobadorFinal = {
-      nombre: 'Marcos Fernando Terán Valenzuela',
-      cargo: 'Director Ejecutivo',
-    };
-
-    return this.pdfService.generatePdf('rendicion.hbs', {
-      ...rendicion,
-      usuario: {
-        nombre: emisor.nombre,
-        cargo: emisor.cargo,
-      },
-      solicitud: {
-        ...rendicion.solicitud,
-        proyecto: rendicion.solicitud.proyecto || 'Proyecto General',
-        montoTotalNeto: this.formatCurrency(montoRecibido),
-      },
-      aprobadorActualNombre:
-        rendicion.aprobadorActual?.nombreCompleto ?? 'Sin asignar',
-      fechaRendicion: this.formatDate(rendicion.fechaRendicion),
-      montoRecibido: this.formatCurrency(montoRecibido),
-      totalEfectivoPagado: this.formatCurrency(totalEfectivoPagado),
-      totalImpuestosRetenidos: this.formatCurrency(totalImpuestosRetenidos),
-      totalPresupuestado: this.formatCurrency(totalPresupuestado),
-      saldoLiquido: Math.abs(finalSaldoLiquido),
-      saldoLiquidoFormat: this.formatCurrency(Math.abs(finalSaldoLiquido)),
-      saldoEsDevolucion: finalSaldoLiquido >= 0,
-      // Liquidación de caja del ANEXO 4 (sobre el efectivo, no sobre el bruto)
-      saldoEfectivo: this.formatCurrency(saldoEfectivo),
-      aFavorEmpleado:
-        saldoEfectivo < 0 ? this.formatCurrency(Math.abs(saldoEfectivo)) : null,
-      aFavorProyecto:
-        saldoEfectivo > 0 ? this.formatCurrency(saldoEfectivo) : null,
-      conteoDocumentos: {
-        facturasCantidad: conteo.facturasCantidad,
-        facturasMonto: this.formatCurrency(conteo.facturasMonto),
-        recibosCantidad: conteo.recibosCantidad,
-        recibosMonto: this.formatCurrency(conteo.recibosMonto),
-        totalCantidad: conteo.facturasCantidad + conteo.recibosCantidad,
-        totalMonto: this.formatCurrency(
-          conteo.facturasMonto + conteo.recibosMonto,
-        ),
-      },
-      totalesTransacciones: {
-        ingreso: this.formatCurrency(montoRecibido),
-        egreso: this.formatCurrency(totalEfectivoPagado),
-        saldo: this.formatCurrency(saldoEfectivo),
-        total: this.formatCurrency(totalPresupuestado),
-        rcIva: totalRcIva > 0 ? this.formatCurrency(totalRcIva) : '—',
-        iue: totalIue > 0 ? this.formatCurrency(totalIue) : '—',
-        it: totalIt > 0 ? this.formatCurrency(totalIt) : '—',
-        totalImpuestos:
-          totalImpuestosRetenidos > 0
-            ? this.formatCurrency(totalImpuestosRetenidos)
-            : '—',
-        neto: this.formatCurrency(totalEfectivoPagado),
-      },
-      saldoStatus:
-        finalSaldoLiquido >= 0
-          ? 'A favor del Proyecto (a devolver)'
-          : 'A favor del empleado (a reembolsar)',
-      firmas: {
-        emitidoPor: emisor,
-        directorProyecto,
-        aprobadoPor: aprobadorFinal,
-      },
-      transacciones,
-      resumenContable,
-      generatedAt: this.formatDate(new Date()),
-    });
   }
 
   async create(dto: CreateRendicionDto, usuarioId: number) {
@@ -1392,44 +1199,6 @@ export class RendicionesService {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(value)}`;
-  }
-
-  private obtenerDirectorProyecto(
-    historial: {
-      usuario: {
-        nombreCompleto: string | null;
-        cargo: string | null;
-        rol: Rol;
-      } | null;
-      derivadoA: { rol: Rol | null } | null;
-    }[],
-    rolObjetivo: Rol,
-    fallbackNombre?: string | null,
-    fallbackCargo?: string | null,
-  ): { nombre: string; cargo: string } {
-    const idx = historial.findIndex(
-      (h) => h.derivadoA?.rol === rolObjetivo || h.usuario?.rol === rolObjetivo,
-    );
-
-    const candidato = idx > 0 ? historial[idx - 1]?.usuario : null;
-
-    const nombre = candidato?.nombreCompleto ?? fallbackNombre ?? 'Sin asignar';
-    const cargo = candidato?.cargo ?? fallbackCargo ?? 'Sin cargo asignado';
-
-    return { nombre, cargo };
-  }
-
-  private formatDate(value: Date | string | null | undefined): string {
-    if (!value) return 'N/A';
-
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return 'N/A';
-
-    return new Intl.DateTimeFormat('es-BO', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date);
   }
 
   async updateGastoPartidaContable(

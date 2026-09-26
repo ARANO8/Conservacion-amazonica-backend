@@ -19,6 +19,18 @@ export class PdfService {
     // Import dinámico para no cargar handlebars en startup
     const handlebars = await import('handlebars');
 
+    // Importe en Bs para los anexos: vacío si no aplica, "-" si es cero
+    handlebars.default.registerHelper('bs', (valor: unknown) => {
+      if (valor === null || valor === undefined || valor === '') return '';
+      const numero = Number(valor);
+      if (!Number.isFinite(numero)) return '';
+      if (Math.round(numero * 100) === 0) return '-';
+      return new Intl.NumberFormat('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(numero);
+    });
+
     const templateFile = this.readTemplate(templateName);
     const template = handlebars.default.compile(templateFile);
     return template({

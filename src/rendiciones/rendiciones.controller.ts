@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseIntPipe,
   Patch,
@@ -164,6 +165,46 @@ export class RendicionesController {
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="rendicion.pdf"',
+    });
+    res.send(buffer);
+  }
+
+  @Get(':id/anexo4')
+  @ApiOperation({
+    summary: 'ANEXO 4 de una rendición en HTML (misma plantilla que el PDF)',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  getAnexo4(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ): Promise<string> {
+    return this.rendicionesService.getAnexo4Html(id, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
+  }
+
+  @SkipThrottle()
+  @Get(':id/excel')
+  @ApiOperation({ summary: 'Descargar el ANEXO 4 de una rendición en Excel' })
+  @ApiProduces(
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  async generateExcel(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+    @Res() res: Response,
+  ): Promise<void> {
+    const { buffer, nombre } = await this.rendicionesService.generateExcel(id, {
+      id: req.user!.userId,
+      rol: req.user!.rol,
+    });
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${nombre}"`,
     });
     res.send(buffer);
   }
