@@ -41,6 +41,7 @@ describe('RendicionesService', () => {
   };
   let pdfServiceMock: {
     generatePdf: jest.Mock;
+    leerLogos: jest.Mock;
   };
 
   const PARTIDA_ID = 10;
@@ -109,6 +110,7 @@ describe('RendicionesService', () => {
 
     pdfServiceMock = {
       generatePdf: jest.fn().mockResolvedValue(Buffer.from('pdf-data')),
+      leerLogos: jest.fn().mockReturnValue({ aceaa: null, amz: null }),
     };
 
     const module: TestingModule = await Test.createTestingModule({

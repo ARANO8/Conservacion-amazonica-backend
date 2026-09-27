@@ -1,5 +1,6 @@
 import * as ExcelJS from 'exceljs';
 import type { Anexo4 } from './anexo4.builder';
+import type { LogosDocumento } from '../pdf/pdf.service';
 
 /**
  * ANEXO 4 en Excel, con la misma grilla que la hoja "REND. FONDOS BS" de los
@@ -44,7 +45,46 @@ function relleno(argb: string): ExcelJS.Fill {
   return { type: 'pattern', pattern: 'solid', fgColor: { argb } };
 }
 
-export async function generarExcelAnexo4(anexo: Anexo4): Promise<Buffer> {
+/** Alto de la fila de los logos, en puntos (como en el encabezado del PDF). */
+const ALTO_FILA_LOGOS = 52;
+
+/**
+ * Logos de ACEAA y de AMZ desk en el costado izquierdo, igual que en el PDF.
+ * Tamaños en píxeles respetando las proporciones de cada imagen (ACEAA es
+ * cuadrado; el PNG de AMZ desk es 2,5:1 y trae margen propio).
+ */
+function agregarLogos(
+  libro: ExcelJS.Workbook,
+  hoja: ExcelJS.Worksheet,
+  logos: LogosDocumento,
+): void {
+  hoja.getRow(1).height = ALTO_FILA_LOGOS;
+  if (logos.aceaa) {
+    const id = libro.addImage({
+      buffer: logos.aceaa as unknown as ExcelJS.Buffer,
+      extension: 'jpeg',
+    });
+    hoja.addImage(id, {
+      tl: { col: 0.1, row: 0.05 },
+      ext: { width: 64, height: 64 },
+    });
+  }
+  if (logos.amz) {
+    const id = libro.addImage({
+      buffer: logos.amz as unknown as ExcelJS.Buffer,
+      extension: 'png',
+    });
+    hoja.addImage(id, {
+      tl: { col: 1.1, row: 0 },
+      ext: { width: 175, height: 70 },
+    });
+  }
+}
+
+export async function generarExcelAnexo4(
+  anexo: Anexo4,
+  logos: LogosDocumento = { aceaa: null, amz: null },
+): Promise<Buffer> {
   const libro = new ExcelJS.Workbook();
   libro.creator = 'AMZ desk';
   const hoja = libro.addWorksheet('REND. FONDOS BS', {
@@ -87,6 +127,8 @@ export async function generarExcelAnexo4(anexo: Anexo4): Promise<Buffer> {
     return c;
   };
   const combinar = (rango: string) => hoja.mergeCells(rango);
+
+  agregarLogos(libro, hoja, logos);
   const formula = (f: string, resultado: number | string | null) => ({
     formula: f,
     result: resultado ?? undefined,

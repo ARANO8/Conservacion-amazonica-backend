@@ -47,7 +47,7 @@ import {
 } from '../common/constants/financial.constants';
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
-import { PdfService } from '../pdf/pdf.service';
+import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
 import { Anexo2, construirAnexo2 } from './anexo2.builder';
 
 /** Aprobador final que firma los PDF de compras. */
@@ -959,19 +959,15 @@ export class SolicitudesService {
     return construirAnexo2(solicitud, catalogo, DESTINATARIO_ANEXOS);
   }
 
-  async generatePdf(
+  /** Datos y plantilla del documento: de aquí salen el PDF y la vista. */
+  private async armarDocumento(
     id: number,
     usuario?: { id: number; rol: Rol },
-  ): Promise<Buffer> {
+  ): Promise<DocumentoPdf> {
     const solicitud = await this.findOne(id, usuario);
 
     if (solicitud.tipo === TipoSolicitud.VIAJE) {
-      // Márgenes estrechos, como el formulario original: cabe en una hoja
-      return this.pdfService.generatePdf(
-        'anexo2.hbs',
-        await this.armarAnexo2(solicitud),
-        { marginMm: 12 },
-      );
+      return documentoPdf('anexo2.hbs', await this.armarAnexo2(solicitud));
     }
     const cuentaBancaria =
       solicitud.presupuestos?.[0]?.poa?.estructura?.proyecto?.cuentaBancaria;
@@ -1046,7 +1042,7 @@ export class SolicitudesService {
           .join(' — ')
       : null;
 
-    return this.pdfService.generatePdf('solicitud.hbs', {
+    return documentoPdf('solicitud.hbs', {
       ...solicitud,
       codigoSolicitud: solicitud.codigoSolicitud,
       fechaSolicitud: this.formatDate(solicitud.fechaSolicitud),
@@ -1087,6 +1083,21 @@ export class SolicitudesService {
         : null,
       detalle,
     });
+  }
+
+  async generatePdf(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<Buffer> {
+    return this.pdfService.pdfDe(await this.armarDocumento(id, usuario));
+  }
+
+  /** El documento en HTML, idéntico al PDF, para verlo en el detalle. */
+  async getDocumentoHtml(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<string> {
+    return this.pdfService.htmlDe(await this.armarDocumento(id, usuario));
   }
 
   private formatDate(value: Date | string | null | undefined): string {

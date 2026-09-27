@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { PdfService } from '../pdf/pdf.service';
+import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
 import { CreateOrdenCompraDto } from './dto/create-orden-compra.dto';
 import { Rol, Prisma } from '@prisma/client';
 import { montoEnLetrasBolivianos } from '../shared/utils/letras.util';
@@ -309,7 +309,11 @@ export class OrdenesCompraService {
     return { message: 'Orden de compra eliminada correctamente' };
   }
 
-  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+  /** Datos y plantilla del documento: de aquí salen el PDF y la vista. */
+  private async armarDocumento(
+    id: number,
+    user?: UsuarioContexto,
+  ): Promise<DocumentoPdf> {
     const orden = await this.findOne(id, user);
 
     const items = orden.items.map((it) => ({
@@ -325,7 +329,7 @@ export class OrdenesCompraService {
 
     const totalNum = Number(orden.total);
 
-    return this.pdfService.generatePdf('orden-compra.hbs', {
+    return documentoPdf('orden-compra.hbs', {
       codigoOrden: orden.codigoOrden,
       fecha: this.formatFecha(orden.fecha),
       proveedorNombre: orden.proveedorNombre,
@@ -347,6 +351,15 @@ export class OrdenesCompraService {
       preparadoPor: orden.usuarioEmisor?.nombreCompleto ?? '',
       cuadroCodigo: orden.cuadroComparativo?.codigoCuadro ?? '',
     });
+  }
+
+  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+    return this.pdfService.pdfDe(await this.armarDocumento(id, user));
+  }
+
+  /** El documento en HTML, idéntico al PDF, para verlo en el detalle. */
+  async getDocumentoHtml(id: number, user?: UsuarioContexto): Promise<string> {
+    return this.pdfService.htmlDe(await this.armarDocumento(id, user));
   }
 
   private fmt(value: number, decimals: number): string {

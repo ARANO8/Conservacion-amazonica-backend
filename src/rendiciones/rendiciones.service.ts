@@ -284,7 +284,7 @@ export class RendicionesService {
     return this.pdfService.generatePdf(
       'anexo4.hbs',
       await this.armarAnexo4(id, usuario),
-      { landscape: true, marginMm: 10 },
+      { landscape: true },
     );
   }
 
@@ -306,7 +306,7 @@ export class RendicionesService {
   ): Promise<{ buffer: Buffer; nombre: string }> {
     const anexo = await this.armarAnexo4(id, usuario);
     return {
-      buffer: await generarExcelAnexo4(anexo),
+      buffer: await generarExcelAnexo4(anexo, this.pdfService.leerLogos()),
       nombre: `Rendicion-${anexo.codigoSolicitud}.xlsx`,
     };
   }

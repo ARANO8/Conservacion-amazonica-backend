@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { PdfService } from '../pdf/pdf.service';
+import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
 import { CreateDeclaracionMovilidadDto } from './dto/create-declaracion-movilidad.dto';
 import { UpdateDeclaracionMovilidadDto } from './dto/update-declaracion-movilidad.dto';
 import {
@@ -277,10 +277,14 @@ export class DeclaracionesMovilidadService {
     });
   }
 
-  async generatePdf(id: number, user: UsuarioContexto): Promise<Buffer> {
+  /** Datos y plantilla del documento: de aquí salen el PDF y la vista. */
+  private async armarDocumento(
+    id: number,
+    user: UsuarioContexto,
+  ): Promise<DocumentoPdf> {
     const declaracion = await this.findOne(id, user);
 
-    return this.pdfService.generatePdf('declaracion-movilidad.hbs', {
+    return documentoPdf('declaracion-movilidad.hbs', {
       codigoDeclaracion: declaracion.codigoDeclaracion,
       nombre: declaracion.usuario.nombreCompleto,
       cargo: declaracion.cargo,
@@ -300,5 +304,14 @@ export class DeclaracionesMovilidadService {
       totalLiquido: this.formatMonto(declaracion.totalLiquido),
       generatedAt: formatDate(new Date()),
     });
+  }
+
+  async generatePdf(id: number, user: UsuarioContexto): Promise<Buffer> {
+    return this.pdfService.pdfDe(await this.armarDocumento(id, user));
+  }
+
+  /** El documento en HTML, idéntico al PDF, para verlo en el detalle. */
+  async getDocumentoHtml(id: number, user: UsuarioContexto): Promise<string> {
+    return this.pdfService.htmlDe(await this.armarDocumento(id, user));
   }
 }
