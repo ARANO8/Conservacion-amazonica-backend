@@ -257,6 +257,23 @@ export class SolicitudesController {
     return this.solicitudesService.pagarPago(id, pagoId, req.user.userId);
   }
 
+  @Get(':id/documento')
+  @ApiOperation({
+    summary:
+      'HTML de la solicitud (ANEXO 2 o ANEXO 3), con la misma plantilla que el PDF',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  getDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ): Promise<string> {
+    return this.solicitudesService.getDocumentoHtml(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
   @SkipThrottle()
   @Get(':id/pdf')
   @ApiOperation({ summary: 'Generar y descargar reporte PDF de la solicitud' })

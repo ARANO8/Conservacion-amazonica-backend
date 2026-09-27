@@ -1,0 +1,217 @@
+{{!--
+  Estilos comunes de todos los documentos (PDF, vista en pantalla y la base
+  del Excel): la tipografía y la hoja del ANEXO 1 de ACEAA. Cada plantilla los
+  incluye con {{> estilos-documento}} y solo añade lo propio de su cuerpo.
+--}}
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    color: #000000;
+  }
+
+  body {
+    font-family: 'Bookman Old Style', 'Bookman', Georgia, serif;
+    font-size: 8.5pt;
+  }
+
+  /* En pantalla la hoja se ve como papel; en el PDF mandan los márgenes */
+  @media screen {
+    body {
+      padding: 12px;
+    }
+    .hoja {
+      max-width: 186mm;
+      margin: 0 auto;
+    }
+    .hoja.apaisada {
+      max-width: 273mm;
+    }
+  }
+
+  /* Con border-collapse medio borde exterior cae fuera de la tabla: la
+     holgura evita que el PDF recorte el borde derecho */
+  .hoja {
+    width: 100%;
+    padding: 0 1px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  .b { font-weight: bold; }
+  .i { font-style: italic; }
+  .c { text-align: center; }
+  .r { text-align: right; }
+  .mono { font-variant-numeric: tabular-nums; }
+  .no-romper { page-break-inside: avoid; break-inside: avoid; }
+
+  /* --- Encabezado: logos a la izquierda, título en banda gris --- */
+  .encabezado td {
+    vertical-align: bottom;
+    padding: 0;
+  }
+  .encabezado .logos {
+    width: 60mm;
+    white-space: nowrap;
+  }
+  .encabezado .anexo {
+    text-align: right;
+    font-weight: bold;
+    font-size: 13pt;
+    padding-bottom: 5mm;
+    padding-right: 6mm;
+  }
+  .encabezado .titulo {
+    background: #d9d9d9;
+    text-align: center;
+    font-weight: bold;
+    font-size: 12pt;
+    padding: 3px 4px;
+    text-transform: uppercase;
+  }
+  .encabezado .nota {
+    font-size: 8pt;
+    text-transform: none;
+  }
+  .codigo {
+    text-align: right;
+    font-size: 7pt;
+    color: #555555;
+    margin-top: 1mm;
+  }
+
+  /* --- Datos: etiqueta en negrita y renglón subrayado --- */
+  .datos {
+    margin-top: 5mm;
+  }
+  .datos td {
+    padding: 4px 0 2px;
+    vertical-align: bottom;
+  }
+  .datos .etiqueta {
+    width: 52mm;
+    font-weight: bold;
+    white-space: nowrap;
+    padding-right: 3mm;
+  }
+  .datos .valor {
+    border-bottom: 1px solid #000000;
+    padding-left: 2px;
+  }
+
+  /* --- Grilla: bordes negros y cabecera gris --- */
+  .grilla {
+    margin-top: 4mm;
+  }
+  .grilla th,
+  .grilla td {
+    border: 1px solid #000000;
+    padding: 2px 4px;
+    vertical-align: middle;
+  }
+  .grilla th {
+    background: #d9d9d9;
+    font-weight: bold;
+    text-align: center;
+  }
+  .grilla .fila-vacia td {
+    height: 7mm;
+  }
+  .grilla .total td {
+    background: #d9d9d9;
+    font-weight: bold;
+  }
+
+  .seccion {
+    margin-top: 4mm;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  .notas {
+    margin-top: 3mm;
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 6.5pt;
+    line-height: 1.5;
+  }
+
+  /* --- Lugar y fecha de emisión --- */
+  .emision {
+    margin-top: 8mm;
+    width: 52%;
+    margin-left: auto;
+  }
+  .emision td {
+    padding: 0;
+    vertical-align: bottom;
+  }
+  .emision .lugar {
+    font-style: italic;
+    width: 16mm;
+  }
+  .emision .fecha {
+    border-bottom: 1px solid #bfbfbf;
+    padding-left: 4px;
+  }
+
+  /* --- Firmas: línea gruesa, rótulo y nombre sobre fondo gris --- */
+  .firmas {
+    margin-top: 14mm;
+    table-layout: fixed;
+  }
+  .firmas td {
+    vertical-align: top;
+    text-align: center;
+    padding: 0 3mm;
+  }
+  .firma-linea {
+    border-top: 2px solid #000000;
+    padding-top: 1px;
+    font-weight: bold;
+  }
+  .firma-nombre {
+    background: #f2f2f2;
+    border-bottom: 1px dashed #000000;
+    min-height: 8mm;
+    padding: 2px 3px;
+    font-size: 7.5pt;
+  }
+  .firma-cargo {
+    font-size: 7pt;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  /* --- Ficha: tabla de etiqueta gris / valor con bordes --- */
+  .ficha {
+    margin-top: 4mm;
+  }
+  .ficha td {
+    border: 1px solid #000000;
+    padding: 2px 4px;
+  }
+  .ficha .etiqueta {
+    background: #d9d9d9;
+    font-weight: bold;
+    white-space: nowrap;
+    width: 1%;
+  }
+
+  .recuadro {
+    margin-top: 4mm;
+    border: 1px solid #000000;
+    padding: 2mm 3mm;
+  }
+  .pre {
+    white-space: pre-line;
+  }
+</style>

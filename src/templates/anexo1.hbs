@@ -4,101 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ANEXO 1 {{codigoPlan}}</title>
+    {{> estilos-documento}}
     <style>
-      @page {
-        size: A4;
-        margin: 14mm 12mm;
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        background: #ffffff;
-        color: #000000;
-      }
-
-      body {
-        font-family: 'Bookman Old Style', 'Bookman', Georgia, serif;
-        font-size: 8.5pt;
-      }
-
-      /* En pantalla la hoja se ve como papel; al imprimir manda @page */
-      @media screen {
-        body {
-          padding: 12px;
-        }
-        .hoja {
-          max-width: 186mm;
-          margin: 0 auto;
-        }
-      }
-
-      .hoja {
-        width: 100%;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      /* --- Encabezado: logo, "ANEXO 1" y banda gris con el título --- */
-      .cabecera td {
-        vertical-align: bottom;
-        padding: 0;
-      }
-      .logo {
-        width: 26mm;
-      }
-      .logo img {
-        width: 24mm;
-        height: auto;
-        display: block;
-      }
-      .anexo {
-        text-align: right;
-        font-weight: bold;
-        font-size: 13pt;
-        padding-bottom: 6mm !important;
-        padding-right: 12mm !important;
-      }
-      .titulo {
-        background: #d9d9d9;
-        text-align: center;
-        font-weight: bold;
-        font-size: 12pt;
-        padding: 3px 0 !important;
-      }
-
-      /* --- Datos del viaje: etiqueta y renglón subrayado --- */
-      .datos {
-        margin-top: 6mm;
-      }
-      .datos td {
-        padding: 4px 0 2px;
-        vertical-align: bottom;
-      }
-      .datos .etiqueta {
-        width: 58mm;
-        font-weight: bold;
-        white-space: nowrap;
-      }
-      .datos .valor {
-        border-bottom: 1px solid #000;
-        padding-left: 2px;
-      }
-      .codigo {
-        text-align: right;
-        font-size: 7pt;
-        color: #555;
-        margin-top: 1mm;
-      }
-
       /* --- Cronograma --- */
       .cronograma {
         margin-top: 4mm;
@@ -135,73 +42,11 @@
         margin-top: 1px;
       }
 
-      .notas {
-        margin-top: 3mm;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 6.5pt;
-        line-height: 1.5;
-      }
-
-      .emision {
-        margin-top: 8mm;
-        width: 52%;
-        margin-left: auto;
-      }
-      .emision td {
-        padding: 0;
-        vertical-align: bottom;
-      }
-      .emision .lugar {
-        font-style: italic;
-        width: 16mm;
-      }
-      .emision .fecha {
-        border-bottom: 1px solid #bfbfbf;
-        padding-left: 4px;
-      }
-
-      /* --- Firmas --- */
-      .firmas {
-        margin-top: 14mm;
-      }
-      .firmas td {
-        width: 38%;
-        vertical-align: top;
-        text-align: center;
-        padding: 0;
-      }
-      .firmas td.hueco {
-        width: 24%;
-      }
-      .firma-linea {
-        border-top: 2px solid #000;
-        padding-top: 1px;
-        font-weight: bold;
-      }
-      .firma-nombre {
-        background: #f2f2f2;
-        border-bottom: 1px dashed #000;
-        min-height: 8mm;
-        padding: 2px 3px;
-        font-size: 7.5pt;
-      }
     </style>
   </head>
   <body>
     <div class="hoja">
-      <table class="cabecera">
-        <tr>
-          <td rowspan="2" class="logo">
-            {{#if logoAceaaBase64}}
-              <img src="data:image/jpeg;base64,{{logoAceaaBase64}}" alt="Conservación Amazónica" />
-            {{/if}}
-          </td>
-          <td class="anexo">ANEXO 1</td>
-        </tr>
-        <tr>
-          <td class="titulo">PLANIFICACIÓN DE VIAJE</td>
-        </tr>
-      </table>
+      {{> encabezado anexo="ANEXO 1" titulo="PLANIFICACIÓN DE VIAJE"}}
 
       <table class="datos">
         <tr>
@@ -282,7 +127,7 @@
             <div class="firma-linea">Responsable de viaje</div>
             <div class="firma-nombre">{{responsable}}</div>
           </td>
-          <td class="hueco"></td>
+          <td></td>
           <td>
             <div class="firma-linea">VoBo. Director de Programa</div>
             <div class="firma-nombre">{{directorPrograma}}</div>

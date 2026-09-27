@@ -100,12 +100,8 @@
         padding: 3px 0 !important;
       }
       .logo {
-        width: 70px;
-        text-align: center;
-      }
-      .logo img {
-        max-height: 58px;
-        max-width: 68px;
+        width: 62mm;
+        text-align: left;
       }
 
       /* Datos generales */
@@ -253,9 +249,7 @@
       <table class="encabezado">
         <tr>
           <td rowspan="3" class="logo">
-            {{#if logoAceaaBase64}}
-              <img src="data:image/jpeg;base64,{{logoAceaaBase64}}" alt="Conservación Amazónica" />
-            {{/if}}
+            {{> logos}}
           </td>
           <td class="anexo">ANEXO 2</td>
         </tr>

@@ -96,10 +96,6 @@
         font-size: 9pt;
         line-height: 1.25;
       }
-      .logo img {
-        max-height: 48px;
-        max-width: 60px;
-      }
 
       /* Encabezado de datos */
       .datos td {
@@ -172,9 +168,7 @@
         </colgroup>
         <tr>
           <td class="logo">
-            {{#if logoAceaaBase64}}
-              <img src="data:image/jpeg;base64,{{logoAceaaBase64}}" alt="Conservación Amazónica" />
-            {{/if}}
+            {{> logos}}
             <span class="anexo" style="float: right">ANEXO 4</span>
           </td>
           <td></td>

@@ -4,219 +4,159 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Orden de Compra/Servicio {{codigoOrden}}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    {{> estilos-documento}}
     <style>
-      @page {
-        size: A4 portrait;
-        margin: 12mm;
-      }
-
-      body {
-        font-family: Georgia, 'Times New Roman', serif;
-      }
-
-      table.oc {
-        width: 100%;
-        border-collapse: collapse;
-      }
-
-      table.oc th,
-      table.oc td {
-        border: 1px solid #1f3a5f;
-        padding: 3px 6px;
-      }
-
-      .hd {
-        background: #cdddf0;
-        font-weight: 700;
-        text-align: center;
-      }
-
-      .sc-badge {
-        background: #fff2a8;
-        color: #92400e;
-        font-size: 7px;
+      .sin-cuadro {
+        font-size: 6.5pt;
         font-style: italic;
-        padding: 0 3px;
-        border-radius: 2px;
+        border: 1px solid #7f7f7f;
+        padding: 0 2px;
       }
-
-      .leader {
-        flex: 1 1 auto;
-        border-bottom: 1px dotted #334155;
-        padding-left: 4px;
-        min-height: 1rem;
+      .recepcion td {
+        width: 50%;
+        vertical-align: top;
       }
-
-      .info-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 9px;
+      .recepcion .datos {
+        margin-top: 2mm;
       }
-
-      .info-table td {
-        padding: 2px 5px;
-        border: 1px solid #1f3a5f;
-      }
-
-      .info-label {
-        background: #cdddf0;
-        font-weight: 700;
-        white-space: nowrap;
-        width: 1%;
+      .recepcion .datos .etiqueta {
+        width: 34mm;
       }
     </style>
   </head>
-  <body class="bg-white text-[9px] text-slate-900">
-    <div class="mb-1 text-right text-[12px] font-bold">ANEXO 12</div>
+  <body>
+    <div class="hoja">
+      {{> encabezado anexo="ANEXO 12" titulo="Orden de Compra / Servicio" nota="(Expresado en Bolivianos)" codigo=codigoOrden referencia=cuadroCodigo}}
 
-    <header class="mb-3 flex items-center gap-4">
-      <div class="w-28 shrink-0">
-        {{#if logoBase64}}
-          <img
-            src="data:image/png;base64,{{logoBase64}}"
-            alt="Conservación Amazónica"
-            class="h-12 w-auto object-contain"
-          />
-        {{/if}}
-      </div>
-      <div class="flex-1 text-center">
-        <h1 class="text-[14px] font-bold uppercase tracking-wide">
-          Orden de Compra / Servicio
-        </h1>
-        <p class="text-[10px] font-bold text-slate-700">ACEAA</p>
-        <p class="text-[9px] text-slate-600">(Expresado en Bolivianos)</p>
-      </div>
-      <div class="w-28 shrink-0 text-right text-[8px] text-slate-500">
-        <p class="font-bold">{{codigoOrden}}</p>
-        {{#if cuadroCodigo}}
-          <p class="text-slate-400">Ref: {{cuadroCodigo}}</p>
-        {{/if}}
-      </div>
-    </header>
-
-    <table class="info-table mb-3">
-      <tr>
-        <td class="info-label">Fecha</td>
-        <td colspan="3">{{fecha}}</td>
-        <td class="info-label">T/C</td>
-        <td>1 USD = Bs {{tc}}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Proveedor / Empresa</td>
-        <td colspan="5">{{proveedorNombre}}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Dirección</td>
-        <td colspan="2">{{proveedorDireccion}}</td>
-        <td class="info-label">Teléfono</td>
-        <td colspan="2">{{proveedorTelefono}}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Factura a nombre de</td>
-        <td colspan="2">ACEAA</td>
-        <td class="info-label">NIT</td>
-        <td colspan="2">{{nit}}</td>
-      </tr>
-    </table>
-
-    <table class="oc text-[9px]">
-      <thead>
+      <table class="ficha">
         <tr>
-          <th class="hd" style="width: 4%">N°</th>
-          <th class="hd" style="width: 28%">ARTÍCULO / SERVICIO</th>
-          <th class="hd" style="width: 8%">CANTIDAD</th>
-          <th class="hd" style="width: 8%">UNIDAD</th>
-          <th class="hd">DETALLE</th>
-          <th class="hd" style="width: 13%">PRECIO UNIT. (Bs)</th>
-          <th class="hd" style="width: 13%">TOTAL (Bs)</th>
+          <td class="etiqueta">Fecha</td>
+          <td colspan="3">{{fecha}}</td>
+          <td class="etiqueta">T/C</td>
+          <td>1 USD = Bs {{tc}}</td>
         </tr>
-      </thead>
-      <tbody>
-        {{#each items}}
+        <tr>
+          <td class="etiqueta">Proveedor / Empresa</td>
+          <td colspan="5">{{proveedorNombre}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">Dirección</td>
+          <td colspan="2">{{proveedorDireccion}}</td>
+          <td class="etiqueta">Teléfono</td>
+          <td colspan="2">{{proveedorTelefono}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">Factura a nombre de</td>
+          <td colspan="2">ACEAA</td>
+          <td class="etiqueta">NIT</td>
+          <td colspan="2">{{nit}}</td>
+        </tr>
+      </table>
+
+      <table class="grilla">
+        <thead>
           <tr>
-            <td class="text-center">{{orden}}</td>
-            <td>
-              {{item}}
-              {{#if sinCuadro}}
-                <span class="sc-badge">sin cuadro</span>
-              {{/if}}
-            </td>
-            <td class="text-center">{{cantidad}}</td>
-            <td class="text-center">{{unidad}}</td>
-            <td>{{detalle}}</td>
-            <td class="text-right">{{precioUnitario}}</td>
-            <td class="text-right">{{total}}</td>
+            <th style="width: 4%">N°</th>
+            <th style="width: 28%">ARTÍCULO / SERVICIO</th>
+            <th style="width: 8%">CANTIDAD</th>
+            <th style="width: 8%">UNIDAD</th>
+            <th>DETALLE</th>
+            <th style="width: 13%">PRECIO UNIT. (Bs)</th>
+            <th style="width: 13%">TOTAL (Bs)</th>
           </tr>
-        {{/each}}
+        </thead>
+        <tbody>
+          {{#each items}}
+            <tr>
+              <td class="c">{{orden}}</td>
+              <td>
+                {{item}}
+                {{#if sinCuadro}}<span class="sin-cuadro">sin cuadro</span>{{/if}}
+              </td>
+              <td class="c">{{cantidad}}</td>
+              <td class="c">{{unidad}}</td>
+              <td>{{detalle}}</td>
+              <td class="r mono">{{precioUnitario}}</td>
+              <td class="r mono">{{total}}</td>
+            </tr>
+          {{/each}}
+          <tr class="total">
+            <td class="r" colspan="6">TOTAL</td>
+            <td class="r mono">{{total}}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table class="ficha">
         <tr>
-          <td class="hd text-right" colspan="6">TOTAL</td>
-          <td class="text-right font-bold" style="background:#d8efd8">{{total}}</td>
+          <td class="etiqueta">Son</td>
+          <td class="i">{{totalLetras}}</td>
         </tr>
-      </tbody>
-    </table>
-
-    <table class="info-table mt-3">
-      <tr>
-        <td class="info-label">Son</td>
-        <td class="italic">{{totalLetras}}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Lugar de entrega / prestación</td>
-        <td>{{lugarEntrega}}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Forma de pago</td>
-        <td>{{formaPago}}</td>
-      </tr>
-      <tr>
-        <td class="info-label">Garantía</td>
-        <td>{{garantia}}</td>
-      </tr>
-      {{#if observaciones}}
         <tr>
-          <td class="info-label">Observaciones</td>
-          <td class="whitespace-pre-line">{{observaciones}}</td>
+          <td class="etiqueta">Lugar de entrega / prestación</td>
+          <td>{{lugarEntrega}}</td>
         </tr>
-      {{/if}}
-    </table>
+        <tr>
+          <td class="etiqueta">Forma de pago</td>
+          <td>{{formaPago}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">Garantía</td>
+          <td>{{garantia}}</td>
+        </tr>
+        {{#if observaciones}}
+          <tr>
+            <td class="etiqueta">Observaciones</td>
+            <td class="pre">{{observaciones}}</td>
+          </tr>
+        {{/if}}
+      </table>
 
-    <section class="mt-10 grid grid-cols-3 gap-6 text-center text-[9px]">
-      <div>
-        <div class="mx-auto mb-1 h-px w-40 bg-slate-500"></div>
-        <p class="font-bold">ELABORADO POR</p>
-        <p>{{preparadoPor}}</p>
-      </div>
-      <div>
-        <div class="mx-auto mb-1 h-px w-40 bg-slate-500"></div>
-        <p class="font-bold">{{cargoDirectorFinanciero}}</p>
-        <p>{{directorFinanciero}}</p>
-      </div>
-      <div>
-        <div class="mx-auto mb-1 h-px w-40 bg-slate-500"></div>
-        <p class="font-bold">{{cargoDirectorEjecutivo}}</p>
-        <p>{{directorEjecutivo}}</p>
-      </div>
-    </section>
+      <table class="firmas no-romper">
+        <tr>
+          <td>
+            <div class="firma-linea">Elaborado por</div>
+            <div class="firma-nombre">{{preparadoPor}}</div>
+          </td>
+          <td>
+            <div class="firma-linea">{{cargoDirectorFinanciero}}</div>
+            <div class="firma-nombre">{{directorFinanciero}}</div>
+          </td>
+          <td>
+            <div class="firma-linea">{{cargoDirectorEjecutivo}}</div>
+            <div class="firma-nombre">{{directorEjecutivo}}</div>
+          </td>
+        </tr>
+      </table>
 
-    <div class="mt-10 border border-slate-600 p-3 text-[9px]">
-      <p class="mb-3 font-bold uppercase">Conformidad de Recepción</p>
-      <div class="grid grid-cols-2 gap-8">
-        <div>
-          <div class="flex items-baseline gap-2 mb-2">
-            <span class="font-bold shrink-0">Fecha de recepción:</span>
-            <span class="leader"></span>
-          </div>
-          <div class="flex items-baseline gap-2">
-            <span class="font-bold shrink-0">Observaciones:</span>
-            <span class="leader"></span>
-          </div>
-        </div>
-        <div class="text-center">
-          <div class="mx-auto mb-1 mt-6 h-px w-40 bg-slate-500"></div>
-          <p class="font-bold">FIRMA Y SELLO DE RECEPCIÓN</p>
-          <p class="text-slate-500">Nombre y cargo</p>
-        </div>
+      <div class="recuadro no-romper" style="margin-top: 10mm">
+        <div class="b">CONFORMIDAD DE RECEPCIÓN</div>
+        <table class="recepcion">
+          <tr>
+            <td>
+              <table class="datos">
+                <tr>
+                  <td class="etiqueta">Fecha de recepción:</td>
+                  <td class="valor">&nbsp;</td>
+                </tr>
+                <tr>
+                  <td class="etiqueta">Observaciones:</td>
+                  <td class="valor">&nbsp;</td>
+                </tr>
+              </table>
+            </td>
+            <td>
+              <table class="firmas" style="margin-top: 12mm">
+                <tr>
+                  <td>
+                    <div class="firma-linea">Firma y sello de recepción</div>
+                    <div class="firma-nombre">Nombre y cargo</div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
       </div>
     </div>
   </body>

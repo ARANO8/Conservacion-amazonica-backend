@@ -1,0 +1,15 @@
+{{!--
+  Logos de ACEAA y de AMZ desk, juntos y separados por una línea fina. Estilos
+  en línea para que se vea igual dentro de cualquier encabezado (los ANEXOS 2
+  y 4 tienen el suyo propio, calcado del formulario oficial).
+  El PNG de AMZ desk trae mucho margen: por eso su altura es mayor.
+--}}
+<span style="display: inline-block; white-space: nowrap; vertical-align: middle">
+  {{#if @root.logoAceaaBase64}}
+    <img src="data:image/jpeg;base64,{{@root.logoAceaaBase64}}" alt="Conservación Amazónica" style="height: 17mm; width: auto; vertical-align: middle" />
+  {{/if}}
+  <span style="display: inline-block; width: 1px; height: 12mm; margin: 0 3mm; background: #bfbfbf; vertical-align: middle"></span>
+  {{#if @root.logoBase64}}
+    <img src="data:image/png;base64,{{@root.logoBase64}}" alt="AMZ desk" style="height: 15mm; width: auto; vertical-align: middle" />
+  {{/if}}
+</span>

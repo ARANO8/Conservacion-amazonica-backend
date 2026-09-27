@@ -14,7 +14,7 @@ import {
   EstadoCuadroComparativo,
   TipoAccionHistorial,
 } from '@prisma/client';
-import { PdfService } from '../pdf/pdf.service';
+import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CUADRO_INCLUDE } from './cuadros-comparativos.constants';
 
@@ -816,7 +816,11 @@ export class CuadrosComparativosService {
     return this.findOne(id);
   }
 
-  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+  /** Datos y plantilla del documento: de aquí salen el PDF y la vista. */
+  private async armarDocumento(
+    id: number,
+    user?: UsuarioContexto,
+  ): Promise<DocumentoPdf> {
     const cuadro = await this.findOne(id, user);
 
     const columnas = cuadro.cotizaciones.map((col) => ({
@@ -857,7 +861,7 @@ export class CuadrosComparativosService {
     const emisorNombre = cuadro.usuarioEmisor?.nombreCompleto ?? '';
     const emisorCargo = cuadro.usuarioEmisor?.cargo ?? 'Resp. Cotización';
 
-    return this.pdfService.generatePdf(
+    return documentoPdf(
       'cuadro-comparativo.hbs',
       {
         codigoCuadro: cuadro.codigoCuadro,
@@ -876,6 +880,15 @@ export class CuadrosComparativosService {
       },
       { landscape: true },
     );
+  }
+
+  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+    return this.pdfService.pdfDe(await this.armarDocumento(id, user));
+  }
+
+  /** El documento en HTML, idéntico al PDF, para verlo en el detalle. */
+  async getDocumentoHtml(id: number, user?: UsuarioContexto): Promise<string> {
+    return this.pdfService.htmlDe(await this.armarDocumento(id, user));
   }
 
   private formatNumber(value: number): string {
