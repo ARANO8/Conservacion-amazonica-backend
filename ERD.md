@@ -112,6 +112,18 @@ PAGO_REALIZADO PAGO_REALIZADO
 PLAN_VIAJE_PENDIENTE PLAN_VIAJE_PENDIENTE
 PLAN_VIAJE_APROBADO PLAN_VIAJE_APROBADO
 PLAN_VIAJE_OBSERVADO PLAN_VIAJE_OBSERVADO
+INFORME_VIAJE_PENDIENTE INFORME_VIAJE_PENDIENTE
+INFORME_VIAJE_REVISADO INFORME_VIAJE_REVISADO
+INFORME_VIAJE_OBSERVADO INFORME_VIAJE_OBSERVADO
+        }
+    
+
+
+        EstadoInformeViaje {
+            BORRADOR BORRADOR
+ENVIADO ENVIADO
+OBSERVADO OBSERVADO
+REVISADO REVISADO
         }
     
 
@@ -282,19 +294,27 @@ APROBADO APROBADO
     }
   
 
-  "InformeActividades" {
+  "InformeViaje" {
     Int id "🗝️"
     String codigoInforme 
+    String motivoViaje 
+    String lugarViaje 
     DateTime fechaInicio 
     DateTime fechaFin 
+    String lugarEmision 
+    DateTime fechaEmision 
+    EstadoInformeViaje estado 
+    String observacion "❓"
+    DateTime fechaRevision "❓"
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
     }
   
 
-  "ActividadInforme" {
+  "ActividadInformeViaje" {
     Int id "🗝️"
+    Int orden 
     DateTime fecha 
     String lugar 
     String personaInstitucion 
@@ -624,16 +644,21 @@ APROBADO APROBADO
     "HistorialAprobacion" }o--|o "Rendicion" : "rendicion"
     "HistorialAprobacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
     "HistorialAprobacion" }o--|o "PlanViaje" : "planViaje"
+    "HistorialAprobacion" }o--|o "InformeViaje" : "informeViaje"
     "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Notificacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
     "Notificacion" }o--|o "PlanViaje" : "planViaje"
+    "Notificacion" }o--|o "InformeViaje" : "informeViaje"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
     "Rendicion" }o--|o "Usuario" : "aprobadorActual"
-    "InformeActividades" }o--|| "Usuario" : "usuario"
-    "ActividadInforme" }o--|| "InformeActividades" : "informe"
+    "InformeViaje" |o--|| "EstadoInformeViaje" : "enum:estado"
+    "InformeViaje" }o--|| "Usuario" : "usuario"
+    "InformeViaje" }o--|o "Usuario" : "directorPrograma"
+    "InformeViaje" |o--|o "Solicitud" : "solicitud"
+    "ActividadInformeViaje" }o--|| "InformeViaje" : "informe"
     "DeclaracionMovilidad" }o--|| "Usuario" : "usuario"
     "DetalleMovilidad" }o--|| "DeclaracionMovilidad" : "declaracion"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"

@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
-import { InformesViajeService } from './informes-viaje.service';
 import { InformesViajeController } from './informes-viaje.controller';
+import { InformesViajeService } from './informes-viaje.service';
 import { PrismaModule } from '../prisma/prisma.module';
+import { PdfModule } from '../pdf/pdf.module';
+import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, PdfModule, NotificacionesModule],
   controllers: [InformesViajeController],
   providers: [InformesViajeService],
   exports: [InformesViajeService],
