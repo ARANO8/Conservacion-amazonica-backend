@@ -7,8 +7,8 @@ import {
 } from '@nestjs/common';
 import { Prisma, Rol } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateInformeActividadesDto } from './dto/create-informe-actividades.dto';
-import { UpdateInformeActividadesDto } from './dto/update-informe-actividades.dto';
+import { CreateInformeViajeDto } from './dto/create-informe-viaje.dto';
+import { UpdateInformeViajeDto } from './dto/update-informe-viaje.dto';
 
 /** ADMIN y EJECUTIVO ven los informes de todos; el resto sólo los suyos. */
 const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
@@ -28,8 +28,8 @@ interface UsuarioContexto {
 }
 
 @Injectable()
-export class InformesActividadesService {
-  private readonly logger = new Logger(InformesActividadesService.name);
+export class InformesViajeService {
+  private readonly logger = new Logger(InformesViajeService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -59,7 +59,7 @@ export class InformesActividadesService {
     }
   }
 
-  async create(dto: CreateInformeActividadesDto, usuarioId: number) {
+  async create(dto: CreateInformeViajeDto, usuarioId: number) {
     this.validarRango(dto.fechaInicio, dto.fechaFin);
 
     return this.prisma.$transaction(async (tx) => {
@@ -147,11 +147,7 @@ export class InformesActividadesService {
     return informe;
   }
 
-  async update(
-    id: number,
-    dto: UpdateInformeActividadesDto,
-    usuarioId: number,
-  ) {
+  async update(id: number, dto: UpdateInformeViajeDto, usuarioId: number) {
     const actual = await this.findPropio(id, usuarioId);
 
     const fechaInicio = dto.fechaInicio ?? actual.fechaInicio;

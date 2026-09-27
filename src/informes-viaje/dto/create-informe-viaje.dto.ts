@@ -10,7 +10,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-export class CreateActividadInformeDto {
+export class CreateActividadInformeViajeDto {
   @ApiProperty({
     example: '2026-03-12T00:00:00.000Z',
     description: 'Fecha de la actividad',
@@ -41,7 +41,7 @@ export class CreateActividadInformeDto {
   actividadesRealizadas: string;
 }
 
-export class CreateInformeActividadesDto {
+export class CreateInformeViajeDto {
   @ApiProperty({
     example: '2026-03-10T00:00:00.000Z',
     description: 'Fecha de inicio del viaje',
@@ -58,10 +58,10 @@ export class CreateInformeActividadesDto {
   @IsDate()
   fechaFin: Date;
 
-  @ApiProperty({ type: [CreateActividadInformeDto] })
+  @ApiProperty({ type: [CreateActividadInformeViajeDto] })
   @IsArray()
   @ArrayMinSize(1, { message: 'Debes registrar al menos una actividad' })
   @ValidateNested({ each: true })
-  @Type(() => CreateActividadInformeDto)
-  actividades: CreateActividadInformeDto[];
+  @Type(() => CreateActividadInformeViajeDto)
+  actividades: CreateActividadInformeViajeDto[];
 }

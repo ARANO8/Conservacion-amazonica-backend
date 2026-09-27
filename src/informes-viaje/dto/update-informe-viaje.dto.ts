@@ -1,10 +1,8 @@
 import { PartialType } from '@nestjs/swagger';
-import { CreateInformeActividadesDto } from './create-informe-actividades.dto';
+import { CreateInformeViajeDto } from './create-informe-viaje.dto';
 
 /**
  * Al actualizar, si vienen `actividades` se reemplaza la bitácora completa:
  * el formulario siempre envía la lista entera.
  */
-export class UpdateInformeActividadesDto extends PartialType(
-  CreateInformeActividadesDto,
-) {}
+export class UpdateInformeViajeDto extends PartialType(CreateInformeViajeDto) {}
