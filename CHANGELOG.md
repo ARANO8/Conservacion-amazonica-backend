@@ -125,3 +125,9 @@
 - **Backend:** El `update` de la solicitud ya no borra las actividades, y registra el historial `CORREGIDO`, que quedaba detrás del `return`
 - **Backend:** Migración con backfill: cada solicitud existente con planificación recibe un plan `APROBADO`
 - **Frontend:** Módulo `app/app/planes-viaje/` y Paso 1 del wizard como selección del plan aprobado; corrige el adaptador inverso, que perdía la actividad de los viáticos al editar una solicitud observada
+
+## Formato estándar de documentos (27 Sep)
+
+- **Backend:** Todos los documentos comparten `templates/partials/` (`estilos-documento`, `encabezado`, `logos`): tipografía Bookman y hoja del ANEXO 1, con los logos de ACEAA y AMZ desk a la izquierda. Cotización, cuadro comparativo, orden de compra, ANEXO 3 y ANEXO 6 dejan de cargar Tailwind desde un CDN, así que el PDF ya no depende de internet. ANEXO 2 y 4 conservan su grilla oficial con ambos logos, y el Excel del ANEXO 4 también los lleva. Margen uniforme de 12 mm
+- **Backend:** Los servicios arman un `DocumentoPdf` una sola vez y lo convierten en PDF o en HTML; endpoints `GET :id/documento` para cotización, cuadro, orden, solicitud y declaración de movilidad
+- **Frontend:** `DocumentoViewer`: el detalle de cada documento se ve idéntico a su PDF
