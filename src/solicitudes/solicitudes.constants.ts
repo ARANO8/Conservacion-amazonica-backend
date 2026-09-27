@@ -73,10 +73,18 @@ export const SOLICITUD_INCLUDE = {
       },
     },
   },
-  planificaciones: {
+  // ANEXO 1 del que nace la solicitud de viaje; sus actividades son el
+  // cronograma al que se asignan viáticos y nómina de terceros
+  planViaje: {
     include: {
-      participantesInstitucionales: {
-        select: { id: true, nombreCompleto: true, cargo: true },
+      directorPrograma: { select: USER_SAFE_SELECT },
+      actividades: {
+        orderBy: { orden: 'asc' },
+        include: {
+          participantesInstitucionales: {
+            select: { id: true, nombreCompleto: true, cargo: true },
+          },
+        },
       },
     },
   },

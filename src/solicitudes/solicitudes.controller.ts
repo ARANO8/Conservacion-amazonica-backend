@@ -62,7 +62,7 @@ export class SolicitudesController {
     @Req() req: RequestWithUser,
   ) {
     this.logger.log(
-      `[CREATE] usuarioId=${req.user.userId} | poaIds=${JSON.stringify(createSolicitudDto.poaIds)} | viaticos=${createSolicitudDto.viaticos?.length ?? 0} | gastos=${createSolicitudDto.gastos?.length ?? 0} | hospedajes=${createSolicitudDto.hospedajes?.length ?? 0} | planificaciones=${createSolicitudDto.planificaciones?.length ?? 0}`,
+      `[CREATE] usuarioId=${req.user.userId} | poaIds=${JSON.stringify(createSolicitudDto.poaIds)} | viaticos=${createSolicitudDto.viaticos?.length ?? 0} | gastos=${createSolicitudDto.gastos?.length ?? 0} | hospedajes=${createSolicitudDto.hospedajes?.length ?? 0} | planViajeId=${createSolicitudDto.planViajeId ?? '-'}`,
     );
     this.logger.debug(
       `[CREATE] Body completo: ${JSON.stringify(createSolicitudDto)}`,

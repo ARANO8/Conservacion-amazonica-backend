@@ -8,7 +8,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateSolicitudDto,
-  CreatePlanificacionDto,
   CreateNominaDto,
   CreateHospedajeDto,
 } from './dto/create-solicitud.dto';
@@ -39,6 +38,8 @@ import {
   validarLimitesViatico,
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
+import { PlanesViajeService } from '../planes-viaje/planes-viaje.service';
+import type { PlanViajeCompleto } from '../planes-viaje/planes-viaje.constants';
 import {
   DESTINATARIO_ANEXOS,
   ESTADOS_COMPROMISO_ACTIVO,
@@ -63,7 +64,7 @@ type DetalleSolicitud = {
       Prisma.ViaticoUncheckedCreateInput,
       'solicitudId' | 'solicitudPresupuestoId'
     >;
-    planificacionIndexes: number[];
+    planificacionIds: number[];
     poaId: number;
   }[];
   gastosData: {
@@ -80,10 +81,27 @@ type DetalleSolicitud = {
     >;
     poaId: number;
   }[];
-  planificaciones: CreatePlanificacionDto[];
+  /** Actividades del plan de viaje (vacío en compras y servicios) */
+  actividades: PlanViajeCompleto['actividades'];
   nominasTerceros: CreateNominaDto[];
   hospedajes: CreateHospedajeDto[];
 };
+
+/** Rango del viaje: de la primera fecha de inicio a la última de fin. */
+function rangoDelPlan(actividades: { fechaInicio: Date; fechaFin: Date }[]): {
+  fechaInicio: Date | null;
+  fechaFin: Date | null;
+} {
+  if (actividades.length === 0) return { fechaInicio: null, fechaFin: null };
+  return {
+    fechaInicio: new Date(
+      Math.min(...actividades.map((a) => a.fechaInicio.getTime())),
+    ),
+    fechaFin: new Date(
+      Math.max(...actividades.map((a) => a.fechaFin.getTime())),
+    ),
+  };
+}
 
 type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
@@ -100,6 +118,7 @@ export class SolicitudesService {
     private poaService: PoaService,
     private notificacionesService: NotificacionesService,
     private readonly pdfService: PdfService,
+    private readonly planesViajeService: PlanesViajeService,
   ) {}
 
   private async generarCodigo(tx: Prisma.TransactionClient): Promise<string> {
@@ -118,49 +137,49 @@ export class SolicitudesService {
   }
 
   /**
-   * La nómina institucional es opcional (solicitudes anteriores no la traen),
-   * pero cuando se envía debe cuadrar con el conteo declarado y referir a
-   * usuarios activos, sin repetidos.
+   * Una solicitud eliminada conserva el vínculo con su plan (así `restore`
+   * puede recuperarlo) hasta que otra solicitud toma ese plan.
    */
-  private async validarParticipantesInstitucionales(
-    planificaciones: CreatePlanificacionDto[],
+  private async liberarPlanDeEliminadas(
+    tx: Prisma.TransactionClient,
+    planViajeId: number,
   ): Promise<void> {
-    const todosLosIds = new Set<number>();
-
-    for (const p of planificaciones) {
-      const ids = p.participantesInstitucionalesIds;
-      if (!ids || ids.length === 0) continue;
-
-      if (new Set(ids).size !== ids.length) {
-        throw new BadRequestException(
-          `La actividad "${p.actividad}" repite personal institucional`,
-        );
-      }
-      if (ids.length !== p.cantInstitucional) {
-        throw new BadRequestException(
-          `La actividad "${p.actividad}" declara ${p.cantInstitucional} persona(s) institucional(es) pero selecciona ${ids.length}`,
-        );
-      }
-      ids.forEach((id) => todosLosIds.add(id));
-    }
-
-    if (todosLosIds.size === 0) return;
-
-    const activos = await this.prisma.usuario.count({
-      where: { id: { in: [...todosLosIds] }, deletedAt: null },
+    await tx.solicitud.updateMany({
+      where: { planViajeId, deletedAt: { not: null } },
+      data: { planViajeId: null },
     });
-    if (activos !== todosLosIds.size) {
+  }
+
+  /**
+   * El plan de viaje del que nace (o con el que se corrige) una solicitud de
+   * viaje. Compras y servicios no tienen plan.
+   */
+  private async resolverPlanViaje(
+    tipo: TipoSolicitud,
+    planViajeId: number | undefined,
+    emisorId: number,
+    solicitudId?: number,
+  ): Promise<PlanViajeCompleto | null> {
+    if (tipo !== TipoSolicitud.VIAJE) return null;
+    if (!planViajeId) {
       throw new BadRequestException(
-        'Uno o más participantes institucionales no existen o están inactivos',
+        'Una solicitud de viaje debe nacer de un plan de viaje (ANEXO 1) aprobado',
       );
     }
+    return this.planesViajeService.obtenerParaSolicitud(
+      planViajeId,
+      emisorId,
+      solicitudId,
+    );
   }
 
   private async prepararInsertAnidado(
     dto: CreateSolicitudDto | UpdateSolicitudDto,
+    plan: PlanViajeCompleto | null,
   ): Promise<DetalleSolicitud> {
+    const actividades = plan?.actividades ?? [];
+    const actividadesPorId = new Map(actividades.map((a) => [a.id, a]));
     const {
-      planificaciones = [],
       viaticos = [],
       gastos = [],
       gastosCompra = [],
@@ -177,8 +196,6 @@ export class SolicitudesService {
     const conceptosMap = new Map(conceptosRaw.map((c) => [c.id, c]));
     const tiposGastoMap = new Map(tiposGastoRaw.map((tg) => [tg.id, tg]));
 
-    await this.validarParticipantesInstitucionales(planificaciones);
-
     // 2. CÁLCULOS PREVIOS Y VALIDACIONES
     let montoTotalPresupuestado = new Prisma.Decimal(0);
     let montoTotalNeto = new Prisma.Decimal(0);
@@ -188,7 +205,7 @@ export class SolicitudesService {
         Prisma.ViaticoUncheckedCreateInput,
         'solicitudId' | 'solicitudPresupuestoId'
       >;
-      planificacionIndexes: number[];
+      planificacionIds: number[];
       poaId: number;
     }[] = [];
 
@@ -209,17 +226,16 @@ export class SolicitudesService {
         );
       }
 
-      for (const idx of vDto.planificacionIndexes) {
-        if (!planificaciones[idx]) {
+      // Cada actividad del viático debe ser del plan, y el viático no puede
+      // cubrir más personas de las que la actividad declara
+      for (const actividadId of vDto.planificacionIds) {
+        const actividad = actividadesPorId.get(actividadId);
+        if (!actividad) {
           throw new BadRequestException(
-            `Índice de planificación ${idx} es inválido`,
+            `El viático referencia la actividad ${actividadId}, que no pertenece al plan de viaje. Revisa las actividades asignadas`,
           );
         }
-      }
-
-      // Validamos la capacidad contra cada planificación referenciada por el viático
-      for (const idx of vDto.planificacionIndexes) {
-        validarLimitesViatico(vDto, planificaciones[idx]);
+        validarLimitesViatico(vDto, actividad);
       }
 
       const precioCatalogo = tarifaEnBolivianos(
@@ -266,7 +282,7 @@ export class SolicitudesService {
       montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       viaticosData.push({
-        planificacionIndexes: vDto.planificacionIndexes,
+        planificacionIds: vDto.planificacionIds,
         poaId: vDto.poaId,
         data: {
           conceptoId: vDto.conceptoId,
@@ -415,14 +431,24 @@ export class SolicitudesService {
       });
     }
 
-    // --- Validar índices de planificación de la nómina de terceros ---
+    // --- Nómina de terceros: por actividad, tantos como declara el plan ---
+    const tercerosPorActividad = new Map<number, number>();
     for (const n of nominasTerceros) {
-      if (n.planificacionIndex === undefined || n.planificacionIndex === null) {
-        continue;
-      }
-      if (!planificaciones[n.planificacionIndex]) {
+      if (!actividadesPorId.has(n.planificacionId)) {
         throw new BadRequestException(
-          `Índice de planificación ${n.planificacionIndex} es inválido en la nómina de terceros`,
+          `La nómina de terceros referencia la actividad ${n.planificacionId}, que no pertenece al plan de viaje`,
+        );
+      }
+      tercerosPorActividad.set(
+        n.planificacionId,
+        (tercerosPorActividad.get(n.planificacionId) ?? 0) + 1,
+      );
+    }
+    for (const actividad of actividades) {
+      const registrados = tercerosPorActividad.get(actividad.id) ?? 0;
+      if (registrados !== actividad.cantidadPersonasTerceros) {
+        throw new BadRequestException(
+          `En "${actividad.actividadProgramada}" el plan declara ${actividad.cantidadPersonasTerceros} tercero(s) pero la nómina registra ${registrados}`,
         );
       }
     }
@@ -433,7 +459,7 @@ export class SolicitudesService {
       viaticosData,
       gastosData,
       gastosCompraData,
-      planificaciones,
+      actividades,
       nominasTerceros,
       hospedajes: hospedajesData,
     };
@@ -445,49 +471,13 @@ export class SolicitudesService {
     presupuestosMap: Map<number, number>,
     tx: Prisma.TransactionClient,
   ): Promise<void> {
-    // C. Crear Planificaciones y mapear IDs
-    const createdPlanificaciones: { id: number }[] = [];
-    for (const p of detalles.planificaciones) {
-      const d1 = new Date(p.fechaInicio);
-      const d2 = new Date(p.fechaFin);
-      const diferenciaMilisegundos = d2.getTime() - d1.getTime();
-      const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
-      const diasFinales =
-        p.dias !== undefined && p.dias !== null
-          ? Number(p.dias)
-          : Number(diasExactos.toFixed(2));
-
-      this.logger.log(
-        `[insertarRelaciones] Creando Planificacion: actividad="${p.actividad}", fechaInicio=${p.fechaInicio}, fechaFin=${p.fechaFin}, diasFinales=${diasFinales}`,
-      );
-      const cp = await tx.planificacion.create({
-        data: {
-          actividadProgramada: p.actividad,
-          fechaInicio: d1,
-          fechaFin: d2,
-          diasCalculados: diasFinales,
-          cantidadPersonasInstitucional: p.cantInstitucional,
-          cantidadPersonasTerceros: p.cantTerceros,
-          solicitudId,
-          participantesInstitucionales: {
-            connect: (p.participantesInstitucionalesIds ?? []).map((id) => ({
-              id,
-            })),
-          },
-        },
-      });
-      createdPlanificaciones.push({ id: cp.id });
-      this.logger.log(
-        `[insertarRelaciones] Planificacion creada OK (id=${cp.id})`,
-      );
-    }
-
+    // C. Las actividades ya existen: son las filas del plan de viaje
     // D. Crear Viáticos
     for (let idx = 0; idx < detalles.viaticosData.length; idx++) {
       const vItem = detalles.viaticosData[idx];
       const spId = presupuestosMap.get(vItem.poaId);
       this.logger.log(
-        `[insertarRelaciones] Creando Viatico ${idx}: poaId=${vItem.poaId}, spId=${spId}, planificacionIndexes=${JSON.stringify(vItem.planificacionIndexes)}, data=${JSON.stringify(vItem.data)}`,
+        `[insertarRelaciones] Creando Viatico ${idx}: poaId=${vItem.poaId}, spId=${spId}, planificacionIds=${JSON.stringify(vItem.planificacionIds)}, data=${JSON.stringify(vItem.data)}`,
       );
       await tx.viatico.create({
         data: {
@@ -495,9 +485,7 @@ export class SolicitudesService {
           solicitudId,
           solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
           planificaciones: {
-            connect: vItem.planificacionIndexes.map((i) => ({
-              id: createdPlanificaciones[i].id,
-            })),
+            connect: vItem.planificacionIds.map((id) => ({ id })),
           },
         },
       });
@@ -564,10 +552,7 @@ export class SolicitudesService {
           nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
           procedenciaInstitucion: n.procedenciaInstitucion.trim().toUpperCase(),
           solicitudId,
-          planificacionId:
-            n.planificacionIndex !== undefined && n.planificacionIndex !== null
-              ? (createdPlanificaciones[n.planificacionIndex]?.id ?? null)
-              : null,
+          planificacionId: n.planificacionId,
         },
       });
     }
@@ -580,15 +565,21 @@ export class SolicitudesService {
     const {
       poaIds,
       descripcion,
-      aprobadorId,
       lugarViaje,
       motivoViaje,
       proyecto,
       chequeANombreDe,
-      tipo,
       urlCuadroComparativo,
       urlCotizaciones,
+      planViajeId,
     } = createSolicitudDto;
+    const tipo = createSolicitudDto.tipo ?? TipoSolicitud.VIAJE;
+
+    // Un viaje nace de su plan (ANEXO 1): el Director de Programa que le dio
+    // el VoBo es quien revisa la solicitud, aunque el cliente envíe otro.
+    const plan = await this.resolverPlanViaje(tipo, planViajeId, usuarioId);
+    const aprobadorId =
+      plan?.directorProgramaId ?? createSolicitudDto.aprobadorId;
 
     this.logger.log(
       `[create] INICIO — usuarioId=${usuarioId}, aprobadorId=${aprobadorId}, poaIds=${JSON.stringify(poaIds)}`,
@@ -616,7 +607,7 @@ export class SolicitudesService {
         );
       }
 
-      if ((tipo ?? TipoSolicitud.VIAJE) === TipoSolicitud.VIAJE) {
+      if (tipo === TipoSolicitud.VIAJE) {
         this.validarDirectorPrograma(aprobador);
       }
 
@@ -627,36 +618,19 @@ export class SolicitudesService {
       );
     }
 
-    const detalles = await this.prepararInsertAnidado(createSolicitudDto);
+    const detalles = await this.prepararInsertAnidado(createSolicitudDto, plan);
 
     this.logger.log(
-      `[create] prepararInsertAnidado OK — viaticosData=${detalles.viaticosData.length}, gastosData=${detalles.gastosData.length}, hospedajes=${detalles.hospedajes.length}, planificaciones=${detalles.planificaciones.length}`,
+      `[create] prepararInsertAnidado OK — viaticosData=${detalles.viaticosData.length}, gastosData=${detalles.gastosData.length}, hospedajes=${detalles.hospedajes.length}, actividades=${detalles.actividades.length}`,
     );
     this.logger.log(
       `[create] montoTotalPresupuestado=${detalles.montoTotalPresupuestado.toString()}, montoTotalNeto=${detalles.montoTotalNeto.toString()}`,
     );
 
-    // --- CÁLCULO DE FECHAS (Strict Separation) ---
-    let minDate: Date | null = null;
-    let maxDate: Date | null = null;
-
-    if (detalles.planificaciones && detalles.planificaciones.length > 0) {
-      minDate = detalles.planificaciones.reduce(
-        (min, p) => {
-          const current = new Date(p.fechaInicio);
-          return !min || current < min ? current : min;
-        },
-        null as Date | null,
-      );
-
-      maxDate = detalles.planificaciones.reduce(
-        (max, p) => {
-          const current = new Date(p.fechaFin);
-          return !max || current > max ? current : max;
-        },
-        null as Date | null,
-      );
-    }
+    // Las fechas del viaje salen del cronograma del plan
+    const { fechaInicio: minDate, fechaFin: maxDate } = rangoDelPlan(
+      detalles.actividades,
+    );
 
     // 3. TRANSACCIÓN PRISMA
     if (!poaIds || poaIds.length === 0) {
@@ -767,19 +741,24 @@ export class SolicitudesService {
         }
       }
 
+      // Una solicitud eliminada conserva su plan hasta que otra lo toma
+      if (plan) await this.liberarPlanDeEliminadas(tx, plan.id);
+
       // A. Crear Solicitud
       this.logger.log(`[create TX] Creando solicitud...`);
       const solicitud = await tx.solicitud.create({
         data: {
           codigoSolicitud,
-          tipo: tipo ?? TipoSolicitud.VIAJE,
+          tipo,
           descripcion,
           proyecto: proyecto?.trim() || null,
           chequeANombreDe: chequeANombreDe?.trim() || null,
           montoTotalPresupuestado: detalles.montoTotalPresupuestado,
           montoTotalNeto: detalles.montoTotalNeto,
-          lugarViaje: lugarViaje ?? null,
-          motivoViaje: motivoViaje ?? null,
+          // Copiados del plan para que listados y ANEXO 2 no cambien
+          lugarViaje: plan ? plan.lugaresViaje : (lugarViaje ?? null),
+          motivoViaje: plan ? plan.objetivoViaje : (motivoViaje ?? null),
+          ...(plan ? { planViaje: { connect: { id: plan.id } } } : {}),
           urlCuadroComparativo,
           urlCotizaciones: urlCotizaciones ?? [],
           fechaInicio: minDate,
@@ -825,7 +804,7 @@ export class SolicitudesService {
         );
       }
 
-      // C–F. Insertar relaciones anidadas (planificaciones, viáticos, hospedajes, gastos, nóminas)
+      // C–F. Insertar relaciones anidadas (viáticos, hospedajes, gastos, nóminas)
       this.logger.log(`[create TX] Insertando relaciones anidadas...`);
       await this.insertarRelacionesSolicitud(
         solicitud.id,
@@ -1215,7 +1194,6 @@ export class SolicitudesService {
       urlCuadroComparativo,
       urlCotizaciones,
       poaIds,
-      planificaciones,
       viaticos,
       gastos,
       hospedajes,
@@ -1223,7 +1201,17 @@ export class SolicitudesService {
       gastosCompra,
       proyecto,
       chequeANombreDe,
+      planViajeId,
     } = updateSolicitudDto;
+
+    // El plan se revalida al corregir: pudo haberse editado mientras la
+    // solicitud estaba observada. Se admite cambiarlo por otro plan libre.
+    const plan = await this.resolverPlanViaje(
+      solicitud.tipo,
+      planViajeId ?? solicitud.planViajeId ?? undefined,
+      solicitud.usuarioEmisorId,
+      id,
+    );
 
     // En un viaje el Director de Programa se designa una sola vez: al subsanar,
     // la solicitud vuelve a él aunque el cliente envíe otro aprobador. Las
@@ -1263,7 +1251,7 @@ export class SolicitudesService {
 
     const debeReemplazarRelacionesAnidadas =
       poaIds !== undefined ||
-      planificaciones !== undefined ||
+      planViajeId !== undefined ||
       viaticos !== undefined ||
       gastos !== undefined ||
       hospedajes !== undefined ||
@@ -1290,7 +1278,6 @@ export class SolicitudesService {
         const dtoParaReemplazo: UpdateSolicitudDto = {
           ...updateSolicitudDto,
           poaIds: poaIdsActualizados,
-          planificaciones: planificaciones ?? [],
           viaticos: viaticos ?? [],
           gastos: gastos ?? [],
           hospedajes: hospedajes ?? [],
@@ -1299,7 +1286,10 @@ export class SolicitudesService {
         };
 
         // B. Recalcular y re-insertar
-        const detalles = await this.prepararInsertAnidado(dtoParaReemplazo);
+        const detalles = await this.prepararInsertAnidado(
+          dtoParaReemplazo,
+          plan,
+        );
 
         // Validación: todas las referencias por POA deben existir en poaIds
         const poaIdSet = new Set(poaIdsActualizados);
@@ -1335,39 +1325,24 @@ export class SolicitudesService {
           }
         }
 
-        // A. Limpiar existentes (orden: hijos primero por FK)
+        // A. Limpiar existentes (orden: hijos primero por FK). Las
+        // actividades NO se borran: pertenecen al plan de viaje, no a la
+        // solicitud.
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
         await tx.gastoCompra.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
-        await tx.planificacion.deleteMany({ where: { solicitudId: id } });
         await tx.solicitudPresupuesto.deleteMany({
           where: { solicitudId: id },
         });
         finalMontoTotalPresupuestado = detalles.montoTotalPresupuestado;
         finalMontoTotalNeto = detalles.montoTotalNeto;
 
-        // --- CÁLCULO DE FECHAS (Update - Strict Separation) ---
-        if (detalles.planificaciones && detalles.planificaciones.length > 0) {
-          finalFechaInicio = detalles.planificaciones.reduce(
-            (min, p) => {
-              const current = new Date(p.fechaInicio);
-              return !min || current < min ? current : min;
-            },
-            null as Date | null,
-          );
-
-          finalFechaFin = detalles.planificaciones.reduce(
-            (max, p) => {
-              const current = new Date(p.fechaFin);
-              return !max || current > max ? current : max;
-            },
-            null as Date | null,
-          );
-        } else {
-          finalFechaInicio = null;
-          finalFechaFin = null;
+        // Las fechas del viaje salen del cronograma del plan
+        if (plan) {
+          ({ fechaInicio: finalFechaInicio, fechaFin: finalFechaFin } =
+            rangoDelPlan(detalles.actividades));
         }
 
         // B.5 Recrear SolicitudPresupuesto
@@ -1391,12 +1366,15 @@ export class SolicitudesService {
       // SYNC: Recalcular subtotales de los presupuestos involucrados
       await this.presupuestoService.recalcularTotales(id, tx);
 
+      if (plan) await this.liberarPlanDeEliminadas(tx, plan.id);
+
       // D. Actualizar Cabecera
-      return tx.solicitud.update({
+      const actualizada = await tx.solicitud.update({
         where: { id },
         data: {
-          lugarViaje,
-          motivoViaje,
+          lugarViaje: plan ? plan.lugaresViaje : lugarViaje,
+          motivoViaje: plan ? plan.objetivoViaje : motivoViaje,
+          ...(plan ? { planViaje: { connect: { id: plan.id } } } : {}),
           descripcion,
           proyecto: proyecto !== undefined ? proyecto : undefined,
           chequeANombreDe:
@@ -1436,7 +1414,9 @@ export class SolicitudesService {
           solicitudId: id,
         },
       });
-      this.logger.log(`[create TX] Historial CORREGIDO registrado`);
+      this.logger.log(`[update TX] Historial CORREGIDO registrado`);
+
+      return actualizada;
     });
 
     try {
@@ -1503,6 +1483,13 @@ export class SolicitudesService {
 
     if (!solicitud) {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
+    }
+
+    // Mientras estuvo eliminada, otra solicitud pudo tomar su plan de viaje
+    if (solicitud.tipo === TipoSolicitud.VIAJE && !solicitud.planViajeId) {
+      throw new BadRequestException(
+        'No se puede restaurar: su plan de viaje ya respalda otra solicitud',
+      );
     }
 
     return this.prisma.solicitud.update({

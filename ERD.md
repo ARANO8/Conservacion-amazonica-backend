@@ -109,6 +109,18 @@ CUADRO_APROBADO CUADRO_APROBADO
 PAGO_PENDIENTE_APROBACION PAGO_PENDIENTE_APROBACION
 PAGO_OBSERVADO PAGO_OBSERVADO
 PAGO_REALIZADO PAGO_REALIZADO
+PLAN_VIAJE_PENDIENTE PLAN_VIAJE_PENDIENTE
+PLAN_VIAJE_APROBADO PLAN_VIAJE_APROBADO
+PLAN_VIAJE_OBSERVADO PLAN_VIAJE_OBSERVADO
+        }
+    
+
+
+        EstadoPlanViaje {
+            BORRADOR BORRADOR
+ENVIADO ENVIADO
+OBSERVADO OBSERVADO
+APROBADO APROBADO
         }
     
 
@@ -351,6 +363,23 @@ APROBADO APROBADO
     }
   
 
+  "PlanViaje" {
+    Int id "🗝️"
+    String codigoPlan 
+    String cargo 
+    String lugaresViaje 
+    String objetivoViaje 
+    String lugarEmision 
+    DateTime fechaEmision 
+    EstadoPlanViaje estado 
+    String observacion "❓"
+    DateTime fechaAprobacion "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
   "Planificacion" {
     Int id "🗝️"
     String actividadProgramada 
@@ -359,6 +388,9 @@ APROBADO APROBADO
     DateTime fechaInicio 
     DateTime fechaFin 
     Decimal diasCalculados 
+    String lugarSalida "❓"
+    String lugarLlegada "❓"
+    Int orden 
     }
   
 
@@ -584,16 +616,19 @@ APROBADO APROBADO
     "Solicitud" }o--|o "Usuario" : "aprobador"
     "Solicitud" }o--|o "Usuario" : "directorPrograma"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
+    "Solicitud" |o--|o "PlanViaje" : "planViaje"
     "HistorialAprobacion" |o--|| "TipoAccionHistorial" : "enum:accion"
     "HistorialAprobacion" }o--|| "Usuario" : "usuario"
     "HistorialAprobacion" }o--|o "Usuario" : "derivadoA"
     "HistorialAprobacion" }o--|o "Solicitud" : "solicitud"
     "HistorialAprobacion" }o--|o "Rendicion" : "rendicion"
     "HistorialAprobacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
+    "HistorialAprobacion" }o--|o "PlanViaje" : "planViaje"
     "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Notificacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
+    "Notificacion" }o--|o "PlanViaje" : "planViaje"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
     "Rendicion" }o--|o "Usuario" : "aprobadorActual"
@@ -608,7 +643,10 @@ APROBADO APROBADO
     "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
-    "Planificacion" }o--|| "Solicitud" : "solicitud"
+    "PlanViaje" |o--|| "EstadoPlanViaje" : "enum:estado"
+    "PlanViaje" }o--|| "Usuario" : "usuario"
+    "PlanViaje" }o--|o "Usuario" : "directorPrograma"
+    "Planificacion" }o--|| "PlanViaje" : "planViaje"
     "Planificacion" o{--}o "Viatico" : ""
     "Concepto" |o--|| "Moneda" : "enum:moneda"
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"

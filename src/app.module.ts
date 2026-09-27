@@ -27,6 +27,7 @@ import { OrdenesCompraModule } from './ordenes-compra/ordenes-compra.module';
 import { InformesActividadesModule } from './informes-actividades/informes-actividades.module';
 import { DeclaracionesMovilidadModule } from './declaraciones-movilidad/declaraciones-movilidad.module';
 import { HealthModule } from './health/health.module';
+import { PlanesViajeModule } from './planes-viaje/planes-viaje.module';
 
 const DEFAULT_THROTTLE_TTL_MS = 60000;
 const DEFAULT_THROTTLE_LIMIT = 10;
@@ -87,6 +88,7 @@ function getPositiveIntFromEnv(
     OrdenesCompraModule,
     InformesActividadesModule,
     DeclaracionesMovilidadModule,
+    PlanesViajeModule,
     HealthModule,
   ],
   providers: [
