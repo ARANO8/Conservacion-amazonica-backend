@@ -131,3 +131,10 @@
 - **Backend:** Todos los documentos comparten `templates/partials/` (`estilos-documento`, `encabezado`, `logos`): tipografía Bookman y hoja del ANEXO 1, con los logos de ACEAA y AMZ desk a la izquierda. Cotización, cuadro comparativo, orden de compra, ANEXO 3 y ANEXO 6 dejan de cargar Tailwind desde un CDN, así que el PDF ya no depende de internet. ANEXO 2 y 4 conservan su grilla oficial con ambos logos, y el Excel del ANEXO 4 también los lleva. Margen uniforme de 12 mm
 - **Backend:** Los servicios arman un `DocumentoPdf` una sola vez y lo convierten en PDF o en HTML; endpoints `GET :id/documento` para cotización, cuadro, orden, solicitud y declaración de movilidad
 - **Frontend:** `DocumentoViewer`: el detalle de cada documento se ve idéntico a su PDF
+
+## Informe de Viaje — ANEXO 7 (27 Sep) · spec 022
+
+- **Ambos:** "Informe de Actividades" pasa a llamarse **Informe de Viaje** en todo el sistema: módulo `informes-viaje`, ruta `/app/informes-viaje` y modelo `InformeViaje` (la migración renombra las tablas y conserva los datos)
+- **Backend:** Formato ANEXO 7 en HTML y PDF sobre la plantilla común; el informe nace de una solicitud de viaje propia y desembolsada (1:1), con precarga desde el plan de viaje; revisión del Director de Programa (`EstadoInformeViaje`) con historial y tres `TipoNotificacion` nuevos. El revisor propuesto se descarta si es Tesorero o el propio emisor
+- **Backend:** La solicitud y la rendición incluyen el informe de su viaje
+- **Frontend:** Formulario ANEXO 7 con selector de solicitud, bandeja "Por revisar", detalle idéntico al PDF, y aviso en la rendición cuando falta el informe (no bloquea)
