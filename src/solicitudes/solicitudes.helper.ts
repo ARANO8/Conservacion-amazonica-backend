@@ -1,7 +1,6 @@
 import { Prisma, TipoDocumento, TipoSolicitud } from '@prisma/client';
 import { BadRequestException } from '@nestjs/common';
 import {
-  CreatePlanificacionDto,
   CreateSolicitudDto,
   CreateViaticoDto,
 } from './dto/create-solicitud.dto';
@@ -13,10 +12,14 @@ function redondear(valor: Prisma.Decimal): Prisma.Decimal {
 
 export function validarLimitesViatico(
   vDto: CreateViaticoDto,
-  planificacion: CreatePlanificacionDto,
+  planificacion: {
+    cantidadPersonasInstitucional: number;
+    cantidadPersonasTerceros: number;
+  },
 ): void {
   const totalCapacidadPlanificada =
-    planificacion.cantInstitucional + planificacion.cantTerceros;
+    planificacion.cantidadPersonasInstitucional +
+    planificacion.cantidadPersonasTerceros;
 
   if (vDto.cantidadPersonas > totalCapacidadPlanificada) {
     throw new BadRequestException(

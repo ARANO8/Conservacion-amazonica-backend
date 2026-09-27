@@ -15,61 +15,16 @@ import {
 import { Type } from 'class-transformer';
 import { TipoDestino, TipoDocumento, TipoSolicitud } from '@prisma/client';
 
-export class CreatePlanificacionDto {
-  @ApiProperty({ example: 'Reunión con comunarios' })
-  @IsString()
-  actividad: string;
-
-  @ApiProperty({ example: '2026-02-01T10:00:00Z' })
-  @IsDateString()
-  fechaInicio: string;
-
-  @ApiProperty({ example: '2026-02-15T18:00:00Z' })
-  @IsDateString()
-  fechaFin: string;
-
-  @ApiProperty({ example: 2, minimum: 0 })
-  @IsInt()
-  @Min(0)
-  cantInstitucional: number;
-
-  @ApiProperty({ example: 5, minimum: 0 })
-  @IsInt()
-  @Min(0)
-  cantTerceros: number;
-
-  @ApiPropertyOptional({
-    example: [3, 7],
-    type: [Number],
-    description:
-      'IDs de los usuarios institucionales que participan. Si se envía, su cantidad debe coincidir con cantInstitucional',
-  })
-  @IsOptional()
-  @IsArray()
-  @IsInt({ each: true })
-  participantesInstitucionalesIds?: number[];
-
-  @ApiProperty({
-    example: 2.5,
-    description:
-      'Días explícitos (opcional). Si no se envía, se calcula automáticamente.',
-    required: false,
-  })
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  dias?: number;
-}
-
 export class CreateViaticoDto {
   @ApiProperty({
-    example: [0],
-    description: 'Índices de las planificaciones relacionadas',
+    example: [12],
+    description:
+      'Ids de las actividades del plan de viaje (Planificacion) que cubre este viático',
     type: [Number],
   })
   @IsArray()
   @IsInt({ each: true })
-  planificacionIndexes: number[];
+  planificacionIds: number[];
 
   @ApiProperty({ example: 1, description: 'ID del Concepto (Viático)' })
   @IsInt()
@@ -241,15 +196,12 @@ export class CreateNominaDto {
   procedenciaInstitucion: string;
 
   @ApiProperty({
-    example: 0,
+    example: 12,
     description:
-      'Índice posicional de la planificación a la que pertenece esta persona',
-    required: false,
+      'Id de la actividad del plan de viaje (Planificacion) a la que pertenece esta persona',
   })
-  @IsOptional()
   @IsInt()
-  @Min(0)
-  planificacionIndex?: number;
+  planificacionId: number;
 }
 
 export class CreatePagoParcialDto {
@@ -419,12 +371,14 @@ export class CreateSolicitudDto {
   @IsString({ each: true })
   urlCotizaciones?: string[];
 
-  @ApiProperty({ type: [CreatePlanificacionDto], required: false })
-  @IsArray()
+  @ApiPropertyOptional({
+    example: 4,
+    description:
+      'Plan de viaje (ANEXO 1) aprobado del que nace la solicitud. Obligatorio si tipo = VIAJE',
+  })
   @IsOptional()
-  @ValidateNested({ each: true })
-  @Type(() => CreatePlanificacionDto)
-  planificaciones: CreatePlanificacionDto[];
+  @IsInt()
+  planViajeId?: number;
 
   @ApiProperty({ type: [CreateViaticoDto], required: false })
   @IsArray()

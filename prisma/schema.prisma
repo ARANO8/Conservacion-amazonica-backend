@@ -100,6 +100,18 @@ enum TipoNotificacion {
   PAGO_PENDIENTE_APROBACION
   PAGO_OBSERVADO
   PAGO_REALIZADO
+  PLAN_VIAJE_PENDIENTE
+  PLAN_VIAJE_APROBADO
+  PLAN_VIAJE_OBSERVADO
+}
+
+/// Ciclo del Plan de Viaje (ANEXO 1). Estar vinculado a una solicitud no es un
+/// estado: se deriva de la relación con Solicitud.
+enum EstadoPlanViaje {
+  BORRADOR
+  ENVIADO
+  OBSERVADO
+  APROBADO
 }
 
 // --- MODELOS ---
@@ -132,6 +144,8 @@ model Usuario {
   informesActividades         InformeActividades[]
   declaracionesMovilidad      DeclaracionMovilidad[]
   planificacionesParticipadas Planificacion[]        @relation("PlanificacionParticipantes")
+  planesViaje                 PlanViaje[]            @relation("PlanViajeResponsable")
+  planesViajeComoDirector     PlanViaje[]            @relation("PlanViajeDirector")
 }
 
 model Proyecto {
@@ -275,7 +289,10 @@ model Solicitud {
 
   presupuestos SolicitudPresupuesto[]
 
-  planificaciones Planificacion[]
+  // ANEXO 1 del que nace una solicitud de viaje. Único: un plan alimenta una
+  // sola solicitud activa; al eliminar la solicitud se libera (null).
+  planViajeId Int?       @unique
+  planViaje   PlanViaje? @relation(fields: [planViajeId], references: [id])
 
   historialAprobaciones HistorialAprobacion[] @relation("SolicitudHistorial")
   notificaciones        Notificacion[]
@@ -313,9 +330,13 @@ model HistorialAprobacion {
   cuadroComparativoId Int?
   cuadroComparativo   CuadroComparativo? @relation("CuadroHistorial", fields: [cuadroComparativoId], references: [id])
 
+  planViajeId Int?
+  planViaje   PlanViaje? @relation("PlanViajeHistorial", fields: [planViajeId], references: [id])
+
   @@index([solicitudId])
   @@index([rendicionId])
   @@index([cuadroComparativoId])
+  @@index([planViajeId])
   @@index([usuarioId])
 }
 
@@ -337,6 +358,9 @@ model Notificacion {
 
   cuadroComparativoId Int?
   cuadroComparativo   CuadroComparativo? @relation(fields: [cuadroComparativoId], references: [id], onDelete: SetNull)
+
+  planViajeId Int?
+  planViaje   PlanViaje? @relation(fields: [planViajeId], references: [id], onDelete: SetNull)
 
   @@index([usuarioId, leida])
 }
@@ -516,6 +540,45 @@ model SolicitudPresupuesto {
   @@index([poaId])
 }
 
+/// ANEXO 1 — Plan de Viaje. Documento previo a la solicitud de viaje, con VoBo
+/// del Director de Programa. Sus actividades son filas de Planificacion.
+model PlanViaje {
+  id            Int             @id @default(autoincrement())
+  codigoPlan    String          @unique
+  /// Snapshot del cargo al crear el plan: un documento firmado no debe cambiar
+  /// si la persona cambia de puesto.
+  cargo         String
+  lugaresViaje  String
+  objetivoViaje String
+  lugarEmision  String          @default("La Paz")
+  fechaEmision  DateTime
+  estado        EstadoPlanViaje @default(BORRADOR)
+  /// Último motivo de observación del Director de Programa
+  observacion   String?
+
+  usuarioId Int
+  usuario   Usuario @relation("PlanViajeResponsable", fields: [usuarioId], references: [id])
+
+  directorProgramaId Int?
+  directorPrograma   Usuario? @relation("PlanViajeDirector", fields: [directorProgramaId], references: [id])
+
+  fechaAprobacion DateTime?
+
+  actividades    Planificacion[]
+  solicitud      Solicitud?
+  historial      HistorialAprobacion[] @relation("PlanViajeHistorial")
+  notificaciones Notificacion[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([usuarioId])
+  @@index([directorProgramaId])
+  @@index([estado])
+  @@index([deletedAt])
+}
+
 model Planificacion {
   id                            Int      @id @default(autoincrement())
   actividadProgramada           String
@@ -524,15 +587,22 @@ model Planificacion {
   fechaInicio                   DateTime
   fechaFin                      DateTime
   diasCalculados                Decimal  @db.Decimal(5, 2)
+  /// Opcionales solo por los planes migrados; los nuevos los exigen en el DTO
+  lugarSalida                   String?
+  lugarLlegada                  String?
+  /// Posición de la fila en el ANEXO 1
+  orden                         Int      @default(0)
 
-  solicitudId Int
-  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Cascade)
+  planViajeId Int
+  planViaje   PlanViaje @relation(fields: [planViajeId], references: [id], onDelete: Cascade)
   viaticos    Viatico[]
 
   personasExternas PersonaExterna[]
 
   // Nómina institucional: usuarios del sistema que participan en la actividad
   participantesInstitucionales Usuario[] @relation("PlanificacionParticipantes")
+
+  @@index([planViajeId])
 }
 
 model Concepto {

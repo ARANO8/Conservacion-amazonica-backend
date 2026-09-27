@@ -98,9 +98,11 @@ export interface Anexo2Fuente {
     tipoGasto: { nombre: string; codigo: string } | null;
   }[];
   hospedajes: { region: string; destino: string; costoTotal: Decimalish }[];
-  planificaciones: {
-    participantesInstitucionales: { id: number; nombreCompleto: string }[];
-  }[];
+  planViaje: {
+    actividades: {
+      participantesInstitucionales: { id: number; nombreCompleto: string }[];
+    }[];
+  } | null;
   personasExternas: { nombreCompleto: string }[];
   presupuestos: {
     poa: {
@@ -358,7 +360,7 @@ function clasificarOtrosGastos(fuente: Anexo2Fuente): Anexo2FilaOtroGasto[] {
 
 function viajeros(fuente: Anexo2Fuente): string[] {
   const institucionales = new Map<number, string>();
-  fuente.planificaciones.forEach((p) =>
+  (fuente.planViaje?.actividades ?? []).forEach((p) =>
     p.participantesInstitucionales.forEach((u) =>
       institucionales.set(u.id, u.nombreCompleto),
     ),

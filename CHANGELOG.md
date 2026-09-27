@@ -117,3 +117,11 @@
 
 > Estado al cierre de este changelog: backend `44ec7e4`, frontend `f55cd60` (26-Ago-2026).
 > A partir de aquí el trabajo se planifica en `specs/` (ver `CLAUDE.md`, *Flujo de trabajo*).
+
+## Plan de Viaje — ANEXO 1 (26 Sep) · spec 007
+
+- **Backend:** Módulo `planes-viaje`: el plan de viaje deja de ser el Paso 1 del wizard y pasa a ser un documento propio, con VoBo del Director de Programa (`EstadoPlanViaje`: `BORRADOR` → `ENVIADO` → `APROBADO` / `OBSERVADO`), ANEXO 1 en HTML y PDF (`anexo1.hbs`) y tres `TipoNotificacion` nuevos
+- **Backend:** `Planificacion` pasa a colgar de `PlanViaje` (con `lugarSalida`, `lugarLlegada` y `orden`); la solicitud de viaje nace de un plan aprobado y libre (`Solicitud.planViajeId`, 1:1) y toma de él lugares, objetivo, fechas y director. Viáticos y nómina de terceros se enlazan por id de actividad; la nómina se valida en la API contra lo declarado en el plan
+- **Backend:** El `update` de la solicitud ya no borra las actividades, y registra el historial `CORREGIDO`, que quedaba detrás del `return`
+- **Backend:** Migración con backfill: cada solicitud existente con planificación recibe un plan `APROBADO`
+- **Frontend:** Módulo `app/app/planes-viaje/` y Paso 1 del wizard como selección del plan aprobado; corrige el adaptador inverso, que perdía la actividad de los viáticos al editar una solicitud observada
