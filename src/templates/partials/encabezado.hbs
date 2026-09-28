@@ -3,6 +3,9 @@
   el anexo, el título en banda gris y, debajo, el código del documento.
   Uso: {{> encabezado anexo="ANEXO 1" titulo="PLANIFICACIÓN DE VIAJE" codigo=codigoPlan}}
   Parámetros opcionales: anexo, nota, codigo, referencia (otro documento).
+  Ojo: un parámetro que no se pasa se busca en los datos de la plantilla, así
+  que los datos de un documento no deben usar esos nombres (anexo, titulo,
+  nota, codigo, referencia) para otra cosa.
 --}}
 <table class="encabezado">
   <tr>

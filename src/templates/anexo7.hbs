@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ANEXO 7 {{codigoInforme}}</title>
+    {{> estilos-documento}}
+    <style>
+      .datos .etiqueta {
+        width: 38mm;
+      }
+      /* FECHA: | DEL | fecha | AL | fecha, en recuadros como el formato */
+      .rango {
+        border-collapse: collapse;
+        width: auto;
+      }
+      .rango td {
+        border: 1px solid #000000;
+        padding: 2px 8px;
+        min-width: 22mm;
+        text-align: center;
+      }
+      .rango td.b {
+        min-width: 14mm;
+      }
+      .informe {
+        margin-top: 3mm;
+        font-weight: bold;
+      }
+      .grilla {
+        margin-top: 1mm;
+        table-layout: fixed;
+      }
+      .grilla td {
+        height: 11mm;
+        vertical-align: middle;
+        word-wrap: break-word;
+      }
+      .nota-pie {
+        margin-top: 8mm;
+        border: 1px solid #000000;
+        background: #ffff99;
+        padding: 2mm 3mm;
+        font-weight: bold;
+        font-size: 7.5pt;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hoja">
+      {{> encabezado anexo="ANEXO 7" titulo="INFORME DE VIAJE" codigo=codigoInforme}}
+
+      <table class="datos">
+        <tr>
+          <td class="etiqueta">A:</td>
+          <td class="valor">{{destinatario}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">DE:</td>
+          <td class="valor">{{de}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">MOTIVO DEL VIAJE:</td>
+          <td class="valor">{{motivoViaje}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">LUGAR DE VIAJE:</td>
+          <td class="valor">{{lugarViaje}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">FECHA:</td>
+          <td style="padding-top: 3px">
+            <table class="rango">
+              <tr>
+                <td class="b">DEL</td>
+                <td>{{fechaDel}}</td>
+                <td class="b">AL</td>
+                <td>{{fechaAl}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+
+      <div class="informe">INFORME:</div>
+      <table class="grilla">
+        <colgroup>
+          <col style="width: 18%" />
+          <col style="width: 18%" />
+          <col style="width: 18%" />
+          <col style="width: 46%" />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>FECHAS</th>
+            <th>LUGAR</th>
+            <th>PERSONA/<br />INSTITUCION/<br />LUGAR</th>
+            <th>ACTIVIDADES REALIZADAS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each filas}}
+            <tr>
+              <td class="c">{{fecha}}</td>
+              <td>{{lugar}}</td>
+              <td>{{personaInstitucion}}</td>
+              <td class="pre">{{actividadesRealizadas}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+      </table>
+
+      <table class="emision">
+        <tr>
+          <td class="lugar">{{lugarEmision}}</td>
+          <td class="fecha i">{{fechaEmision}}</td>
+        </tr>
+      </table>
+
+      <table class="firmas no-romper">
+        <tr>
+          <td>
+            <div class="firma-linea">Preparado por</div>
+            <div class="firma-nombre">{{preparadoPor}}</div>
+          </td>
+          <td>
+            <div class="firma-linea">Revisado por</div>
+            <div class="firma-nombre">{{revisadoPor}}</div>
+          </td>
+          <td>
+            <div class="firma-linea">Aprobado por</div>
+            <div class="firma-nombre">&nbsp;</div>
+          </td>
+        </tr>
+      </table>
+
+      <div class="nota-pie no-romper">{{notaPie}}</div>
+    </div>
+  </body>
+</html>

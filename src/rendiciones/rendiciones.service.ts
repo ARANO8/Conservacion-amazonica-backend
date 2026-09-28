@@ -29,6 +29,15 @@ import { DESTINATARIO_ANEXOS } from '../common/constants/financial.constants';
 const RENDICION_INCLUDE = {
   solicitud: {
     include: {
+      // ANEXO 7 del viaje: la rendición lo muestra, o avisa si falta
+      informeViaje: {
+        select: {
+          id: true,
+          codigoInforme: true,
+          estado: true,
+          deletedAt: true,
+        },
+      },
       usuarioEmisor: {
         select: {
           id: true,

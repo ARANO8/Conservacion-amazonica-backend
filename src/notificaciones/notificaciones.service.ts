@@ -17,7 +17,10 @@ export type TipoNotificacion =
   | 'PAGO_REALIZADO'
   | 'PLAN_VIAJE_PENDIENTE'
   | 'PLAN_VIAJE_APROBADO'
-  | 'PLAN_VIAJE_OBSERVADO';
+  | 'PLAN_VIAJE_OBSERVADO'
+  | 'INFORME_VIAJE_PENDIENTE'
+  | 'INFORME_VIAJE_REVISADO'
+  | 'INFORME_VIAJE_OBSERVADO';
 
 @Injectable()
 export class NotificacionesService {
@@ -116,6 +119,7 @@ export class NotificacionesService {
     solicitudId?: number;
     cuadroComparativoId?: number;
     planViajeId?: number;
+    informeViajeId?: number;
     urlDestino?: string;
   }) {
     this.logger.log(
@@ -131,6 +135,7 @@ export class NotificacionesService {
         solicitudId: data.solicitudId,
         cuadroComparativoId: data.cuadroComparativoId,
         planViajeId: data.planViajeId,
+        informeViajeId: data.informeViajeId,
         urlDestino: data.urlDestino,
       },
       include: {

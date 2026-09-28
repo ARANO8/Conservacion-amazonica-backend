@@ -90,6 +90,10 @@ export const SOLICITUD_INCLUDE = {
   },
   hospedajes: true,
   personasExternas: true,
+  // ANEXO 7 del viaje: la rendición y el detalle lo muestran o avisan si falta
+  informeViaje: {
+    select: { id: true, codigoInforme: true, estado: true, deletedAt: true },
+  },
   rendicion: {
     select: {
       id: true,

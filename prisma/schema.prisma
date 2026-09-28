@@ -103,6 +103,17 @@ enum TipoNotificacion {
   PLAN_VIAJE_PENDIENTE
   PLAN_VIAJE_APROBADO
   PLAN_VIAJE_OBSERVADO
+  INFORME_VIAJE_PENDIENTE
+  INFORME_VIAJE_REVISADO
+  INFORME_VIAJE_OBSERVADO
+}
+
+/// Ciclo del Informe de Viaje (ANEXO 7): lo revisa el Director de Programa.
+enum EstadoInformeViaje {
+  BORRADOR
+  ENVIADO
+  OBSERVADO
+  REVISADO
 }
 
 /// Ciclo del Plan de Viaje (ANEXO 1). Estar vinculado a una solicitud no es un
@@ -141,7 +152,8 @@ model Usuario {
   pagosSolicitados            PagoParcial[]          @relation("PagoSolicitante")
   pagosPorAprobar             PagoParcial[]          @relation("PagoAprobador")
   pagosRegistrados            PagoParcial[]          @relation("PagoTesorero")
-  informesActividades         InformeActividades[]
+  informesViaje               InformeViaje[]         @relation("InformeViajeAutor")
+  informesViajeComoRevisor    InformeViaje[]         @relation("InformeViajeRevisor")
   declaracionesMovilidad      DeclaracionMovilidad[]
   planificacionesParticipadas Planificacion[]        @relation("PlanificacionParticipantes")
   planesViaje                 PlanViaje[]            @relation("PlanViajeResponsable")
@@ -294,6 +306,9 @@ model Solicitud {
   planViajeId Int?       @unique
   planViaje   PlanViaje? @relation(fields: [planViajeId], references: [id])
 
+  // ANEXO 7 de este viaje (lado inverso del 1:1)
+  informeViaje InformeViaje?
+
   historialAprobaciones HistorialAprobacion[] @relation("SolicitudHistorial")
   notificaciones        Notificacion[]
   rendicion             Rendicion?
@@ -333,6 +348,9 @@ model HistorialAprobacion {
   planViajeId Int?
   planViaje   PlanViaje? @relation("PlanViajeHistorial", fields: [planViajeId], references: [id])
 
+  informeViajeId Int?
+  informeViaje   InformeViaje? @relation("InformeViajeHistorial", fields: [informeViajeId], references: [id])
+
   @@index([solicitudId])
   @@index([rendicionId])
   @@index([cuadroComparativoId])
@@ -361,6 +379,9 @@ model Notificacion {
 
   planViajeId Int?
   planViaje   PlanViaje? @relation(fields: [planViajeId], references: [id], onDelete: SetNull)
+
+  informeViajeId Int?
+  informeViaje   InformeViaje? @relation(fields: [informeViajeId], references: [id], onDelete: SetNull)
 
   @@index([usuarioId, leida])
 }
@@ -393,31 +414,54 @@ model Rendicion {
   @@index([deletedAt])
 }
 
-/// Bitácora de actividades de un viaje (ANEXO 7). Es independiente: no cuelga
-/// de una rendición ni de una solicitud, sólo de su autor.
-model InformeActividades {
-  id            Int      @id @default(autoincrement())
-  codigoInforme String   @unique
+/// ANEXO 7 — Informe de Viaje: qué se hizo realmente en un viaje. Nace de su
+/// solicitud de viaje desembolsada (1:1) y lo revisa el Director de Programa.
+model InformeViaje {
+  id            Int                @id @default(autoincrement())
+  codigoInforme String             @unique
+  motivoViaje   String
+  lugarViaje    String
   fechaInicio   DateTime
   fechaFin      DateTime
+  lugarEmision  String             @default("La Paz")
+  fechaEmision  DateTime
+  estado        EstadoInformeViaje @default(BORRADOR)
+  /// Último motivo de observación del revisor
+  observacion   String?
+  fechaRevision DateTime?
 
   usuarioId Int
-  usuario   Usuario @relation(fields: [usuarioId], references: [id])
+  usuario   Usuario @relation("InformeViajeAutor", fields: [usuarioId], references: [id])
 
-  actividades ActividadInforme[]
+  /// Director de Programa que revisa ("Revisado por")
+  directorProgramaId Int?
+  directorPrograma   Usuario? @relation("InformeViajeRevisor", fields: [directorProgramaId], references: [id])
+
+  /// Opcional solo en la base: un informe eliminado suelta su solicitud cuando
+  /// otro la toma. La API lo exige al crear.
+  solicitudId Int?       @unique
+  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
+
+  actividades    ActividadInformeViaje[]
+  historial      HistorialAprobacion[]   @relation("InformeViajeHistorial")
+  notificaciones Notificacion[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   @@index([usuarioId])
+  @@index([directorProgramaId])
+  @@index([estado])
   @@index([deletedAt])
 }
 
-model ActividadInforme {
-  id                    Int                @id @default(autoincrement())
+model ActividadInformeViaje {
+  id                    Int          @id @default(autoincrement())
   informeId             Int
-  informe               InformeActividades @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  informe               InformeViaje @relation(fields: [informeId], references: [id], onDelete: Cascade)
+  /// Posición de la fila en el ANEXO 7
+  orden                 Int          @default(0)
   fecha                 DateTime
   lugar                 String
   personaInstitucion    String
