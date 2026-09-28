@@ -141,6 +141,17 @@ export class CreateGastoRendicionDto {
   @IsOptional()
   @IsEnum(TipoRetencionDto)
   tipoRetencion?: TipoRetencionDto;
+
+  @ApiPropertyOptional({
+    example: 7,
+    description:
+      'Hoja del ANEXO 5 de la que se importó este gasto LV (evita importarla dos veces)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  hojaLiquidacionId?: number;
 }
 
 export class CreateRendicionDto {

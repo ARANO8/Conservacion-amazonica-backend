@@ -106,6 +106,17 @@ enum TipoNotificacion {
   INFORME_VIAJE_PENDIENTE
   INFORME_VIAJE_REVISADO
   INFORME_VIAJE_OBSERVADO
+  LIQUIDACION_VIATICOS_PENDIENTE
+  LIQUIDACION_VIATICOS_REVISADA
+  LIQUIDACION_VIATICOS_OBSERVADA
+}
+
+/// Ciclo de la Liquidación de Viáticos (ANEXO 5) de un viaje.
+enum EstadoLiquidacionViaticos {
+  BORRADOR
+  ENVIADO
+  OBSERVADO
+  REVISADO
 }
 
 /// Ciclo del Informe de Viaje (ANEXO 7): lo revisa el Director de Programa.
@@ -134,6 +145,8 @@ model Usuario {
   nombreCompleto String
   rol            Rol       @default(USUARIO)
   cargo          String?
+  /// Cédula de identidad: la firma el beneficiario en el ANEXO 5
+  ci             String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
@@ -154,6 +167,9 @@ model Usuario {
   pagosRegistrados            PagoParcial[]          @relation("PagoTesorero")
   informesViaje               InformeViaje[]         @relation("InformeViajeAutor")
   informesViajeComoRevisor    InformeViaje[]         @relation("InformeViajeRevisor")
+  liquidacionesViaticos       LiquidacionViaticos[]  @relation("LiquidacionAutor")
+  liquidacionesComoRevisor    LiquidacionViaticos[]  @relation("LiquidacionRevisor")
+  hojasLiquidacion            HojaLiquidacion[]
   declaracionesMovilidad      DeclaracionMovilidad[]
   planificacionesParticipadas Planificacion[]        @relation("PlanificacionParticipantes")
   planesViaje                 PlanViaje[]            @relation("PlanViajeResponsable")
@@ -309,6 +325,9 @@ model Solicitud {
   // ANEXO 7 de este viaje (lado inverso del 1:1)
   informeViaje InformeViaje?
 
+  // ANEXO 5 de este viaje (lado inverso del 1:1)
+  liquidacionViaticos LiquidacionViaticos?
+
   historialAprobaciones HistorialAprobacion[] @relation("SolicitudHistorial")
   notificaciones        Notificacion[]
   rendicion             Rendicion?
@@ -351,6 +370,9 @@ model HistorialAprobacion {
   informeViajeId Int?
   informeViaje   InformeViaje? @relation("InformeViajeHistorial", fields: [informeViajeId], references: [id])
 
+  liquidacionViaticosId Int?
+  liquidacionViaticos   LiquidacionViaticos? @relation("LiquidacionHistorial", fields: [liquidacionViaticosId], references: [id])
+
   @@index([solicitudId])
   @@index([rendicionId])
   @@index([cuadroComparativoId])
@@ -382,6 +404,9 @@ model Notificacion {
 
   informeViajeId Int?
   informeViaje   InformeViaje? @relation(fields: [informeViajeId], references: [id], onDelete: SetNull)
+
+  liquidacionViaticosId Int?
+  liquidacionViaticos   LiquidacionViaticos? @relation(fields: [liquidacionViaticosId], references: [id], onDelete: SetNull)
 
   @@index([usuarioId, leida])
 }
@@ -470,6 +495,96 @@ model ActividadInformeViaje {
   @@index([informeId])
 }
 
+/// ANEXO 5 — Liquidación de Viáticos de un viaje: una hoja por persona del
+/// personal institucional. Nace de la solicitud desembolsada (1:1) y la revisa
+/// el Director de Programa.
+model LiquidacionViaticos {
+  id                Int                       @id @default(autoincrement())
+  codigoLiquidacion String                    @unique
+  lugarEmision      String                    @default("La Paz")
+  fechaEmision      DateTime
+  /// T/C Bs por USD con el que se convirtieron las tarifas en dólares
+  tipoCambio        Decimal                   @db.Decimal(10, 2)
+  estado            EstadoLiquidacionViaticos @default(BORRADOR)
+  observacion       String?
+  fechaRevision     DateTime?
+
+  usuarioId Int
+  usuario   Usuario @relation("LiquidacionAutor", fields: [usuarioId], references: [id])
+
+  directorProgramaId Int?
+  directorPrograma   Usuario? @relation("LiquidacionRevisor", fields: [directorProgramaId], references: [id])
+
+  /// Opcional solo en la base: una liquidación eliminada suelta su solicitud
+  /// cuando otra la toma. La API lo exige al crear.
+  solicitudId Int?       @unique
+  solicitud   Solicitud? @relation(fields: [solicitudId], references: [id])
+
+  hojas          HojaLiquidacion[]
+  historial      HistorialAprobacion[] @relation("LiquidacionHistorial")
+  notificaciones Notificacion[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([usuarioId])
+  @@index([directorProgramaId])
+  @@index([estado])
+  @@index([deletedAt])
+}
+
+/// El ANEXO 5 de una persona. Guarda cargo y C.I. copiados: un documento
+/// firmado no cambia si el usuario cambia después.
+model HojaLiquidacion {
+  id            Int      @id @default(autoincrement())
+  liquidacionId Int
+  orden         Int      @default(0)
+  usuarioId     Int
+  cargo         String
+  ci            String   @default("")
+  sede          String   @default("La Paz")
+  via           String   @default("")
+  escala        String   @default("")
+  motivoViaje   String
+  destino       String
+  fechaSalida   DateTime
+  fechaRetorno  DateTime
+  totalLiquido  Decimal  @db.Decimal(10, 2)
+  totalBruto    Decimal  @db.Decimal(10, 2)
+  rcIva         Decimal  @db.Decimal(10, 2)
+
+  liquidacion LiquidacionViaticos @relation(fields: [liquidacionId], references: [id], onDelete: Cascade)
+  usuario     Usuario             @relation(fields: [usuarioId], references: [id])
+  filas       FilaLiquidacion[]
+  gastos      GastoRendicion[]
+
+  @@unique([liquidacionId, usuarioId])
+  @@index([usuarioId])
+}
+
+/// Una tarifa del catálogo × porcentaje (100 o 50) × días.
+model FilaLiquidacion {
+  id                     Int     @id @default(autoincrement())
+  hojaId                 Int
+  orden                  Int     @default(0)
+  conceptoId             Int
+  porcentaje             Int     @default(100)
+  dias                   Decimal @db.Decimal(5, 1)
+  /// Tarifa líquida por día en Bs al liquidar (copia del catálogo)
+  tarifaLiquida          Decimal @db.Decimal(10, 2)
+  totalLiquido           Decimal @db.Decimal(10, 2)
+  totalBruto             Decimal @db.Decimal(10, 2)
+  /// Partida del viático de origen: a ella se imputa el gasto LV
+  solicitudPresupuestoId Int?
+
+  hoja     HojaLiquidacion       @relation(fields: [hojaId], references: [id], onDelete: Cascade)
+  concepto Concepto              @relation(fields: [conceptoId], references: [id])
+  partida  SolicitudPresupuesto? @relation(fields: [solicitudPresupuestoId], references: [id], onDelete: SetNull)
+
+  @@index([hojaId])
+}
+
 /// Declaración Jurada de Movilidad (ANEXO 6). Es independiente: no cuelga de una
 /// rendición ni de una solicitud, sólo de su autor. No confundir con
 /// `DeclaracionJurada`, que es un respaldo dentro de una rendición (ANEXO 4).
@@ -547,9 +662,14 @@ model GastoRendicion {
   partidaContableId Int?
   partidaContable   PartidaContable? @relation(fields: [partidaContableId], references: [id], onDelete: SetNull)
 
+  /// Hoja del ANEXO 5 de la que se importó este gasto LV (evita duplicarlo)
+  hojaLiquidacionId Int?
+  hojaLiquidacion   HojaLiquidacion? @relation(fields: [hojaLiquidacionId], references: [id], onDelete: SetNull)
+
   @@index([rendicionId])
   @@index([partidaId])
   @@index([partidaContableId])
+  @@index([hojaLiquidacionId])
 }
 
 model DeclaracionJurada {
@@ -575,10 +695,11 @@ model SolicitudPresupuesto {
   poaId Int
   poa   Poa @relation(fields: [poaId], references: [id])
 
-  viaticos        Viatico[]
-  gastos          Gasto[]
-  gastosCompra    GastoCompra[]
-  gastosRendicion GastoRendicion[]
+  viaticos         Viatico[]
+  gastos           Gasto[]
+  gastosCompra     GastoCompra[]
+  gastosRendicion  GastoRendicion[]
+  filasLiquidacion FilaLiquidacion[]
 
   @@unique([solicitudId, poaId])
   @@index([poaId])
@@ -650,14 +771,15 @@ model Planificacion {
 }
 
 model Concepto {
-  id                  Int       @id @default(autoincrement())
-  nombre              String    @unique
+  id                  Int               @id @default(autoincrement())
+  nombre              String            @unique
   // Tarifa líquida diaria, expresada en `moneda`. Las internacionales van en
   // USD y se convierten a Bs con el tipo de cambio vigente.
-  precioInstitucional Decimal   @db.Decimal(10, 2)
-  precioTerceros      Decimal   @db.Decimal(10, 2)
-  moneda              Moneda    @default(BOB)
+  precioInstitucional Decimal           @db.Decimal(10, 2)
+  precioTerceros      Decimal           @db.Decimal(10, 2)
+  moneda              Moneda            @default(BOB)
   viaticos            Viatico[]
+  filasLiquidacion    FilaLiquidacion[]
 }
 
 model Viatico {

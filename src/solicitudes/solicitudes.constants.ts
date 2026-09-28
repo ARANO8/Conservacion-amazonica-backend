@@ -94,6 +94,15 @@ export const SOLICITUD_INCLUDE = {
   informeViaje: {
     select: { id: true, codigoInforme: true, estado: true, deletedAt: true },
   },
+  // ANEXO 5 del viaje: la rendición importa sus hojas como gastos LV
+  liquidacionViaticos: {
+    select: {
+      id: true,
+      codigoLiquidacion: true,
+      estado: true,
+      deletedAt: true,
+    },
+  },
   rendicion: {
     select: {
       id: true,
