@@ -75,6 +75,8 @@ type SolicitudParaLiquidar = Prisma.SolicitudGetPayload<{
 /** Hoja con sus filas ya calculadas, lista para guardar. */
 interface HojaCalculada {
   dto: CreateHojaLiquidacionDto;
+  /** La del formulario o, si viene vacía, la del perfil del usuario */
+  ci: string;
   escala: string;
   totales: ReturnType<typeof totalizarHoja>;
   filas: {
@@ -216,10 +218,15 @@ export class LiquidacionesViaticosService {
         'Una persona no puede tener dos hojas en la misma liquidación',
       );
     }
-    const activos = await this.prisma.usuario.count({
-      where: { id: { in: usuarios }, deletedAt: null },
-    });
-    if (activos !== usuarios.length) {
+    const activos = new Map(
+      (
+        await this.prisma.usuario.findMany({
+          where: { id: { in: usuarios }, deletedAt: null },
+          select: { id: true, ci: true },
+        })
+      ).map((u) => [u.id, u.ci]),
+    );
+    if (activos.size !== usuarios.length) {
       throw new BadRequestException(
         'Una o más personas no existen o están inactivas',
       );
@@ -266,6 +273,7 @@ export class LiquidacionesViaticosService {
 
       return {
         dto,
+        ci: dto.ci?.trim() || activos.get(dto.usuarioId) || '',
         escala:
           dto.escala?.trim() ||
           escalaPredominante(
@@ -290,7 +298,7 @@ export class LiquidacionesViaticosService {
       orden,
       usuarioId: h.dto.usuarioId,
       cargo: h.dto.cargo.trim(),
-      ci: h.dto.ci?.trim() ?? '',
+      ci: h.ci,
       sede: h.dto.sede?.trim() || 'La Paz',
       via: h.dto.via?.trim() ?? '',
       escala: h.escala,
