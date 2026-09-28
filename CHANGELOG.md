@@ -138,3 +138,11 @@
 - **Backend:** Formato ANEXO 7 en HTML y PDF sobre la plantilla común; el informe nace de una solicitud de viaje propia y desembolsada (1:1), con precarga desde el plan de viaje; revisión del Director de Programa (`EstadoInformeViaje`) con historial y tres `TipoNotificacion` nuevos. El revisor propuesto se descarta si es Tesorero o el propio emisor
 - **Backend:** La solicitud y la rendición incluyen el informe de su viaje
 - **Frontend:** Formulario ANEXO 7 con selector de solicitud, bandeja "Por revisar", detalle idéntico al PDF, y aviso en la rendición cuando falta el informe (no bloquea)
+
+## Liquidación de Viáticos — ANEXO 5 (28 Sep) · spec 008
+
+- **Backend:** Módulo `liquidaciones-viaticos`: una liquidación por solicitud de viaje propia y desembolsada (1:1) con **una hoja por persona institucional**, precargada desde los viáticos y participantes de la solicitud con las tarifas vigentes del catálogo. Cálculo líquido primero (tarifa × días × 100/50 %), bruto = líquido ÷ 0,87 y RC-IVA como diferencia, siempre recalculado en el servidor
+- **Backend:** Revisión del Director de Programa (`EstadoLiquidacionViaticos`) con historial y tres `TipoNotificacion` nuevos; ANEXO 5 en HTML y PDF (`anexo5.hbs`) del viaje completo o de una persona, con "Revisado por" y el recuadro de firma y C.I. del beneficiario
+- **Backend:** `GET /liquidaciones-viaticos/solicitud/:id/gastos-lv` entrega la liquidación revisada como gastos `LV` (uno por hoja y partida); `GastoRendicion.hojaLiquidacionId` ata el gasto a su hoja. `Usuario.ci` nuevo; la hoja lo toma del perfil si viene vacío
+- **Frontend:** Módulo `app/app/liquidaciones-viaticos/` con formulario por persona y totales en vivo, advertencia (no bloqueante) si lo liquidado supera lo presupuestado, detalle con pestañas por persona y bandeja "Por revisar"
+- **Frontend:** La rendición importa los gastos `LV` de la liquidación revisada sin duplicarlos; campo C.I. en la gestión de usuarios
