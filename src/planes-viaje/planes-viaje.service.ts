@@ -6,7 +6,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
-  EstadoPlanViaje,
   EstadoSolicitud,
   Prisma,
   Rol,
@@ -14,27 +13,20 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from '../pdf/pdf.service';
-import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import {
   CreateActividadPlanDto,
   CreatePlanViajeDto,
 } from './dto/create-plan-viaje.dto';
 import { UpdatePlanViajeDto } from './dto/update-plan-viaje.dto';
-import { ObservarPlanViajeDto } from './dto/observar-plan-viaje.dto';
 import {
   PLAN_VIAJE_INCLUDE,
   PlanViajeCompleto,
 } from './planes-viaje.constants';
 import { construirAnexo1 } from './anexo1.builder';
+import { faltanteDelPlan, planCompleto } from './planes-viaje.helper';
 
 /** ADMIN y EJECUTIVO ven todos los planes; el resto, los propios. */
 const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
-
-/** Estados en los que el responsable edita el plan con libertad. */
-const ESTADOS_EDITABLES: EstadoPlanViaje[] = [
-  EstadoPlanViaje.BORRADOR,
-  EstadoPlanViaje.OBSERVADO,
-];
 
 interface UsuarioContexto {
   id: number;
@@ -42,8 +34,7 @@ interface UsuarioContexto {
 }
 
 export interface FiltrosPlanViaje {
-  estado?: EstadoPlanViaje;
-  /** Solo los propios, aprobados y libres: los que puede usar una solicitud */
+  /** Solo los propios, completos y libres: los que puede usar una solicitud */
   disponibles?: boolean;
 }
 
@@ -61,7 +52,6 @@ export class PlanesViajeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pdfService: PdfService,
-    private readonly notificaciones: NotificacionesService,
   ) {}
 
   private esVistaGlobal(rol: Rol): boolean {
@@ -84,8 +74,8 @@ export class PlanesViajeService {
 
   /**
    * Personal institucional sin repetidos, activo y sin exceder lo declarado.
-   * La coincidencia exacta con el conteo se exige al enviar (`estricto`): un
-   * borrador puede guardarse a medio completar.
+   * La coincidencia exacta con el conteo se exige si el plan ya respalda una
+   * solicitud (`estricto`); uno libre puede guardarse a medio completar.
    */
   private async validarParticipantes(
     actividades: CreateActividadPlanDto[],
@@ -134,34 +124,6 @@ export class PlanesViajeService {
     }
   }
 
-  private async validarDirector(
-    directorProgramaId: number | null | undefined,
-    responsableId: number,
-  ): Promise<void> {
-    if (directorProgramaId == null) return;
-
-    if (directorProgramaId === responsableId) {
-      throw new BadRequestException(
-        'El Director de Programa no puede ser el mismo responsable del viaje',
-      );
-    }
-    const director = await this.prisma.usuario.findFirst({
-      where: { id: directorProgramaId, deletedAt: null },
-      select: { id: true, rol: true },
-    });
-    if (!director) {
-      throw new BadRequestException(
-        'El Director de Programa seleccionado no existe o está inactivo',
-      );
-    }
-    // Será también quien revise la solicitud: misma regla que allí
-    if (director.rol === Rol.TESORERO) {
-      throw new BadRequestException(
-        'Dirección Financiera aprueba la solicitud: no puede ser designada como Director de Programa',
-      );
-    }
-  }
-
   private datosActividad(a: CreateActividadPlanDto, orden: number) {
     return {
       actividadProgramada: a.actividadProgramada.trim(),
@@ -206,7 +168,6 @@ export class PlanesViajeService {
 
     this.validarFechas(dto.actividades);
     await this.validarParticipantes(dto.actividades, false);
-    await this.validarDirector(dto.directorProgramaId, usuarioId);
 
     return this.prisma.$transaction(async (tx) => {
       const codigoPlan = await this.generarCodigo(tx);
@@ -220,7 +181,6 @@ export class PlanesViajeService {
           lugarEmision: dto.lugarEmision?.trim() || 'La Paz',
           fechaEmision: dto.fechaEmision,
           usuarioId,
-          directorProgramaId: dto.directorProgramaId ?? null,
         },
       });
 
@@ -258,47 +218,33 @@ export class PlanesViajeService {
 
     if (filtros.disponibles) {
       where.usuarioId = user.id;
-      where.estado = EstadoPlanViaje.APROBADO;
       where.OR = [
         { solicitud: null },
         { solicitud: { deletedAt: { not: null } } },
       ];
-    } else {
-      if (!this.esVistaGlobal(user.rol)) {
-        where.OR = [{ usuarioId: user.id }, { directorProgramaId: user.id }];
-      }
-      if (filtros.estado) where.estado = filtros.estado;
+    } else if (!this.esVistaGlobal(user.rol)) {
+      where.usuarioId = user.id;
     }
 
-    return this.prisma.planViaje.findMany({
+    const planes = await this.prisma.planViaje.findMany({
       where,
       include: PLAN_VIAJE_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
-  }
 
-  /** Bandeja de VoBo: planes enviados a mí. ADMIN ve todos los enviados. */
-  async findPendientes(user: UsuarioContexto) {
-    return this.prisma.planViaje.findMany({
-      where: {
-        deletedAt: null,
-        estado: EstadoPlanViaje.ENVIADO,
-        ...(user.rol === Rol.ADMIN ? {} : { directorProgramaId: user.id }),
-      },
-      include: PLAN_VIAJE_INCLUDE,
-      orderBy: { updatedAt: 'asc' },
-    });
+    // Prisma no compara el largo de una relación con una columna: lo
+    // completo se filtra aquí
+    return filtros.disponibles ? planes.filter(planCompleto) : planes;
   }
 
   /**
-   * Ven el plan su responsable, su director, ADMIN/EJECUTIVO y quien pueda ver
+   * Ven el plan su responsable, ADMIN/EJECUTIVO y quien pueda ver
    * la solicitud vinculada (mismo criterio que la solicitud: los roles
    * distintos de USUARIO, o el aprobador asignado).
    */
   private puedeVer(plan: PlanViajeCompleto, user: UsuarioContexto): boolean {
     if (this.esVistaGlobal(user.rol)) return true;
     if (plan.usuarioId === user.id) return true;
-    if (plan.directorProgramaId === user.id) return true;
 
     const solicitud = solicitudActiva(plan);
     if (!solicitud) return false;
@@ -337,24 +283,15 @@ export class PlanesViajeService {
   }
 
   /**
-   * Libre en BORRADOR/OBSERVADO. Un plan aprobado solo se corrige cuando la
-   * solicitud que alimenta fue observada: la solicitud se revalida al reenviarse.
+   * Libre mientras no respalde una solicitud. Vinculado, solo se corrige cuando
+   * la solicitud fue observada: la solicitud se revalida al reenviarse.
    */
   private validarEditable(plan: PlanViajeCompleto): void {
-    if (ESTADOS_EDITABLES.includes(plan.estado)) return;
-
     const solicitud = solicitudActiva(plan);
-    if (
-      plan.estado === EstadoPlanViaje.APROBADO &&
-      solicitud?.estado === EstadoSolicitud.OBSERVADO
-    ) {
-      return;
-    }
+    if (!solicitud || solicitud.estado === EstadoSolicitud.OBSERVADO) return;
 
     throw new BadRequestException(
-      plan.estado === EstadoPlanViaje.ENVIADO
-        ? 'El plan está esperando el VoBo del Director de Programa y no se puede editar'
-        : 'El plan ya fue aprobado; solo se puede corregir si su solicitud está observada',
+      `El plan respalda la solicitud ${solicitud.codigoSolicitud}; solo se puede corregir si esa solicitud está observada`,
     );
   }
 
@@ -362,12 +299,12 @@ export class PlanesViajeService {
     const plan = await this.findPropio(id, usuarioId);
     this.validarEditable(plan);
 
-    const corrigeAprobado = plan.estado === EstadoPlanViaje.APROBADO;
+    const corrigeVinculado = solicitudActiva(plan) !== null;
 
     if (dto.actividades) {
       this.validarFechas(dto.actividades);
-      // Un plan aprobado no vuelve a pasar por "enviar": se exige completo ya
-      await this.validarParticipantes(dto.actividades, corrigeAprobado);
+      // Un plan vinculado debe seguir sirviendo a su solicitud: completo ya
+      await this.validarParticipantes(dto.actividades, corrigeVinculado);
 
       const idsDelPlan = new Set(plan.actividades.map((a) => a.id));
       const ajena = dto.actividades.find(
@@ -378,18 +315,6 @@ export class PlanesViajeService {
           `La actividad ${ajena.id} no pertenece a este plan`,
         );
       }
-    }
-    if (dto.directorProgramaId !== undefined) {
-      // Una solicitud en curso ya tiene fijado a su director
-      if (
-        solicitudActiva(plan) &&
-        dto.directorProgramaId !== plan.directorProgramaId
-      ) {
-        throw new BadRequestException(
-          'No se puede cambiar el Director de Programa de un plan vinculado a una solicitud',
-        );
-      }
-      await this.validarDirector(dto.directorProgramaId, usuarioId);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -441,14 +366,11 @@ export class PlanesViajeService {
           objetivoViaje: dto.objetivoViaje?.trim() ?? plan.objetivoViaje,
           lugarEmision: dto.lugarEmision?.trim() || plan.lugarEmision,
           fechaEmision: dto.fechaEmision ?? plan.fechaEmision,
-          ...(dto.directorProgramaId !== undefined
-            ? { directorProgramaId: dto.directorProgramaId }
-            : {}),
         },
       });
 
-      // Corregir un plan aprobado no pide un nuevo VoBo, pero queda registrado
-      if (corrigeAprobado) {
+      // Corregir el plan de una solicitud observada queda registrado
+      if (corrigeVinculado) {
         await this.registrarHistorial(tx, {
           accion: TipoAccionHistorial.CORREGIDO,
           usuarioId,
@@ -462,144 +384,6 @@ export class PlanesViajeService {
         include: PLAN_VIAJE_INCLUDE,
       });
     });
-  }
-
-  async enviar(id: number, usuarioId: number) {
-    const plan = await this.findPropio(id, usuarioId);
-
-    if (!ESTADOS_EDITABLES.includes(plan.estado)) {
-      throw new BadRequestException(
-        `Solo se puede enviar un plan en borrador u observado (estado actual: ${plan.estado})`,
-      );
-    }
-    if (!plan.directorProgramaId) {
-      throw new BadRequestException(
-        'Selecciona al Director de Programa que dará el VoBo',
-      );
-    }
-    // Recién aquí la nómina institucional debe cuadrar con lo declarado
-    for (const a of plan.actividades) {
-      const seleccionados = a.participantesInstitucionales.length;
-      if (seleccionados !== a.cantidadPersonasInstitucional) {
-        throw new BadRequestException(
-          `En "${a.actividadProgramada}" declaraste ${a.cantidadPersonasInstitucional} persona(s) institucional(es) pero seleccionaste ${seleccionados}`,
-        );
-      }
-      if (!a.lugarSalida || !a.lugarLlegada) {
-        throw new BadRequestException(
-          `En "${a.actividadProgramada}" faltan el lugar de salida o el de llegada`,
-        );
-      }
-    }
-
-    const reenvio = plan.estado === EstadoPlanViaje.OBSERVADO;
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.planViaje.update({
-        where: { id },
-        data: { estado: EstadoPlanViaje.ENVIADO },
-      });
-      await this.registrarHistorial(tx, {
-        accion: reenvio
-          ? TipoAccionHistorial.CORREGIDO
-          : TipoAccionHistorial.ENVIADO,
-        usuarioId,
-        planViajeId: id,
-      });
-    });
-
-    await this.notificaciones.crearNotificacion({
-      titulo: 'Plan de viaje para VoBo',
-      mensaje: `${plan.usuario.nombreCompleto} ${reenvio ? 'corrigió y reenvió' : 'envió'} el plan ${plan.codigoPlan} para tu VoBo`,
-      tipo: 'PLAN_VIAJE_PENDIENTE',
-      usuarioId: plan.directorProgramaId,
-      planViajeId: id,
-      urlDestino: `/app/planes-viaje/${id}`,
-    });
-
-    this.logger.log(
-      `[enviar] planId=${id} | director=${plan.directorProgramaId}`,
-    );
-    return this.findOne(id);
-  }
-
-  /** Solo el Director de Programa asignado (o un ADMIN) da el VoBo. */
-  private async findParaVoBo(id: number, user: UsuarioContexto) {
-    const plan = await this.findOne(id);
-
-    if (plan.directorProgramaId !== user.id && user.rol !== Rol.ADMIN) {
-      throw new ForbiddenException(
-        'Solo el Director de Programa asignado puede dar el VoBo de este plan',
-      );
-    }
-    if (plan.estado !== EstadoPlanViaje.ENVIADO) {
-      throw new BadRequestException(
-        `El plan no está esperando VoBo (estado actual: ${plan.estado})`,
-      );
-    }
-    return plan;
-  }
-
-  async aprobar(id: number, user: UsuarioContexto) {
-    const plan = await this.findParaVoBo(id, user);
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.planViaje.update({
-        where: { id },
-        data: {
-          estado: EstadoPlanViaje.APROBADO,
-          observacion: null,
-          fechaAprobacion: new Date(),
-        },
-      });
-      await this.registrarHistorial(tx, {
-        accion: TipoAccionHistorial.APROBADO,
-        usuarioId: user.id,
-        planViajeId: id,
-      });
-    });
-
-    await this.notificaciones.crearNotificacion({
-      titulo: 'Plan de viaje aprobado',
-      mensaje: `Tu plan ${plan.codigoPlan} recibió el VoBo. Ya puedes crear la solicitud de viaje`,
-      tipo: 'PLAN_VIAJE_APROBADO',
-      usuarioId: plan.usuarioId,
-      planViajeId: id,
-      urlDestino: `/app/planes-viaje/${id}`,
-    });
-
-    this.logger.log(`[aprobar] planId=${id} | por=${user.id}`);
-    return this.findOne(id);
-  }
-
-  async observar(id: number, dto: ObservarPlanViajeDto, user: UsuarioContexto) {
-    const plan = await this.findParaVoBo(id, user);
-    const motivo = dto.motivo.trim();
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.planViaje.update({
-        where: { id },
-        data: { estado: EstadoPlanViaje.OBSERVADO, observacion: motivo },
-      });
-      await this.registrarHistorial(tx, {
-        accion: TipoAccionHistorial.OBSERVADO,
-        usuarioId: user.id,
-        planViajeId: id,
-        comentario: motivo,
-      });
-    });
-
-    await this.notificaciones.crearNotificacion({
-      titulo: 'Plan de viaje observado',
-      mensaje: `Tu plan ${plan.codigoPlan} fue observado: ${motivo}`,
-      tipo: 'PLAN_VIAJE_OBSERVADO',
-      usuarioId: plan.usuarioId,
-      planViajeId: id,
-      urlDestino: `/app/planes-viaje/${id}`,
-    });
-
-    this.logger.log(`[observar] planId=${id} | por=${user.id}`);
-    return this.findOne(id);
   }
 
   async remove(id: number, usuarioId: number) {
@@ -623,7 +407,7 @@ export class PlanesViajeService {
 
   /**
    * Plan con el que nace (o se corrige) una solicitud de viaje: del emisor,
-   * aprobado y libre. En la edición se admite la propia solicitud.
+   * completo y libre. En la edición se admite la propia solicitud.
    */
   async obtenerParaSolicitud(
     planViajeId: number,
@@ -645,9 +429,10 @@ export class PlanesViajeService {
         'Solo puedes usar tus propios planes de viaje',
       );
     }
-    if (plan.estado !== EstadoPlanViaje.APROBADO) {
+    const faltante = faltanteDelPlan(plan);
+    if (faltante) {
       throw new BadRequestException(
-        'El plan de viaje aún no tiene el VoBo del Director de Programa',
+        `El plan de viaje ${plan.codigoPlan} está incompleto. ${faltante}`,
       );
     }
     const vinculada = solicitudActiva(plan);

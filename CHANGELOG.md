@@ -146,3 +146,12 @@
 - **Backend:** `GET /liquidaciones-viaticos/solicitud/:id/gastos-lv` entrega la liquidación revisada como gastos `LV` (uno por hoja y partida); `GastoRendicion.hojaLiquidacionId` ata el gasto a su hoja. `Usuario.ci` nuevo; la hoja lo toma del perfil si viene vacío
 - **Frontend:** Módulo `app/app/liquidaciones-viaticos/` con formulario por persona y totales en vivo, advertencia (no bloqueante) si lo liquidado supera lo presupuestado, detalle con pestañas por persona y bandeja "Por revisar"
 - **Frontend:** La rendición importa los gastos `LV` de la liquidación revisada sin duplicarlos; campo C.I. en la gestión de usuarios
+
+## Plan de Viaje sin VoBo — ANEXO 1 (14 Oct) · spec 023
+
+- **Backend:** El plan de viaje deja de pasar por el VoBo del Director de Programa: se eliminan los endpoints `enviar`, `aprobar`, `observar` y `pendientes`, los campos `estado`, `observacion`, `fechaAprobacion` y `directorProgramaId`, el enum `EstadoPlanViaje` y los tres `TipoNotificacion` `PLAN_VIAJE_*`
+- **Backend:** Una solicitud de viaje puede nacer de cualquier plan propio, libre y **completo** (la nómina institucional cuadra y cada actividad tiene salida y llegada); `?disponibles=true` filtra por eso. El plan se edita libremente mientras no respalde una solicitud, y vinculado solo si esa solicitud está observada
+- **Backend:** El ANEXO 1 firma "VoBo. Director Ejecutivo" con `DESTINATARIO_ANEXOS` (Marcos F. Terán Valenzuela)
+- **Backend:** El Director de Programa de la solicitud de viaje lo elige el emisor; la API lo exige explícitamente
+- **Backend:** Migración: borra los planes `ENVIADO` (con su historial y notificaciones) y las notificaciones `PLAN_VIAJE_*`
+- **Frontend:** Planes de viaje sin bandeja "Por aprobar" ni acciones de VoBo; el listado muestra si cada plan está incompleto, disponible o vinculado; el Director de Programa se elige al enviar la solicitud

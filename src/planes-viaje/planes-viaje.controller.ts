@@ -7,7 +7,6 @@ import {
   Logger,
   Param,
   ParseBoolPipe,
-  ParseEnumPipe,
   ParseIntPipe,
   Patch,
   Post,
@@ -24,14 +23,13 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
-import { EstadoPlanViaje, Rol } from '@prisma/client';
+import { Rol } from '@prisma/client';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { PlanesViajeService } from './planes-viaje.service';
 import { CreatePlanViajeDto } from './dto/create-plan-viaje.dto';
 import { UpdatePlanViajeDto } from './dto/update-plan-viaje.dto';
-import { ObservarPlanViajeDto } from './dto/observar-plan-viaje.dto';
 
 interface RequestWithUser extends Request {
   user: {
@@ -66,30 +64,21 @@ export class PlanesViajeController {
   @Get()
   @ApiOperation({
     summary:
-      'Listar planes. ADMIN y EJECUTIVO ven todos; el resto, los propios y los que les enviaron para VoBo',
+      'Listar planes. ADMIN y EJECUTIVO ven todos; el resto, los propios',
   })
-  @ApiQuery({ name: 'estado', enum: EstadoPlanViaje, required: false })
   @ApiQuery({
     name: 'disponibles',
     type: Boolean,
     required: false,
     description:
-      'Solo los propios, aprobados y sin solicitud: los que puede usar una solicitud de viaje',
+      'Solo los propios, completos y sin solicitud: los que puede usar una solicitud de viaje',
   })
   findAll(
     @Req() req: RequestWithUser,
-    @Query('estado', new ParseEnumPipe(EstadoPlanViaje, { optional: true }))
-    estado?: EstadoPlanViaje,
     @Query('disponibles', new ParseBoolPipe({ optional: true }))
     disponibles?: boolean,
   ) {
-    return this.service.findAll(contexto(req), { estado, disponibles });
-  }
-
-  @Get('pendientes')
-  @ApiOperation({ summary: 'Planes enviados a mí para VoBo' })
-  findPendientes(@Req() req: RequestWithUser) {
-    return this.service.findPendientes(contexto(req));
+    return this.service.findAll(contexto(req), { disponibles });
   }
 
   @Get(':id')
@@ -132,7 +121,7 @@ export class PlanesViajeController {
   @Patch(':id')
   @ApiOperation({
     summary:
-      'Editar un plan propio (borrador u observado, o aprobado con su solicitud observada)',
+      'Editar un plan propio (libre, o vinculado a una solicitud observada)',
   })
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -140,28 +129,6 @@ export class PlanesViajeController {
     @Req() req: RequestWithUser,
   ) {
     return this.service.update(id, dto, req.user.userId);
-  }
-
-  @Post(':id/enviar')
-  @ApiOperation({ summary: 'Enviar el plan al Director de Programa para VoBo' })
-  enviar(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
-    return this.service.enviar(id, req.user.userId);
-  }
-
-  @Post(':id/aprobar')
-  @ApiOperation({ summary: 'Dar el VoBo al plan (Director de Programa)' })
-  aprobar(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
-    return this.service.aprobar(id, contexto(req));
-  }
-
-  @Post(':id/observar')
-  @ApiOperation({ summary: 'Observar el plan con un motivo' })
-  observar(
-    @Param('id', ParseIntPipe) id: number,
-    @Body() dto: ObservarPlanViajeDto,
-    @Req() req: RequestWithUser,
-  ) {
-    return this.service.observar(id, dto, contexto(req));
   }
 
   @Delete(':id')

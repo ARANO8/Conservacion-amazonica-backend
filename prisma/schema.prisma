@@ -100,9 +100,6 @@ enum TipoNotificacion {
   PAGO_PENDIENTE_APROBACION
   PAGO_OBSERVADO
   PAGO_REALIZADO
-  PLAN_VIAJE_PENDIENTE
-  PLAN_VIAJE_APROBADO
-  PLAN_VIAJE_OBSERVADO
   INFORME_VIAJE_PENDIENTE
   INFORME_VIAJE_REVISADO
   INFORME_VIAJE_OBSERVADO
@@ -129,13 +126,6 @@ enum EstadoInformeViaje {
 
 /// Ciclo del Plan de Viaje (ANEXO 1). Estar vinculado a una solicitud no es un
 /// estado: se deriva de la relación con Solicitud.
-enum EstadoPlanViaje {
-  BORRADOR
-  ENVIADO
-  OBSERVADO
-  APROBADO
-}
-
 // --- MODELOS ---
 
 model Usuario {
@@ -173,7 +163,6 @@ model Usuario {
   declaracionesMovilidad      DeclaracionMovilidad[]
   planificacionesParticipadas Planificacion[]        @relation("PlanificacionParticipantes")
   planesViaje                 PlanViaje[]            @relation("PlanViajeResponsable")
-  planesViajeComoDirector     PlanViaje[]            @relation("PlanViajeDirector")
 }
 
 model Proyecto {
@@ -708,26 +697,18 @@ model SolicitudPresupuesto {
 /// ANEXO 1 — Plan de Viaje. Documento previo a la solicitud de viaje, con VoBo
 /// del Director de Programa. Sus actividades son filas de Planificacion.
 model PlanViaje {
-  id            Int             @id @default(autoincrement())
-  codigoPlan    String          @unique
+  id            Int      @id @default(autoincrement())
+  codigoPlan    String   @unique
   /// Snapshot del cargo al crear el plan: un documento firmado no debe cambiar
   /// si la persona cambia de puesto.
   cargo         String
   lugaresViaje  String
   objetivoViaje String
-  lugarEmision  String          @default("La Paz")
+  lugarEmision  String   @default("La Paz")
   fechaEmision  DateTime
-  estado        EstadoPlanViaje @default(BORRADOR)
-  /// Último motivo de observación del Director de Programa
-  observacion   String?
 
   usuarioId Int
   usuario   Usuario @relation("PlanViajeResponsable", fields: [usuarioId], references: [id])
-
-  directorProgramaId Int?
-  directorPrograma   Usuario? @relation("PlanViajeDirector", fields: [directorProgramaId], references: [id])
-
-  fechaAprobacion DateTime?
 
   actividades    Planificacion[]
   solicitud      Solicitud?
@@ -739,8 +720,6 @@ model PlanViaje {
   deletedAt DateTime?
 
   @@index([usuarioId])
-  @@index([directorProgramaId])
-  @@index([estado])
   @@index([deletedAt])
 }
 

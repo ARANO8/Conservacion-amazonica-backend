@@ -77,7 +77,6 @@ export const SOLICITUD_INCLUDE = {
   // cronograma al que se asignan viáticos y nómina de terceros
   planViaje: {
     include: {
-      directorPrograma: { select: USER_SAFE_SELECT },
       actividades: {
         orderBy: { orden: 'asc' },
         include: {
