@@ -115,6 +115,18 @@ PLAN_VIAJE_OBSERVADO PLAN_VIAJE_OBSERVADO
 INFORME_VIAJE_PENDIENTE INFORME_VIAJE_PENDIENTE
 INFORME_VIAJE_REVISADO INFORME_VIAJE_REVISADO
 INFORME_VIAJE_OBSERVADO INFORME_VIAJE_OBSERVADO
+LIQUIDACION_VIATICOS_PENDIENTE LIQUIDACION_VIATICOS_PENDIENTE
+LIQUIDACION_VIATICOS_REVISADA LIQUIDACION_VIATICOS_REVISADA
+LIQUIDACION_VIATICOS_OBSERVADA LIQUIDACION_VIATICOS_OBSERVADA
+        }
+    
+
+
+        EstadoLiquidacionViaticos {
+            BORRADOR BORRADOR
+ENVIADO ENVIADO
+OBSERVADO OBSERVADO
+REVISADO REVISADO
         }
     
 
@@ -161,6 +173,7 @@ APROBADO APROBADO
     String nombreCompleto 
     Rol rol 
     String cargo "❓"
+    String ci "❓"
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
@@ -319,6 +332,50 @@ APROBADO APROBADO
     String lugar 
     String personaInstitucion 
     String actividadesRealizadas 
+    }
+  
+
+  "LiquidacionViaticos" {
+    Int id "🗝️"
+    String codigoLiquidacion 
+    String lugarEmision 
+    DateTime fechaEmision 
+    Decimal tipoCambio 
+    EstadoLiquidacionViaticos estado 
+    String observacion "❓"
+    DateTime fechaRevision "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
+  "HojaLiquidacion" {
+    Int id "🗝️"
+    Int orden 
+    String cargo 
+    String ci 
+    String sede 
+    String via 
+    String escala 
+    String motivoViaje 
+    String destino 
+    DateTime fechaSalida 
+    DateTime fechaRetorno 
+    Decimal totalLiquido 
+    Decimal totalBruto 
+    Decimal rcIva 
+    }
+  
+
+  "FilaLiquidacion" {
+    Int id "🗝️"
+    Int orden 
+    Int porcentaje 
+    Decimal dias 
+    Decimal tarifaLiquida 
+    Decimal totalLiquido 
+    Decimal totalBruto 
     }
   
 
@@ -645,12 +702,14 @@ APROBADO APROBADO
     "HistorialAprobacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
     "HistorialAprobacion" }o--|o "PlanViaje" : "planViaje"
     "HistorialAprobacion" }o--|o "InformeViaje" : "informeViaje"
+    "HistorialAprobacion" }o--|o "LiquidacionViaticos" : "liquidacionViaticos"
     "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Notificacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
     "Notificacion" }o--|o "PlanViaje" : "planViaje"
     "Notificacion" }o--|o "InformeViaje" : "informeViaje"
+    "Notificacion" }o--|o "LiquidacionViaticos" : "liquidacionViaticos"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
     "Rendicion" }o--|o "Usuario" : "aprobadorActual"
@@ -659,12 +718,22 @@ APROBADO APROBADO
     "InformeViaje" }o--|o "Usuario" : "directorPrograma"
     "InformeViaje" |o--|o "Solicitud" : "solicitud"
     "ActividadInformeViaje" }o--|| "InformeViaje" : "informe"
+    "LiquidacionViaticos" |o--|| "EstadoLiquidacionViaticos" : "enum:estado"
+    "LiquidacionViaticos" }o--|| "Usuario" : "usuario"
+    "LiquidacionViaticos" }o--|o "Usuario" : "directorPrograma"
+    "LiquidacionViaticos" |o--|o "Solicitud" : "solicitud"
+    "HojaLiquidacion" }o--|| "LiquidacionViaticos" : "liquidacion"
+    "HojaLiquidacion" }o--|| "Usuario" : "usuario"
+    "FilaLiquidacion" }o--|| "HojaLiquidacion" : "hoja"
+    "FilaLiquidacion" }o--|| "Concepto" : "concepto"
+    "FilaLiquidacion" }o--|o "SolicitudPresupuesto" : "partida"
     "DeclaracionMovilidad" }o--|| "Usuario" : "usuario"
     "DetalleMovilidad" }o--|| "DeclaracionMovilidad" : "declaracion"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoRendicion" }o--|| "Rendicion" : "rendicion"
     "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"
     "GastoRendicion" }o--|o "PartidaContable" : "partidaContable"
+    "GastoRendicion" }o--|o "HojaLiquidacion" : "hojaLiquidacion"
     "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"

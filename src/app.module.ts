@@ -28,6 +28,7 @@ import { InformesViajeModule } from './informes-viaje/informes-viaje.module';
 import { DeclaracionesMovilidadModule } from './declaraciones-movilidad/declaraciones-movilidad.module';
 import { HealthModule } from './health/health.module';
 import { PlanesViajeModule } from './planes-viaje/planes-viaje.module';
+import { LiquidacionesViaticosModule } from './liquidaciones-viaticos/liquidaciones-viaticos.module';
 
 const DEFAULT_THROTTLE_TTL_MS = 60000;
 const DEFAULT_THROTTLE_LIMIT = 10;
@@ -89,6 +90,7 @@ function getPositiveIntFromEnv(
     InformesViajeModule,
     DeclaracionesMovilidadModule,
     PlanesViajeModule,
+    LiquidacionesViaticosModule,
     HealthModule,
   ],
   providers: [

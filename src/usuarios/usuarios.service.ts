@@ -16,6 +16,7 @@ export class UsuariosService {
     email: true,
     rol: true,
     cargo: true,
+    ci: true,
     createdAt: true,
     updatedAt: true,
     deletedAt: true,

@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ANEXO 5 {{codigoLiquidacion}}</title>
+    {{> estilos-documento}}
+    <style>
+      /* Una hoja por persona: cada una empieza en página nueva */
+      .hoja + .hoja {
+        page-break-before: always;
+        break-before: page;
+      }
+      @media screen {
+        .hoja + .hoja {
+          margin-top: 10mm;
+          padding-top: 10mm;
+          border-top: 1px dashed #bfbfbf;
+        }
+      }
+      .i {
+        font-style: italic;
+      }
+      .cabecera-derecha {
+        width: 60%;
+        margin-left: auto;
+        margin-top: -2mm;
+      }
+      .cabecera-derecha td {
+        padding: 1px 0;
+      }
+      .cabecera-derecha .etiqueta {
+        width: 28mm;
+        font-weight: bold;
+        font-style: italic;
+        text-align: right;
+        padding-right: 3mm;
+      }
+      .cabecera-derecha .valor {
+        border-bottom: 1px solid #bfbfbf;
+        font-style: italic;
+      }
+      .lugar-fecha {
+        margin-top: 4mm;
+      }
+      .lugar-fecha td {
+        padding: 2px 0;
+        font-style: italic;
+      }
+      .lugar-fecha .etiqueta {
+        font-weight: bold;
+        width: 38mm;
+      }
+      .lugar-fecha .valor {
+        border-bottom: 1px solid #bfbfbf;
+      }
+      /* Cuerpo: marco grueso, dos columnas */
+      .cuerpo {
+        margin-top: 4mm;
+        border: 2px solid #000000;
+        table-layout: fixed;
+        font-style: italic;
+      }
+      .cuerpo > tbody > tr > td {
+        vertical-align: top;
+        padding: 0;
+      }
+      .cuerpo .izquierda {
+        width: 43%;
+        border-right: 2px solid #000000;
+      }
+      .datos-persona td {
+        padding: 3px 4px;
+        border-bottom: 1px solid #d9d9d9;
+        vertical-align: top;
+      }
+      .datos-persona .etiqueta {
+        font-weight: bold;
+        width: 34mm;
+      }
+      .datos-persona .motivo {
+        height: 26mm;
+      }
+      .liquidacion th {
+        font-weight: bold;
+        text-align: center;
+        padding: 3px 4px;
+      }
+      .liquidacion .titulo-liq {
+        text-decoration: underline;
+      }
+      .liquidacion td {
+        padding: 3px 4px;
+      }
+      .liquidacion .fila td {
+        border-right: 1px solid #000000;
+        border-top: 1px solid #000000;
+        height: 6mm;
+      }
+      .liquidacion .fila td:last-child {
+        border-right: none;
+      }
+      .liquidacion .desc {
+        font-size: 7.5pt;
+      }
+      .liquidacion .total td {
+        border-top: 1px solid #000000;
+        font-weight: bold;
+      }
+      .liquidacion .son td {
+        border-top: 1px solid #000000;
+      }
+      .firmas-pie {
+        margin-top: 18mm;
+        table-layout: fixed;
+      }
+      .firmas-pie td {
+        text-align: center;
+        font-weight: bold;
+        font-style: italic;
+        padding: 0 3mm;
+      }
+      .firmas-pie .linea {
+        border-top: 1px solid #bfbfbf;
+        padding-top: 1px;
+      }
+      .firmas-pie .nombre {
+        font-weight: normal;
+        font-size: 7.5pt;
+      }
+      .beneficiario {
+        margin-top: 10mm;
+        border: 1px solid #000000;
+        font-style: italic;
+      }
+      .beneficiario td {
+        border-bottom: 1px solid #d9d9d9;
+        padding: 3mm 3mm;
+      }
+      .beneficiario .etiqueta {
+        width: 32mm;
+        font-weight: bold;
+        border-right: 1px solid #d9d9d9;
+      }
+    </style>
+  </head>
+  <body>
+    {{#each hojas}}
+      <div class="hoja">
+        {{> encabezado anexo="ANEXO 5" titulo="LIQUIDACIÓN DE VIÁTICOS" nota="(Expresado en Bolivianos)" codigo=codigo}}
+
+        <table class="cabecera-derecha">
+          <tr>
+            <td class="etiqueta">PROYECTO:</td>
+            <td class="valor">{{proyecto}}</td>
+          </tr>
+          <tr>
+            <td class="etiqueta">ACTIVIDAD:</td>
+            <td class="valor">{{actividad}}</td>
+          </tr>
+        </table>
+
+        <table class="lugar-fecha">
+          <tr>
+            <td class="etiqueta">Lugar y Fecha:</td>
+            <td class="valor r">{{lugarEmision}} {{fechaEmision}}</td>
+            <td class="etiqueta r" style="width: 36mm; padding-right: 2mm">T/C:1 $us=Bs.</td>
+            <td class="valor" style="width: 24mm">{{tipoCambio}}</td>
+          </tr>
+        </table>
+
+        <table class="cuerpo">
+          <tr>
+            <td class="izquierda">
+              <table class="datos-persona">
+                <tr>
+                  <td class="etiqueta">Nombre:</td>
+                  <td>{{nombre}}</td>
+                </tr>
+                <tr>
+                  <td class="etiqueta">Cargo:</td>
+                  <td>{{cargo}}</td>
+                </tr>
+                <tr>
+                  <td class="etiqueta">Sede: {{sede}}</td>
+                  <td><strong>Vía:</strong> {{via}}</td>
+                </tr>
+                <tr>
+                  <td class="etiqueta motivo">Motivo de Viaje:</td>
+                  <td class="motivo">{{motivoViaje}}</td>
+                </tr>
+                <tr>
+                  <td class="etiqueta">Fecha de Salida:</td>
+                  <td>{{fechaSalida}}</td>
+                </tr>
+                <tr>
+                  <td class="etiqueta">Fecha de Retorno:</td>
+                  <td>{{fechaRetorno}}</td>
+                </tr>
+                {{#each diasPorEscala}}
+                  <tr>
+                    <td class="etiqueta">No. Días {{escala}}:</td>
+                    <td>{{dias}}</td>
+                  </tr>
+                {{/each}}
+                <tr>
+                  <td class="etiqueta">Destino:</td>
+                  <td>{{destino}}</td>
+                </tr>
+              </table>
+            </td>
+            <td>
+              <table class="liquidacion">
+                <tr>
+                  <th colspan="4" class="titulo-liq">LIQUIDACIÓN EN BOLIVIANOS</th>
+                </tr>
+                <tr>
+                  <td colspan="4" class="c"><strong>Escala:</strong> {{escala}}</td>
+                </tr>
+                <tr>
+                  <th style="width: 38%">Descripción</th>
+                  <th style="width: 20%">No: Días+Pers</th>
+                  <th style="width: 20%">Importe día</th>
+                  <th style="width: 22%">TOTAL</th>
+                </tr>
+                {{#each filas}}
+                  <tr class="fila">
+                    <td class="desc">{{descripcion}}</td>
+                    <td class="c">{{dias}}</td>
+                    <td class="r">{{importeDia}}</td>
+                    <td class="r">{{total}}</td>
+                  </tr>
+                {{/each}}
+                <tr class="total">
+                  <td colspan="3" class="c">TOTAL VIÁTICO</td>
+                  <td class="r">{{totalViatico}}</td>
+                </tr>
+                <tr class="total">
+                  <td colspan="3"><strong>Menos:</strong> <span style="font-weight: normal">Retención del RC-IVA 13%</span></td>
+                  <td class="r">{{rcIva}}</td>
+                </tr>
+                <tr class="total">
+                  <td colspan="3" class="c">TOTAL A PAGAR</td>
+                  <td class="r">{{totalPagar}}</td>
+                </tr>
+                <tr class="son">
+                  <td class="r"><strong>SON:</strong></td>
+                  <td colspan="3">{{son}}</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+        <table class="firmas-pie no-romper">
+          <tr>
+            <td>
+              <div class="linea">REVISADO POR</div>
+              <div class="nombre">{{revisadoPor}}</div>
+            </td>
+            <td></td>
+            <td>
+              <div class="linea">APROBADO POR</div>
+            </td>
+          </tr>
+        </table>
+
+        <table class="beneficiario no-romper">
+          <tr>
+            <td class="etiqueta">FIRMA</td>
+            <td>&nbsp;</td>
+          </tr>
+          <tr>
+            <td class="etiqueta">NOMBRE</td>
+            <td>{{nombre}}</td>
+          </tr>
+          <tr>
+            <td class="etiqueta">Nº C. I.</td>
+            <td>{{ci}}</td>
+          </tr>
+        </table>
+      </div>
+    {{/each}}
+  </body>
+</html>
