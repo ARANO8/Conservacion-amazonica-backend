@@ -24,6 +24,7 @@ import {
 } from './planes-viaje.constants';
 import { construirAnexo1 } from './anexo1.builder';
 import { faltanteDelPlan, planCompleto } from './planes-viaje.helper';
+import { etiquetaSede } from '../common/constants/sede.constants';
 
 /** ADMIN y EJECUTIVO ven todos los planes; el resto, los propios. */
 const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
@@ -160,7 +161,7 @@ export class PlanesViajeService {
   async create(dto: CreatePlanViajeDto, usuarioId: number) {
     const autor = await this.prisma.usuario.findFirst({
       where: { id: usuarioId, deletedAt: null },
-      select: { cargo: true },
+      select: { cargo: true, sede: true },
     });
     if (!autor) {
       throw new NotFoundException(`Usuario ${usuarioId} no encontrado`);
@@ -178,7 +179,8 @@ export class PlanesViajeService {
           cargo: dto.cargo?.trim() || autor.cargo || '',
           lugaresViaje: dto.lugaresViaje.trim(),
           objetivoViaje: dto.objetivoViaje.trim(),
-          lugarEmision: dto.lugarEmision?.trim() || 'La Paz',
+          // Sin lugar explícito, el de la sede del responsable
+          lugarEmision: dto.lugarEmision?.trim() || etiquetaSede(autor.sede),
           fechaEmision: dto.fechaEmision,
           usuarioId,
         },

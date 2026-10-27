@@ -126,6 +126,13 @@ enum EstadoInformeViaje {
 
 /// Ciclo del Plan de Viaje (ANEXO 1). Estar vinculado a una solicitud no es un
 /// estado: se deriva de la relación con Solicitud.
+/// Sede de trabajo del personal de ACEAA
+enum Sede {
+  LA_PAZ
+  TRINIDAD
+  COBIJA
+}
+
 // --- MODELOS ---
 
 model Usuario {
@@ -137,6 +144,8 @@ model Usuario {
   cargo          String?
   /// Cédula de identidad: la firma el beneficiario en el ANEXO 5
   ci             String?
+  /// Propone el lugar de emisión de sus documentos (ANEXO 1)
+  sede           Sede?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?

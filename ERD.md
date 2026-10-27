@@ -137,6 +137,14 @@ REVISADO REVISADO
     
 
 
+        Sede {
+            LA_PAZ LA_PAZ
+TRINIDAD TRINIDAD
+COBIJA COBIJA
+        }
+    
+
+
         TipoCotizacion {
             PROPIA PROPIA
 EXTERNA EXTERNA
@@ -162,6 +170,7 @@ APROBADO APROBADO
     Rol rol 
     String cargo "❓"
     String ci "❓"
+    Sede sede "❓"
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
@@ -662,6 +671,7 @@ APROBADO APROBADO
     }
   
     "Usuario" |o--|| "Rol" : "enum:rol"
+    "Usuario" |o--|o "Sede" : "enum:sede"
     "Usuario" o{--}o "Planificacion" : ""
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
     "PartidaContable" |o--|o "PartidaContable" : "parent"

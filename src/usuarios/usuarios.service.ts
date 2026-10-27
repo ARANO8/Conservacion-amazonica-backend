@@ -17,6 +17,7 @@ export class UsuariosService {
     rol: true,
     cargo: true,
     ci: true,
+    sede: true,
     createdAt: true,
     updatedAt: true,
     deletedAt: true,
@@ -53,6 +54,7 @@ export class UsuariosService {
         email: true,
         rol: true,
         cargo: true,
+        sede: true,
       },
     });
   }
