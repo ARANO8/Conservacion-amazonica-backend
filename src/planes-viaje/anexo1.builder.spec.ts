@@ -10,7 +10,6 @@ describe('construirAnexo1', () => {
     lugarEmision: 'La Paz',
     fechaEmision: new Date('2026-10-28T00:00:00.000Z'),
     usuario: { nombreCompleto: 'Ana Rojas' },
-    directorPrograma: { nombreCompleto: 'Luis Vaca' },
     actividades: [
       {
         fechaInicio: new Date('2026-11-03T00:00:00.000Z'),
@@ -64,11 +63,11 @@ describe('construirAnexo1', () => {
     expect(anexo.filas[MIN_FILAS_ANEXO1 - 1].actividad).toBe('');
   });
 
-  it('firma con el responsable y el Director de Programa', () => {
+  it('firma con el responsable y el VoBo del Director Ejecutivo', () => {
     const anexo = construirAnexo1(fuente);
 
     expect(anexo.responsable).toBe('Ana Rojas');
-    expect(anexo.directorPrograma).toBe('Luis Vaca');
+    expect(anexo.directorEjecutivo).toBe('Marcos F. Terán Valenzuela');
     expect(anexo.fechaEmision).toBe('28/10/2026');
   });
 });

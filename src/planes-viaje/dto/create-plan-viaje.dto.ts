@@ -116,15 +116,6 @@ export class CreatePlanViajeDto {
   @IsDate()
   fechaEmision: Date;
 
-  @ApiPropertyOptional({
-    example: 2,
-    description:
-      'Director de Programa que dará el VoBo. Obligatorio para enviar el plan',
-  })
-  @IsOptional()
-  @IsInt()
-  directorProgramaId?: number;
-
   @ApiProperty({ type: [CreateActividadPlanDto] })
   @IsArray()
   @ArrayMinSize(1, { message: 'Debes agregar al menos una actividad' })

@@ -43,7 +43,7 @@ export function tarifaEnBolivianos(
 
 /**
  * Campo "A:" de los anexos: todos los documentos van dirigidos al Director
- * Ejecutivo, escrito tal como lo pide ACEAA.
+ * Ejecutivo, escrito tal como lo pide ACEAA. También firma el VoBo del ANEXO 1.
  */
 export const DESTINATARIO_ANEXOS = 'Marcos F. Terán Valenzuela';
 

@@ -163,7 +163,7 @@ export class SolicitudesService {
     if (tipo !== TipoSolicitud.VIAJE) return null;
     if (!planViajeId) {
       throw new BadRequestException(
-        'Una solicitud de viaje debe nacer de un plan de viaje (ANEXO 1) aprobado',
+        'Una solicitud de viaje debe nacer de un plan de viaje (ANEXO 1)',
       );
     }
     return this.planesViajeService.obtenerParaSolicitud(
@@ -575,11 +575,10 @@ export class SolicitudesService {
     } = createSolicitudDto;
     const tipo = createSolicitudDto.tipo ?? TipoSolicitud.VIAJE;
 
-    // Un viaje nace de su plan (ANEXO 1): el Director de Programa que le dio
-    // el VoBo es quien revisa la solicitud, aunque el cliente envíe otro.
+    // Un viaje nace de su plan (ANEXO 1). El plan no tiene VoBo: el Director
+    // de Programa que revisa la solicitud lo elige el emisor al enviarla.
     const plan = await this.resolverPlanViaje(tipo, planViajeId, usuarioId);
-    const aprobadorId =
-      plan?.directorProgramaId ?? createSolicitudDto.aprobadorId;
+    const aprobadorId = createSolicitudDto.aprobadorId;
 
     this.logger.log(
       `[create] INICIO — usuarioId=${usuarioId}, aprobadorId=${aprobadorId}, poaIds=${JSON.stringify(poaIds)}`,
@@ -590,6 +589,15 @@ export class SolicitudesService {
     const esContratoConsultoria = esConsultoria(createSolicitudDto);
 
     if (!esContratoConsultoria) {
+      // Sin id, la búsqueda del aprobador devolvería a cualquier usuario
+      if (aprobadorId === undefined) {
+        throw new BadRequestException(
+          tipo === TipoSolicitud.VIAJE
+            ? 'Elige al Director de Programa que revisará la solicitud'
+            : 'Debes asignar un aprobador a la solicitud',
+        );
+      }
+
       // VALIDACIÓN: Evitar Auto-Aprobación
       if (aprobadorId === usuarioId) {
         throw new BadRequestException(

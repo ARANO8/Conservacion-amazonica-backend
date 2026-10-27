@@ -109,9 +109,6 @@ CUADRO_APROBADO CUADRO_APROBADO
 PAGO_PENDIENTE_APROBACION PAGO_PENDIENTE_APROBACION
 PAGO_OBSERVADO PAGO_OBSERVADO
 PAGO_REALIZADO PAGO_REALIZADO
-PLAN_VIAJE_PENDIENTE PLAN_VIAJE_PENDIENTE
-PLAN_VIAJE_APROBADO PLAN_VIAJE_APROBADO
-PLAN_VIAJE_OBSERVADO PLAN_VIAJE_OBSERVADO
 INFORME_VIAJE_PENDIENTE INFORME_VIAJE_PENDIENTE
 INFORME_VIAJE_REVISADO INFORME_VIAJE_REVISADO
 INFORME_VIAJE_OBSERVADO INFORME_VIAJE_OBSERVADO
@@ -136,15 +133,6 @@ REVISADO REVISADO
 ENVIADO ENVIADO
 OBSERVADO OBSERVADO
 REVISADO REVISADO
-        }
-    
-
-
-        EstadoPlanViaje {
-            BORRADOR BORRADOR
-ENVIADO ENVIADO
-OBSERVADO OBSERVADO
-APROBADO APROBADO
         }
     
 
@@ -448,9 +436,6 @@ APROBADO APROBADO
     String objetivoViaje 
     String lugarEmision 
     DateTime fechaEmision 
-    EstadoPlanViaje estado 
-    String observacion "❓"
-    DateTime fechaAprobacion "❓"
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
@@ -737,9 +722,7 @@ APROBADO APROBADO
     "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
-    "PlanViaje" |o--|| "EstadoPlanViaje" : "enum:estado"
     "PlanViaje" }o--|| "Usuario" : "usuario"
-    "PlanViaje" }o--|o "Usuario" : "directorPrograma"
     "Planificacion" }o--|| "PlanViaje" : "planViaje"
     "Planificacion" o{--}o "Viatico" : ""
     "Concepto" |o--|| "Moneda" : "enum:moneda"

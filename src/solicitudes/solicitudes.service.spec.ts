@@ -169,7 +169,6 @@ describe('SolicitudesService', () => {
       id: 4,
       lugaresViaje: 'Riberalta',
       objetivoViaje: 'Monitoreo de biodiversidad',
-      directorProgramaId: 7,
       actividades: [
         {
           id: 12,
@@ -215,6 +214,20 @@ describe('SolicitudesService', () => {
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(planesViajeMock.obtenerParaSolicitud).not.toHaveBeenCalled();
+    });
+
+    it('exige elegir al Director de Programa: el plan ya no lo trae', async () => {
+      await expect(
+        service.create(
+          {
+            tipo: TipoSolicitud.VIAJE,
+            planViajeId: PLAN.id,
+            poaIds: [10],
+          } as never,
+          42,
+        ),
+      ).rejects.toThrow(/Elige al Director de Programa/);
+      expect(prismaMock.usuario.findFirst).not.toHaveBeenCalled();
     });
 
     describe('corregir una solicitud observada', () => {

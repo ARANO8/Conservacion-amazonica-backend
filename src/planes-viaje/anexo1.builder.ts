@@ -1,4 +1,7 @@
-import { LOCALE_DEFAULT } from '../common/constants/financial.constants';
+import {
+  DESTINATARIO_ANEXOS,
+  LOCALE_DEFAULT,
+} from '../common/constants/financial.constants';
 import { MIN_FILAS_ANEXO1 } from './planes-viaje.constants';
 
 /** Lo mínimo del plan que necesita el ANEXO 1 impreso. */
@@ -10,7 +13,6 @@ export interface Anexo1Fuente {
   lugarEmision: string;
   fechaEmision: Date;
   usuario: { nombreCompleto: string };
-  directorPrograma: { nombreCompleto: string } | null;
   actividades: {
     fechaInicio: Date;
     fechaFin: Date;
@@ -41,7 +43,8 @@ export interface Anexo1 {
   lugarEmision: string;
   fechaEmision: string;
   responsable: string;
-  directorPrograma: string;
+  /** Firma el VoBo en papel; no interviene en el sistema */
+  directorEjecutivo: string;
 }
 
 /**
@@ -99,6 +102,6 @@ export function construirAnexo1(fuente: Anexo1Fuente): Anexo1 {
     lugarEmision: fuente.lugarEmision,
     fechaEmision: formatFechaAnexo(fuente.fechaEmision),
     responsable: fuente.usuario.nombreCompleto,
-    directorPrograma: fuente.directorPrograma?.nombreCompleto ?? '',
+    directorEjecutivo: DESTINATARIO_ANEXOS,
   };
 }
