@@ -36,7 +36,7 @@ export function documentoPdf(
 }
 
 /** Parciales de `templates/partials/` que comparten todos los documentos. */
-const PARCIALES = ['estilos-documento', 'encabezado', 'logos'];
+const PARCIALES = ['estilos-documento', 'encabezado', 'logo-aceaa', 'logo-amz'];
 
 /** Margen uniforme de todos los documentos, vertical y apaisado. */
 const MARGEN_MM = 12;

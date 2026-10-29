@@ -1,6 +1,6 @@
 {{!--
-  Encabezado común: logos de ACEAA y de AMZ desk a la izquierda; a la derecha
-  el anexo, el título en banda gris y, debajo, el código del documento.
+  Encabezado común: logo de ACEAA a la izquierda y de AMZ desk a la derecha;
+  al centro el anexo, el título en banda gris y, debajo, el código del documento.
   Uso: {{> encabezado anexo="ANEXO 1" titulo="PLANIFICACIÓN DE VIAJE" codigo=codigoPlan}}
   Parámetros opcionales: anexo, nota, codigo, referencia (otro documento).
   Ojo: un parámetro que no se pasa se busca en los datos de la plantilla, así
@@ -9,8 +9,9 @@
 --}}
 <table class="encabezado">
   <tr>
-    <td rowspan="2" class="logos">{{> logos}}</td>
+    <td rowspan="2" class="logo-izq">{{> logo-aceaa}}</td>
     <td class="anexo">{{anexo}}</td>
+    <td rowspan="2" class="logo-der">{{> logo-amz}}</td>
   </tr>
   <tr>
     <td class="titulo">
