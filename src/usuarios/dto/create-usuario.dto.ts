@@ -7,7 +7,7 @@ import {
   IsString,
   MinLength,
 } from 'class-validator';
-import { Rol } from '@prisma/client';
+import { Rol, Sede } from '@prisma/client';
 
 export class CreateUsuarioDto {
   @ApiProperty({
@@ -51,6 +51,17 @@ export class CreateUsuarioDto {
   @IsString()
   @MaxLength(30)
   ci?: string;
+
+  @ApiProperty({
+    enum: Sede,
+    example: Sede.LA_PAZ,
+    description:
+      'Sede de trabajo; propone el lugar de emisión de sus documentos',
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(Sede, { message: 'La sede proporcionada no es válida' })
+  sede?: Sede;
 
   @ApiProperty({
     enum: Rol,

@@ -155,3 +155,10 @@
 - **Backend:** El Director de Programa de la solicitud de viaje lo elige el emisor; la API lo exige explícitamente
 - **Backend:** Migración: borra los planes `ENVIADO` (con su historial y notificaciones) y las notificaciones `PLAN_VIAJE_*`
 - **Frontend:** Planes de viaje sin bandeja "Por aprobar" ni acciones de VoBo; el listado muestra si cada plan está incompleto, disponible o vinculado; el Director de Programa se elige al enviar la solicitud
+
+## Datos del personal (27 Oct) · spec 024
+
+- **Backend:** `enum Sede` (La Paz, Trinidad, Cobija) y `Usuario.sede`; el DTO de usuarios la acepta y el lookup de usuarios la expone (el C.I. sigue solo para `ADMIN`)
+- **Backend:** `Usuario.csv` del seed se rehace desde la planilla de ACEAA: cargo, C.I. normalizado y sede de 55 personas, y 7 cuentas nuevas. El seed escribe C.I. y sede, y una columna vacía no pisa lo cargado a mano
+- **Backend:** el plan de viaje propone como lugar de emisión la sede del responsable (o "La Paz" si no tiene)
+- **Frontend:** sede en la gestión de usuarios (selector y columna) y precarga del lugar de emisión del ANEXO 1
