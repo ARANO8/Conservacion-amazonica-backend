@@ -337,7 +337,6 @@ APROBADO APROBADO
     String codigoLiquidacion 
     String lugarEmision 
     DateTime fechaEmision 
-    Decimal tipoCambio 
     EstadoLiquidacionViaticos estado 
     String observacion "❓"
     DateTime fechaRevision "❓"
