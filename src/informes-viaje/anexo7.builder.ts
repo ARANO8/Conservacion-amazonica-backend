@@ -1,3 +1,7 @@
+import {
+  CARGO_DIRECTOR_EJECUTIVO,
+  DESTINATARIO_ANEXOS,
+} from '../common/constants/financial.constants';
 import { MIN_FILAS_ANEXO7, NOTA_ANEXO7 } from './informes-viaje.constants';
 import { formatFechaAnexo } from '../planes-viaje/anexo1.builder';
 
@@ -42,6 +46,9 @@ export interface Anexo7 {
   preparadoPorCargo: string;
   revisadoPor: string;
   revisadoPorCargo: string;
+  /** Aprueba el Director Ejecutivo */
+  aprobadoPor: string;
+  aprobadoPorCargo: string;
   notaPie: string;
 }
 
@@ -104,6 +111,8 @@ export function construirAnexo7(
     preparadoPorCargo: fuente.usuario.cargo ?? '',
     revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
     revisadoPorCargo: fuente.directorPrograma?.cargo ?? '',
+    aprobadoPor: DESTINATARIO_ANEXOS,
+    aprobadoPorCargo: CARGO_DIRECTOR_EJECUTIVO,
     notaPie: NOTA_ANEXO7,
   };
 }

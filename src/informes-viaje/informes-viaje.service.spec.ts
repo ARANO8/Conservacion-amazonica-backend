@@ -154,6 +154,8 @@ describe('construirAnexo7', () => {
       preparadoPorCargo: 'TÉCNICO DE CAMPO',
       revisadoPor: 'Luis Vaca',
       revisadoPorCargo: 'DIRECTOR DE PROGRAMA',
+      aprobadoPor: 'Marcos F. Terán Valenzuela',
+      aprobadoPorCargo: 'DIRECTOR EJECUTIVO',
       notaPie: NOTA_ANEXO7,
     });
   });

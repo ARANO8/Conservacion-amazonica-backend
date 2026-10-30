@@ -180,3 +180,4 @@
 ## Firmas de Dirección en los anexos (30 Oct)
 
 - **Backend:** ANEXO 5 y ANEXO 6 firman "Revisado por" la Dirección Financiera (usuario `TESORERO`) y "Aprobado por" el Director Ejecutivo, con nombre y cargo, como ya lo hacía el ANEXO 4. El ANEXO 5 deja de mostrar al Director de Programa en "Revisado por" (sigue revisando la liquidación en el sistema). Helper compartido `pdf/firmas-direccion.ts`
+- **Backend:** ANEXO 2 y ANEXO 7 completan "Aprobado por" con el Director Ejecutivo; "Revisado por" sigue siendo el Director de Programa y el "DE:" del ANEXO 2 no cambia

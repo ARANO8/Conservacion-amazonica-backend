@@ -1,5 +1,7 @@
 import { Moneda, Prisma, TipoDestino } from '@prisma/client';
 import {
+  CARGO_DIRECTOR_EJECUTIVO,
+  DESTINATARIO_ANEXOS,
   FACTOR_RETENCION_VIATICOS,
   tarifaEnBolivianos,
 } from '../common/constants/financial.constants';
@@ -65,6 +67,9 @@ export interface Anexo2 {
   /** Director de Programa: revisa la solicitud antes de Dirección Financiera. */
   revisadoPor: string;
   revisadoPorCargo: string;
+  /** Aprueba el Director Ejecutivo */
+  aprobadoPor: string;
+  aprobadoPorCargo: string;
   /** Nómina de firmas: los terceros no tienen cargo */
   viajeros: Anexo2Viajero[];
 }
@@ -470,6 +475,8 @@ export function construirAnexo2(
     solicitadoPorCargo: fuente.usuarioEmisor?.cargo ?? '',
     revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
     revisadoPorCargo: fuente.directorPrograma?.cargo ?? '',
+    aprobadoPor: DESTINATARIO_ANEXOS,
+    aprobadoPorCargo: CARGO_DIRECTOR_EJECUTIVO,
     viajeros: viajeros(fuente),
   };
 }
