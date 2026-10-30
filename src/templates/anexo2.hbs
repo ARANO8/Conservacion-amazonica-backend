@@ -234,6 +234,15 @@
         font-size: 7.5pt;
         vertical-align: middle;
       }
+      .firmas .cargo {
+        font-size: 6.5pt;
+        font-weight: bold;
+        text-transform: uppercase;
+      }
+      .firmas .renglon .cargo {
+        font-size: 6pt;
+        font-weight: normal;
+      }
       .firmas .cabecera {
         font-weight: bold;
         font-size: 7pt;
@@ -453,9 +462,15 @@
           <td class="raya">Aprobado por:</td>
         </tr>
         <tr class="bloque-firmas">
-          <td class="solicitante">{{solicitadoPor}}</td>
+          <td class="solicitante">
+            {{solicitadoPor}}
+            <div class="cargo">{{solicitadoPorCargo}}</div>
+          </td>
           <td></td>
-          <td class="solicitante">{{revisadoPor}}</td>
+          <td class="solicitante">
+            {{revisadoPor}}
+            <div class="cargo">{{revisadoPorCargo}}</div>
+          </td>
           <td colspan="2"></td>
         </tr>
         <tr>
@@ -467,7 +482,9 @@
         </tr>
         {{#each viajeros}}
           <tr class="renglon">
-            <td class="punteado">{{this}}</td>
+            <td class="punteado">
+              {{nombre}}{{#if cargo}} <span class="cargo">— {{cargo}}</span>{{/if}}
+            </td>
             <td></td>
             <td class="punteado"></td>
             <td></td>

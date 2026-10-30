@@ -46,6 +46,7 @@ export function tarifaEnBolivianos(
  * Ejecutivo, escrito tal como lo pide ACEAA. También firma el VoBo del ANEXO 1.
  */
 export const DESTINATARIO_ANEXOS = 'Marcos F. Terán Valenzuela';
+export const CARGO_DIRECTOR_EJECUTIVO = 'DIRECTOR EJECUTIVO';
 
 export const MONEDA_DEFAULT = 'Bs';
 export const LOCALE_DEFAULT = 'es-BO';

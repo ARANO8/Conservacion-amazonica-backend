@@ -68,6 +68,8 @@ describe('construirAnexo1', () => {
 
     expect(anexo.responsable).toBe('Ana Rojas');
     expect(anexo.directorEjecutivo).toBe('Marcos F. Terán Valenzuela');
+    expect(anexo.responsableCargo).toBe('Técnico de campo');
+    expect(anexo.directorEjecutivoCargo).toBe('DIRECTOR EJECUTIVO');
     expect(anexo.fechaEmision).toBe('28/10/2026');
   });
 });

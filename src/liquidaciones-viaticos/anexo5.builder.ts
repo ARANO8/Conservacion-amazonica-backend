@@ -18,7 +18,7 @@ export interface Anexo5Fuente {
   codigoLiquidacion: string;
   lugarEmision: string;
   fechaEmision: Date;
-  directorPrograma: { nombreCompleto: string } | null;
+  directorPrograma: { nombreCompleto: string; cargo: string | null } | null;
   solicitud: {
     proyecto: string | null;
     presupuestos: {
@@ -88,6 +88,7 @@ export interface Anexo5Hoja {
   totalPagar: string;
   son: string;
   revisadoPor: string;
+  revisadoPorCargo: string;
 }
 
 export interface Anexo5 {
@@ -162,6 +163,7 @@ function construirHoja(
       '',
     ),
     revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
+    revisadoPorCargo: fuente.directorPrograma?.cargo ?? '',
   };
 }
 

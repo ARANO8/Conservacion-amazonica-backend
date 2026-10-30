@@ -10,8 +10,8 @@ export interface Anexo7Fuente {
   fechaFin: Date;
   lugarEmision: string;
   fechaEmision: Date;
-  usuario: { nombreCompleto: string };
-  directorPrograma: { nombreCompleto: string } | null;
+  usuario: { nombreCompleto: string; cargo: string | null };
+  directorPrograma: { nombreCompleto: string; cargo: string | null } | null;
   actividades: {
     fecha: Date;
     lugar: string;
@@ -39,7 +39,9 @@ export interface Anexo7 {
   lugarEmision: string;
   fechaEmision: string;
   preparadoPor: string;
+  preparadoPorCargo: string;
   revisadoPor: string;
+  revisadoPorCargo: string;
   notaPie: string;
 }
 
@@ -99,7 +101,9 @@ export function construirAnexo7(
     lugarEmision: fuente.lugarEmision,
     fechaEmision: fechaEnPalabras(fuente.fechaEmision),
     preparadoPor: fuente.usuario.nombreCompleto,
+    preparadoPorCargo: fuente.usuario.cargo ?? '',
     revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
+    revisadoPorCargo: fuente.directorPrograma?.cargo ?? '',
     notaPie: NOTA_ANEXO7,
   };
 }

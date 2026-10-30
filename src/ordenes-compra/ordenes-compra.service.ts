@@ -349,6 +349,7 @@ export class OrdenesCompraService {
       directorEjecutivo: DIRECTOR_EJECUTIVO.nombre,
       cargoDirectorEjecutivo: DIRECTOR_EJECUTIVO.cargo,
       preparadoPor: orden.usuarioEmisor?.nombreCompleto ?? '',
+      preparadoPorCargo: orden.usuarioEmisor?.cargo ?? '',
       cuadroCodigo: orden.cuadroComparativo?.codigoCuadro ?? '',
     });
   }
