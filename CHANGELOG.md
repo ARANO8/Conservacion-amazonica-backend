@@ -162,3 +162,7 @@
 - **Backend:** `Usuario.csv` del seed se rehace desde la planilla de ACEAA: cargo, C.I. normalizado y sede de 55 personas, y 7 cuentas nuevas. El seed escribe C.I. y sede, y una columna vacía no pisa lo cargado a mano
 - **Backend:** el plan de viaje propone como lugar de emisión la sede del responsable (o "La Paz" si no tiene)
 - **Frontend:** sede en la gestión de usuarios (selector y columna) y precarga del lugar de emisión del ANEXO 1
+
+## Logos en los documentos (29 Oct)
+
+- **Backend:** Todos los anexos y documentos llevan el logo de ACEAA a la izquierda y el de AMZ desk a la derecha, en HTML, PDF y en el Excel del ANEXO 4. El parcial `logos` se separa en `logo-aceaa` y `logo-amz`

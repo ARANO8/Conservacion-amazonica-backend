@@ -49,9 +49,10 @@ function relleno(argb: string): ExcelJS.Fill {
 const ALTO_FILA_LOGOS = 52;
 
 /**
- * Logos de ACEAA y de AMZ desk en el costado izquierdo, igual que en el PDF.
- * Tamaños en píxeles respetando las proporciones de cada imagen (ACEAA es
- * cuadrado; el PNG de AMZ desk es 2,5:1 y trae margen propio).
+ * Logo de ACEAA en el costado izquierdo (columna A) y de AMZ desk en el
+ * derecho (columnas N-O), igual que en el PDF. Tamaños en píxeles respetando
+ * las proporciones de cada imagen (ACEAA es cuadrado; el PNG de AMZ desk es
+ * 2,5:1 y trae margen propio).
  */
 function agregarLogos(
   libro: ExcelJS.Workbook,
@@ -74,8 +75,9 @@ function agregarLogos(
       buffer: logos.amz as unknown as ExcelJS.Buffer,
       extension: 'png',
     });
+    // Termina en el borde derecho de la columna O (N y O miden ~107 px)
     hoja.addImage(id, {
-      tl: { col: 1.1, row: 0 },
+      tl: { col: 13.3, row: 0 },
       ext: { width: 175, height: 70 },
     });
   }

@@ -54,21 +54,28 @@
   .mono { font-variant-numeric: tabular-nums; }
   .no-romper { page-break-inside: avoid; break-inside: avoid; }
 
-  /* --- Encabezado: logos a la izquierda, título en banda gris --- */
+  /* --- Encabezado: ACEAA a la izquierda, AMZ desk a la derecha, título al centro --- */
   .encabezado td {
     vertical-align: bottom;
     padding: 0;
   }
-  .encabezado .logos {
-    width: 60mm;
+  .encabezado .logo-izq {
+    width: 24mm;
     white-space: nowrap;
+    text-align: left;
+    padding-right: 4mm;
+  }
+  .encabezado .logo-der {
+    width: 42mm;
+    white-space: nowrap;
+    text-align: right;
+    padding-left: 4mm;
   }
   .encabezado .anexo {
     text-align: right;
     font-weight: bold;
     font-size: 13pt;
     padding-bottom: 5mm;
-    padding-right: 6mm;
   }
   .encabezado .titulo {
     background: #d9d9d9;

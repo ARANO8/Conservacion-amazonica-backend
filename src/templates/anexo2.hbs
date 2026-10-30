@@ -100,8 +100,14 @@
         padding: 3px 0 !important;
       }
       .logo {
-        width: 62mm;
+        width: 24mm;
         text-align: left;
+        padding-right: 4mm !important;
+      }
+      .logo-der {
+        width: 42mm;
+        text-align: right;
+        padding-left: 4mm !important;
       }
 
       /* Datos generales */
@@ -249,9 +255,12 @@
       <table class="encabezado">
         <tr>
           <td rowspan="3" class="logo">
-            {{> logos}}
+            {{> logo-aceaa}}
           </td>
           <td class="anexo">ANEXO 2</td>
+          <td rowspan="3" class="logo-der">
+            {{> logo-amz}}
+          </td>
         </tr>
         <tr>
           <td class="titulo gris">
