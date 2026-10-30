@@ -25,6 +25,7 @@ import { NotificacionesService } from '../notificaciones/notificaciones.service'
 import { Anexo4, construirAnexo4 } from './anexo4.builder';
 import { generarExcelAnexo4 } from './anexo4.excel';
 import { DESTINATARIO_ANEXOS } from '../common/constants/financial.constants';
+import { firmasDireccion } from '../pdf/firmas-direccion';
 
 const RENDICION_INCLUDE = {
   solicitud: {
@@ -266,23 +267,9 @@ export class RendicionesService {
   ): Promise<Anexo4> {
     const rendicion = await this.findOne(id, usuario);
 
-    // Revisa Dirección Financiera; aprueba el Director Ejecutivo
-    const tesorero = await this.prisma.usuario.findFirst({
-      where: { rol: Rol.TESORERO, deletedAt: null },
-      select: { nombreCompleto: true, cargo: true },
-      orderBy: { id: 'asc' },
-    });
-
     return construirAnexo4(rendicion, {
       destinatario: DESTINATARIO_ANEXOS,
-      revisadoPor: {
-        nombre: tesorero?.nombreCompleto ?? '',
-        cargo: tesorero?.cargo ?? 'Director Financiero',
-      },
-      aprobadoPor: {
-        nombre: DESTINATARIO_ANEXOS,
-        cargo: 'Director Ejecutivo',
-      },
+      ...(await firmasDireccion(this.prisma)),
     });
   }
 

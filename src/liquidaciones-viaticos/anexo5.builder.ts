@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { fechaEnPalabras } from '../informes-viaje/anexo7.builder';
 import { formatFechaAnexo } from '../planes-viaje/anexo1.builder';
+import { FirmasDireccion } from '../pdf/firmas-direccion';
 import { montoEnLetrasBolivianos } from '../shared/utils/letras.util';
 import {
   descripcionFila,
@@ -18,7 +19,6 @@ export interface Anexo5Fuente {
   codigoLiquidacion: string;
   lugarEmision: string;
   fechaEmision: Date;
-  directorPrograma: { nombreCompleto: string; cargo: string | null } | null;
   solicitud: {
     proyecto: string | null;
     presupuestos: {
@@ -87,8 +87,8 @@ export interface Anexo5Hoja {
   rcIva: string;
   totalPagar: string;
   son: string;
-  revisadoPor: string;
-  revisadoPorCargo: string;
+  /** Revisa la Dirección Financiera; aprueba el Director Ejecutivo */
+  firmas: FirmasDireccion;
 }
 
 export interface Anexo5 {
@@ -118,6 +118,7 @@ function proyectoYActividad(fuente: Anexo5Fuente) {
 function construirHoja(
   fuente: Anexo5Fuente,
   hoja: Anexo5HojaFuente,
+  firmas: FirmasDireccion,
 ): Anexo5Hoja {
   const filas: Anexo5Fila[] = hoja.filas.map((f) => ({
     descripcion: descripcionFila(f.concepto.nombre, f.porcentaje),
@@ -162,14 +163,14 @@ function construirHoja(
       /^SON:\s*/i,
       '',
     ),
-    revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
-    revisadoPorCargo: fuente.directorPrograma?.cargo ?? '',
+    firmas,
   };
 }
 
 /** Todas las hojas del viaje, o solo la indicada. */
 export function construirAnexo5(
   fuente: Anexo5Fuente,
+  firmas: FirmasDireccion,
   soloHojaId?: number,
 ): Anexo5 {
   const hojas = fuente.hojas.filter(
@@ -177,6 +178,6 @@ export function construirAnexo5(
   );
   return {
     codigoLiquidacion: fuente.codigoLiquidacion,
-    hojas: hojas.map((h) => construirHoja(fuente, h)),
+    hojas: hojas.map((h) => construirHoja(fuente, h, firmas)),
   };
 }
