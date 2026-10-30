@@ -1,4 +1,5 @@
 import {
+  CARGO_DIRECTOR_EJECUTIVO,
   DESTINATARIO_ANEXOS,
   LOCALE_DEFAULT,
 } from '../common/constants/financial.constants';
@@ -45,6 +46,9 @@ export interface Anexo1 {
   responsable: string;
   /** Firma el VoBo en papel; no interviene en el sistema */
   directorEjecutivo: string;
+  /** Cargos bajo las firmas */
+  responsableCargo: string;
+  directorEjecutivoCargo: string;
 }
 
 /**
@@ -103,5 +107,7 @@ export function construirAnexo1(fuente: Anexo1Fuente): Anexo1 {
     fechaEmision: formatFechaAnexo(fuente.fechaEmision),
     responsable: fuente.usuario.nombreCompleto,
     directorEjecutivo: DESTINATARIO_ANEXOS,
+    responsableCargo: fuente.cargo,
+    directorEjecutivoCargo: CARGO_DIRECTOR_EJECUTIVO,
   };
 }

@@ -172,3 +172,7 @@
 - **Backend:** La Liquidación de Viáticos ya no lleva el T/C $us (el tipo de cambio es variable): se quita del documento y la columna `LiquidacionViaticos.tipoCambio` (migración `20261030120000_liquidacion_sin_tipo_cambio`)
 - **Backend:** En el ANEXO 5, "Lugar y Fecha" va en formato literal ("La Paz, 28 de septiembre de 2026") y alineado a la izquierda, igual que Proyecto y Actividad
 - **Frontend:** Se quita `tipoCambio` del tipo de la liquidación
+
+## Cargo en las firmas (30 Oct) — spec 025
+
+- **Backend:** Cada firma con nombre imprime el cargo debajo: ANEXO 1 (responsable y VoBo del Director Ejecutivo), ANEXO 2 (solicitado y revisado por, y los viajeros institucionales de la nómina), ANEXO 5 (revisado por y fila CARGO del beneficiario), ANEXO 6 (preparado por), ANEXO 7 (preparado y revisado por) y orden de compra (elaborado por)

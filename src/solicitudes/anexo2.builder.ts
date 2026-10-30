@@ -34,6 +34,11 @@ export interface Anexo2FilaOtroGasto {
   importe: string;
 }
 
+export interface Anexo2Viajero {
+  nombre: string;
+  cargo: string;
+}
+
 export interface Anexo2 {
   codigoSolicitud: string;
   a: string;
@@ -56,9 +61,12 @@ export interface Anexo2 {
   observaciones: string;
   banco: string;
   solicitadoPor: string;
+  solicitadoPorCargo: string;
   /** Director de Programa: revisa la solicitud antes de Dirección Financiera. */
   revisadoPor: string;
-  viajeros: string[];
+  revisadoPorCargo: string;
+  /** Nómina de firmas: los terceros no tienen cargo */
+  viajeros: Anexo2Viajero[];
 }
 
 type Decimalish = Prisma.Decimal | number | string | null | undefined;
@@ -90,7 +98,7 @@ export interface Anexo2Fuente {
   chequeANombreDe: string | null;
   proyecto: string | null;
   usuarioEmisor: { nombreCompleto: string; cargo: string | null } | null;
-  directorPrograma: { nombreCompleto: string } | null;
+  directorPrograma: { nombreCompleto: string; cargo: string | null } | null;
   viaticos: ViaticoFuente[];
   gastos: {
     montoNeto: Decimalish;
@@ -100,7 +108,11 @@ export interface Anexo2Fuente {
   hospedajes: { region: string; destino: string; costoTotal: Decimalish }[];
   planViaje: {
     actividades: {
-      participantesInstitucionales: { id: number; nombreCompleto: string }[];
+      participantesInstitucionales: {
+        id: number;
+        nombreCompleto: string;
+        cargo: string | null;
+      }[];
     }[];
   } | null;
   personasExternas: { nombreCompleto: string }[];
@@ -358,21 +370,26 @@ function clasificarOtrosGastos(fuente: Anexo2Fuente): Anexo2FilaOtroGasto[] {
   });
 }
 
-function viajeros(fuente: Anexo2Fuente): string[] {
-  const institucionales = new Map<number, string>();
+function viajeros(fuente: Anexo2Fuente): Anexo2Viajero[] {
+  const institucionales = new Map<number, Anexo2Viajero>();
   (fuente.planViaje?.actividades ?? []).forEach((p) =>
     p.participantesInstitucionales.forEach((u) =>
-      institucionales.set(u.id, u.nombreCompleto),
+      institucionales.set(u.id, {
+        nombre: u.nombreCompleto,
+        cargo: u.cargo ?? '',
+      }),
     ),
   );
 
   const terceros = [
     ...new Set(fuente.personasExternas.map((p) => p.nombreCompleto)),
-  ];
+  ].map((nombre) => ({ nombre, cargo: '' }));
 
-  const nombres = [...institucionales.values(), ...terceros];
-  while (nombres.length < MIN_RENGLONES_VIAJEROS) nombres.push('');
-  return nombres;
+  const lista = [...institucionales.values(), ...terceros];
+  while (lista.length < MIN_RENGLONES_VIAJEROS) {
+    lista.push({ nombre: '', cargo: '' });
+  }
+  return lista;
 }
 
 export function construirAnexo2(
@@ -450,7 +467,9 @@ export function construirAnexo2(
     observaciones: fuente.descripcion ?? '',
     banco,
     solicitadoPor: emisor,
+    solicitadoPorCargo: fuente.usuarioEmisor?.cargo ?? '',
     revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
+    revisadoPorCargo: fuente.directorPrograma?.cargo ?? '',
     viajeros: viajeros(fuente),
   };
 }

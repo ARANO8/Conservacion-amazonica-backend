@@ -126,8 +126,11 @@ describe('construirAnexo7', () => {
       fechaFin: new Date('2026-11-05T00:00:00.000Z'),
       lugarEmision: 'La Paz',
       fechaEmision: new Date('2026-11-10T00:00:00.000Z'),
-      usuario: { nombreCompleto: 'Ana Rojas' },
-      directorPrograma: { nombreCompleto: 'Luis Vaca' },
+      usuario: { nombreCompleto: 'Ana Rojas', cargo: 'TÉCNICO DE CAMPO' },
+      directorPrograma: {
+        nombreCompleto: 'Luis Vaca',
+        cargo: 'DIRECTOR DE PROGRAMA',
+      },
       actividades: [
         {
           fecha: new Date('2026-11-03T00:00:00.000Z'),
@@ -148,7 +151,9 @@ describe('construirAnexo7', () => {
       fechaAl: '05/11/2026',
       fechaEmision: '10 de noviembre de 2026',
       preparadoPor: 'Ana Rojas',
+      preparadoPorCargo: 'TÉCNICO DE CAMPO',
       revisadoPor: 'Luis Vaca',
+      revisadoPorCargo: 'DIRECTOR DE PROGRAMA',
       notaPie: NOTA_ANEXO7,
     });
   });
