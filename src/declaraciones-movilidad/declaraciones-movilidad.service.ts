@@ -15,6 +15,7 @@ import {
 } from './declaraciones-movilidad.helper';
 import { formatDate } from '../shared/utils/formatters.util';
 import { LOCALE_DEFAULT } from '../common/constants/financial.constants';
+import { firmasDireccion } from '../pdf/firmas-direccion';
 
 /** ADMIN y EJECUTIVO ven las declaraciones de todos; el resto sólo las suyas. */
 const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
@@ -303,6 +304,7 @@ export class DeclaracionesMovilidadService {
       retencion: this.formatMonto(declaracion.retencion),
       totalLiquido: this.formatMonto(declaracion.totalLiquido),
       generatedAt: formatDate(new Date()),
+      firmas: await firmasDireccion(this.prisma),
     });
   }
 

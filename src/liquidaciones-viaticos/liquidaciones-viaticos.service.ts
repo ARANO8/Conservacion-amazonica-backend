@@ -34,6 +34,7 @@ import {
   totalizarHoja,
 } from './liquidacion.helper';
 import { construirAnexo5 } from './anexo5.builder';
+import { firmasDireccion } from '../pdf/firmas-direccion';
 
 /** ADMIN y EJECUTIVO ven las liquidaciones de todos. */
 const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
@@ -773,7 +774,10 @@ export class LiquidacionesViaticosService {
         `Hoja ${hojaId} no encontrada en la liquidación`,
       );
     }
-    return documentoPdf('anexo5.hbs', construirAnexo5(liquidacion, hojaId));
+    return documentoPdf(
+      'anexo5.hbs',
+      construirAnexo5(liquidacion, await firmasDireccion(this.prisma), hojaId),
+    );
   }
 
   async generatePdf(id: number, user: UsuarioContexto, hojaId?: number) {

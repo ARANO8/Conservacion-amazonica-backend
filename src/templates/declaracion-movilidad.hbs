@@ -103,11 +103,17 @@
           </td>
           <td>
             <div class="firma-linea">Revisado por</div>
-            <div class="firma-nombre">&nbsp;</div>
+            <div class="firma-nombre">
+              {{firmas.revisadoPor.nombre}}
+              <div class="firma-cargo">{{firmas.revisadoPor.cargo}}</div>
+            </div>
           </td>
           <td>
             <div class="firma-linea">Aprobado por</div>
-            <div class="firma-nombre">&nbsp;</div>
+            <div class="firma-nombre">
+              {{firmas.aprobadoPor.nombre}}
+              <div class="firma-cargo">{{firmas.aprobadoPor.cargo}}</div>
+            </div>
           </td>
         </tr>
       </table>

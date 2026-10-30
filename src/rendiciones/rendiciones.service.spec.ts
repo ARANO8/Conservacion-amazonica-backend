@@ -415,7 +415,7 @@ describe('RendicionesService', () => {
       expect(anexo.resumenContableTotal).toBe(128.81);
 
       expect(anexo.firmas.revisadoPor.nombre).toBe('Shirley Ramírez');
-      expect(anexo.firmas.aprobadoPor.cargo).toBe('Director Ejecutivo');
+      expect(anexo.firmas.aprobadoPor.cargo).toBe('DIRECTOR EJECUTIVO');
 
       // El Excel lleva la misma grilla con fórmulas de saldo y totales
       const { buffer: xlsx, nombre } =
