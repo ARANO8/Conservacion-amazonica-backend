@@ -166,3 +166,9 @@
 ## Logos en los documentos (29 Oct)
 
 - **Backend:** Todos los anexos y documentos llevan el logo de ACEAA a la izquierda y el de AMZ desk a la derecha, en HTML, PDF y en el Excel del ANEXO 4. El parcial `logos` se separa en `logo-aceaa` y `logo-amz`
+
+## ANEXO 5 sin tipo de cambio (30 Oct)
+
+- **Backend:** La Liquidación de Viáticos ya no lleva el T/C $us (el tipo de cambio es variable): se quita del documento y la columna `LiquidacionViaticos.tipoCambio` (migración `20261030120000_liquidacion_sin_tipo_cambio`)
+- **Backend:** En el ANEXO 5, "Lugar y Fecha" va en formato literal ("La Paz, 28 de septiembre de 2026") y alineado a la izquierda, igual que Proyecto y Actividad
+- **Frontend:** Se quita `tipoCambio` del tipo de la liquidación

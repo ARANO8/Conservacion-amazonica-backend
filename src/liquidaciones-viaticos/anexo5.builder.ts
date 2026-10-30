@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import { fechaEnPalabras } from '../informes-viaje/anexo7.builder';
 import { formatFechaAnexo } from '../planes-viaje/anexo1.builder';
 import { montoEnLetrasBolivianos } from '../shared/utils/letras.util';
 import {
@@ -17,7 +18,6 @@ export interface Anexo5Fuente {
   codigoLiquidacion: string;
   lugarEmision: string;
   fechaEmision: Date;
-  tipoCambio: Decimalish;
   directorPrograma: { nombreCompleto: string } | null;
   solicitud: {
     proyecto: string | null;
@@ -68,9 +68,8 @@ export interface Anexo5Hoja {
   codigo: string;
   proyecto: string;
   actividad: string;
-  lugarEmision: string;
-  fechaEmision: string;
-  tipoCambio: string;
+  /** "Cobija, 30 de octubre de 2026" */
+  lugarYFecha: string;
   nombre: string;
   cargo: string;
   ci: string;
@@ -138,9 +137,7 @@ function construirHoja(
   return {
     codigo: `${fuente.codigoLiquidacion}-${hoja.orden + 1}`,
     ...proyectoYActividad(fuente),
-    lugarEmision: fuente.lugarEmision,
-    fechaEmision: formatFechaAnexo(fuente.fechaEmision),
-    tipoCambio: numero(fuente.tipoCambio),
+    lugarYFecha: `${fuente.lugarEmision}, ${fechaEnPalabras(fuente.fechaEmision)}`,
     nombre: hoja.usuario.nombreCompleto,
     cargo: hoja.cargo,
     ci: hoja.ci,

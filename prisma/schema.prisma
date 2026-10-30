@@ -501,8 +501,6 @@ model LiquidacionViaticos {
   codigoLiquidacion String                    @unique
   lugarEmision      String                    @default("La Paz")
   fechaEmision      DateTime
-  /// T/C Bs por USD con el que se convirtieron las tarifas en dólares
-  tipoCambio        Decimal                   @db.Decimal(10, 2)
   estado            EstadoLiquidacionViaticos @default(BORRADOR)
   observacion       String?
   fechaRevision     DateTime?

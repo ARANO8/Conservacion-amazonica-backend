@@ -21,22 +21,19 @@
       .i {
         font-style: italic;
       }
-      .cabecera-derecha {
-        width: 60%;
-        margin-left: auto;
+      .cabecera {
         margin-top: -2mm;
       }
-      .cabecera-derecha td {
+      .cabecera td {
         padding: 1px 0;
+        text-align: left;
       }
-      .cabecera-derecha .etiqueta {
+      .cabecera .etiqueta {
         width: 28mm;
         font-weight: bold;
         font-style: italic;
-        text-align: right;
-        padding-right: 3mm;
       }
-      .cabecera-derecha .valor {
+      .cabecera .valor {
         border-bottom: 1px solid #bfbfbf;
         font-style: italic;
       }
@@ -49,7 +46,7 @@
       }
       .lugar-fecha .etiqueta {
         font-weight: bold;
-        width: 38mm;
+        width: 28mm;
       }
       .lugar-fecha .valor {
         border-bottom: 1px solid #bfbfbf;
@@ -149,7 +146,7 @@
       <div class="hoja">
         {{> encabezado anexo="ANEXO 5" titulo="LIQUIDACIÓN DE VIÁTICOS" nota="(Expresado en Bolivianos)" codigo=codigo}}
 
-        <table class="cabecera-derecha">
+        <table class="cabecera">
           <tr>
             <td class="etiqueta">PROYECTO:</td>
             <td class="valor">{{proyecto}}</td>
@@ -163,9 +160,7 @@
         <table class="lugar-fecha">
           <tr>
             <td class="etiqueta">Lugar y Fecha:</td>
-            <td class="valor r">{{lugarEmision}} {{fechaEmision}}</td>
-            <td class="etiqueta r" style="width: 36mm; padding-right: 2mm">T/C:1 $us=Bs.</td>
-            <td class="valor" style="width: 24mm">{{tipoCambio}}</td>
+            <td class="valor">{{lugarYFecha}}</td>
           </tr>
         </table>
 

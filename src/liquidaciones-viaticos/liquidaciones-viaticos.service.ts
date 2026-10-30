@@ -15,10 +15,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
-import {
-  TIPO_CAMBIO_USD_BOB,
-  tarifaEnBolivianos,
-} from '../common/constants/financial.constants';
+import { tarifaEnBolivianos } from '../common/constants/financial.constants';
 import { ESTADOS_SOLICITUD_INFORMABLE } from '../informes-viaje/informes-viaje.constants';
 import {
   CreateHojaLiquidacionDto,
@@ -467,7 +464,6 @@ export class LiquidacionesViaticosService {
           codigoLiquidacion,
           lugarEmision: dto.lugarEmision?.trim() || 'La Paz',
           fechaEmision: dto.fechaEmision,
-          tipoCambio: TIPO_CAMBIO_USD_BOB,
           usuarioId,
           directorProgramaId,
           solicitudId: solicitud.id,
