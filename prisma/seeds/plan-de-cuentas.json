@@ -23,7 +23,7 @@
                 },
                 {
                   "codigo": "5.1.1.1.02",
-                  "descripcion": "Técnico Áreas Protegidas Beni",
+                  "descripcion": "Técnico I Áreas Protegidas Beni",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -33,14 +33,13 @@
                 },
                 {
                   "codigo": "5.1.1.1.04",
-                  "descripcion": "Técnico II Biodiversidad",
+                  "descripcion": "Técnico II en Biodiversidad",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.05",
-                  "descripcion": "Asistente Administrativo",
-                  "monetaria": "Bolivianos",
-                  "auxiliar": "Auxiliar"
+                  "descripcion": "Especialista I en Geo. Ambiental",
+                  "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.06",
@@ -79,17 +78,17 @@
                 },
                 {
                   "codigo": "5.1.1.1.13",
-                  "descripcion": "Asistente Técnico y Monitoreo CEPF",
+                  "descripcion": "Técnico I en Gobernanza",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.14",
-                  "descripcion": "Especialista Técnico SIG y Planificación Territorial",
+                  "descripcion": "Especialista II en Redacción y Prensa",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.15",
-                  "descripcion": "Coordinador Regional Pando",
+                  "descripcion": "Especialista II en Manejo de PFNM",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -125,22 +124,22 @@
                 },
                 {
                   "codigo": "5.1.1.1.22",
-                  "descripcion": "Técnico Socio Económico",
+                  "descripcion": "Especialista II en Com. Externa",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.23",
-                  "descripcion": "Técnico en Sistematización",
+                  "descripcion": "Especialista II en Diseño y Medios",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.24",
-                  "descripcion": "Asistente Logístico CEPF",
+                  "descripcion": "Especialista II en Control Territorial",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.25",
-                  "descripcion": "Tec. Manej de Rec. Forest. no maderables",
+                  "descripcion": "Especialista II en Areas de Conserv. Pando",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -155,12 +154,12 @@
                 },
                 {
                   "codigo": "5.1.1.1.28",
-                  "descripcion": "Coordinador Políticas Locales Pando",
+                  "descripcion": "Especialista II en Manejo de PFNM",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.29",
-                  "descripcion": "Coordinador de Investigación y Monitoreo",
+                  "descripcion": "Especialista II en Minería Aluvial",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -175,7 +174,7 @@
                 },
                 {
                   "codigo": "5.1.1.1.32",
-                  "descripcion": "Encargado de Logistica",
+                  "descripcion": "Encargado de Logistíca",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -205,22 +204,22 @@
                 },
                 {
                   "codigo": "5.1.1.1.38",
-                  "descripcion": "Coordinador de Conservación de Áreas Naturales",
+                  "descripcion": "Especialista I en Ciencia de Datos",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.39",
-                  "descripcion": "Encargada de RRHH y Asistente Contable",
+                  "descripcion": "Técnico I en Gestión Social",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.40",
-                  "descripcion": "Técnico Local Porvenir",
+                  "descripcion": "Especialista I de Art. para la Conserv.",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.1.1.1.41",
-                  "descripcion": "Técnico Local Puerto Rico",
+                  "descripcion": "Especialista I Legal en Conserv. y Gestión Terr.",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -255,7 +254,7 @@
                 },
                 {
                   "codigo": "5.1.1.1.48",
-                  "descripcion": "Coordinador Nacional CEPF",
+                  "descripcion": "Técnico I en Comunidad de Prácticas",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -335,7 +334,7 @@
                 },
                 {
                   "codigo": "5.1.1.1.64",
-                  "descripcion": "Técnico IT",
+                  "descripcion": "Responsable RRHH y Asist. Ctable",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -465,7 +464,7 @@
                 },
                 {
                   "codigo": "5.1.1.1.90",
-                  "descripcion": "Especilialista Il en Monitoreo",
+                  "descripcion": "Especilialista II en Monitoreo",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -480,7 +479,7 @@
                 },
                 {
                   "codigo": "5.1.1.1.93",
-                  "descripcion": "Técnico Socioeconómico",
+                  "descripcion": "Técnico I Socioeconómico",
                   "monetaria": "Bolivianos"
                 },
                 {
@@ -542,6 +541,11 @@
                 {
                   "codigo": "5.1.1.2.05",
                   "descripcion": "Trabajo en Campo",
+                  "monetaria": "Bolivianos"
+                },
+                {
+                  "codigo": "5.1.1.2.06",
+                  "descripcion": "Capacitaciones",
                   "monetaria": "Bolivianos"
                 }
               ]
@@ -997,6 +1001,13 @@
               "descripcion": "Impuesto Zofra Cobija (5%)",
               "monetaria": "Bolivianos"
             }
+          ],
+          "subcuentas": [
+            {
+              "codigo": "5.1.5.8.00",
+              "descripcion": "Gastos Varios Aduana",
+              "monetaria": "Bolivianos"
+            }
           ]
         },
         {
@@ -1136,17 +1147,17 @@
               "detalles": [
                 {
                   "codigo": "5.2.1.1.01",
-                  "descripcion": "Sub Convenio CITRMD",
+                  "descripcion": "Sub - Convenio CITRMD",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.2.1.1.02",
-                  "descripcion": "Sub Convenio PROFIT RURAL",
+                  "descripcion": "Sub - Convenio PROFIT RURAL",
                   "monetaria": "Bolivianos"
                 },
                 {
                   "codigo": "5.2.1.1.03",
-                  "descripcion": "Sub Convenio (Otros)",
+                  "descripcion": "Sub - Convenio (Otros)",
                   "monetaria": "Bolivianos"
                 }
               ]
