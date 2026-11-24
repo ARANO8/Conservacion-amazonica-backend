@@ -8,7 +8,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import {
   CreateSolicitudDto,
-  CreatePlanificacionDto,
   CreateNominaDto,
   CreateHospedajeDto,
 } from './dto/create-solicitud.dto';
@@ -39,10 +38,24 @@ import {
   validarLimitesViatico,
 } from './solicitudes.helper';
 import { SOLICITUD_INCLUDE } from './solicitudes.constants';
-import { ESTADOS_COMPROMISO_ACTIVO } from '../common/constants/financial.constants';
+import { PlanesViajeService } from '../planes-viaje/planes-viaje.service';
+import type { PlanViajeCompleto } from '../planes-viaje/planes-viaje.constants';
+import {
+  DESTINATARIO_ANEXOS,
+  ESTADOS_COMPROMISO_ACTIVO,
+  tarifaEnBolivianos,
+} from '../common/constants/financial.constants';
 import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
-import { PdfService } from '../pdf/pdf.service';
+import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
+import { Anexo2, construirAnexo2 } from './anexo2.builder';
+import { firmasDireccion } from '../pdf/firmas-direccion';
+
+/** Aprobador final que firma los PDF de compras. */
+const DIRECTOR_EJECUTIVO = {
+  nombre: 'Marcos Fernando Terán Valenzuela',
+  cargo: 'Director Ejecutivo',
+};
 
 type DetalleSolicitud = {
   montoTotalPresupuestado: Prisma.Decimal;
@@ -52,7 +65,7 @@ type DetalleSolicitud = {
       Prisma.ViaticoUncheckedCreateInput,
       'solicitudId' | 'solicitudPresupuestoId'
     >;
-    planificacionIndexes: number[];
+    planificacionIds: number[];
     poaId: number;
   }[];
   gastosData: {
@@ -69,10 +82,27 @@ type DetalleSolicitud = {
     >;
     poaId: number;
   }[];
-  planificaciones: CreatePlanificacionDto[];
+  /** Actividades del plan de viaje (vacío en compras y servicios) */
+  actividades: PlanViajeCompleto['actividades'];
   nominasTerceros: CreateNominaDto[];
   hospedajes: CreateHospedajeDto[];
 };
+
+/** Rango del viaje: de la primera fecha de inicio a la última de fin. */
+function rangoDelPlan(actividades: { fechaInicio: Date; fechaFin: Date }[]): {
+  fechaInicio: Date | null;
+  fechaFin: Date | null;
+} {
+  if (actividades.length === 0) return { fechaInicio: null, fechaFin: null };
+  return {
+    fechaInicio: new Date(
+      Math.min(...actividades.map((a) => a.fechaInicio.getTime())),
+    ),
+    fechaFin: new Date(
+      Math.max(...actividades.map((a) => a.fechaFin.getTime())),
+    ),
+  };
+}
 
 type SolicitudConRelaciones = Prisma.SolicitudGetPayload<{
   include: typeof SOLICITUD_INCLUDE;
@@ -89,6 +119,7 @@ export class SolicitudesService {
     private poaService: PoaService,
     private notificacionesService: NotificacionesService,
     private readonly pdfService: PdfService,
+    private readonly planesViajeService: PlanesViajeService,
   ) {}
 
   private async generarCodigo(tx: Prisma.TransactionClient): Promise<string> {
@@ -106,11 +137,50 @@ export class SolicitudesService {
     return `SOL-${anioActual}-${correlativo}`;
   }
 
+  /**
+   * Una solicitud eliminada conserva el vínculo con su plan (así `restore`
+   * puede recuperarlo) hasta que otra solicitud toma ese plan.
+   */
+  private async liberarPlanDeEliminadas(
+    tx: Prisma.TransactionClient,
+    planViajeId: number,
+  ): Promise<void> {
+    await tx.solicitud.updateMany({
+      where: { planViajeId, deletedAt: { not: null } },
+      data: { planViajeId: null },
+    });
+  }
+
+  /**
+   * El plan de viaje del que nace (o con el que se corrige) una solicitud de
+   * viaje. Compras y servicios no tienen plan.
+   */
+  private async resolverPlanViaje(
+    tipo: TipoSolicitud,
+    planViajeId: number | undefined,
+    emisorId: number,
+    solicitudId?: number,
+  ): Promise<PlanViajeCompleto | null> {
+    if (tipo !== TipoSolicitud.VIAJE) return null;
+    if (!planViajeId) {
+      throw new BadRequestException(
+        'Una solicitud de viaje debe nacer de un plan de viaje (ANEXO 1)',
+      );
+    }
+    return this.planesViajeService.obtenerParaSolicitud(
+      planViajeId,
+      emisorId,
+      solicitudId,
+    );
+  }
+
   private async prepararInsertAnidado(
     dto: CreateSolicitudDto | UpdateSolicitudDto,
+    plan: PlanViajeCompleto | null,
   ): Promise<DetalleSolicitud> {
+    const actividades = plan?.actividades ?? [];
+    const actividadesPorId = new Map(actividades.map((a) => [a.id, a]));
     const {
-      planificaciones = [],
       viaticos = [],
       gastos = [],
       gastosCompra = [],
@@ -136,7 +206,7 @@ export class SolicitudesService {
         Prisma.ViaticoUncheckedCreateInput,
         'solicitudId' | 'solicitudPresupuestoId'
       >;
-      planificacionIndexes: number[];
+      planificacionIds: number[];
       poaId: number;
     }[] = [];
 
@@ -157,23 +227,24 @@ export class SolicitudesService {
         );
       }
 
-      for (const idx of vDto.planificacionIndexes) {
-        if (!planificaciones[idx]) {
+      // Cada actividad del viático debe ser del plan, y el viático no puede
+      // cubrir más personas de las que la actividad declara
+      for (const actividadId of vDto.planificacionIds) {
+        const actividad = actividadesPorId.get(actividadId);
+        if (!actividad) {
           throw new BadRequestException(
-            `Índice de planificación ${idx} es inválido`,
+            `El viático referencia la actividad ${actividadId}, que no pertenece al plan de viaje. Revisa las actividades asignadas`,
           );
         }
+        validarLimitesViatico(vDto, actividad);
       }
 
-      // Validamos la capacidad contra cada planificación referenciada por el viático
-      for (const idx of vDto.planificacionIndexes) {
-        validarLimitesViatico(vDto, planificaciones[idx]);
-      }
-
-      const precioCatalogo =
+      const precioCatalogo = tarifaEnBolivianos(
         vDto.tipoDestino === 'INSTITUCIONAL'
           ? concepto.precioInstitucional
-          : concepto.precioTerceros;
+          : concepto.precioTerceros,
+        concepto.moneda,
+      );
 
       // montoNeto (si se provee) es el VALOR TOTAL (días * personas * unitario).
       // Derivamos el precio unitario para los cálculos de impuestos y almacenamiento.
@@ -212,7 +283,7 @@ export class SolicitudesService {
       montoTotalNeto = montoTotalNeto.add(finalMontoNeto);
 
       viaticosData.push({
-        planificacionIndexes: vDto.planificacionIndexes,
+        planificacionIds: vDto.planificacionIds,
         poaId: vDto.poaId,
         data: {
           conceptoId: vDto.conceptoId,
@@ -361,14 +432,24 @@ export class SolicitudesService {
       });
     }
 
-    // --- Validar índices de planificación de la nómina de terceros ---
+    // --- Nómina de terceros: por actividad, tantos como declara el plan ---
+    const tercerosPorActividad = new Map<number, number>();
     for (const n of nominasTerceros) {
-      if (n.planificacionIndex === undefined || n.planificacionIndex === null) {
-        continue;
-      }
-      if (!planificaciones[n.planificacionIndex]) {
+      if (!actividadesPorId.has(n.planificacionId)) {
         throw new BadRequestException(
-          `Índice de planificación ${n.planificacionIndex} es inválido en la nómina de terceros`,
+          `La nómina de terceros referencia la actividad ${n.planificacionId}, que no pertenece al plan de viaje`,
+        );
+      }
+      tercerosPorActividad.set(
+        n.planificacionId,
+        (tercerosPorActividad.get(n.planificacionId) ?? 0) + 1,
+      );
+    }
+    for (const actividad of actividades) {
+      const registrados = tercerosPorActividad.get(actividad.id) ?? 0;
+      if (registrados !== actividad.cantidadPersonasTerceros) {
+        throw new BadRequestException(
+          `En "${actividad.actividadProgramada}" el plan declara ${actividad.cantidadPersonasTerceros} tercero(s) pero la nómina registra ${registrados}`,
         );
       }
     }
@@ -379,7 +460,7 @@ export class SolicitudesService {
       viaticosData,
       gastosData,
       gastosCompraData,
-      planificaciones,
+      actividades,
       nominasTerceros,
       hospedajes: hospedajesData,
     };
@@ -391,44 +472,13 @@ export class SolicitudesService {
     presupuestosMap: Map<number, number>,
     tx: Prisma.TransactionClient,
   ): Promise<void> {
-    // C. Crear Planificaciones y mapear IDs
-    const createdPlanificaciones: { id: number }[] = [];
-    for (const p of detalles.planificaciones) {
-      const d1 = new Date(p.fechaInicio);
-      const d2 = new Date(p.fechaFin);
-      const diferenciaMilisegundos = d2.getTime() - d1.getTime();
-      const diasExactos = diferenciaMilisegundos / (1000 * 60 * 60 * 24);
-      const diasFinales =
-        p.dias !== undefined && p.dias !== null
-          ? Number(p.dias)
-          : Number(diasExactos.toFixed(2));
-
-      this.logger.log(
-        `[insertarRelaciones] Creando Planificacion: actividad="${p.actividad}", fechaInicio=${p.fechaInicio}, fechaFin=${p.fechaFin}, diasFinales=${diasFinales}`,
-      );
-      const cp = await tx.planificacion.create({
-        data: {
-          actividadProgramada: p.actividad,
-          fechaInicio: d1,
-          fechaFin: d2,
-          diasCalculados: diasFinales,
-          cantidadPersonasInstitucional: p.cantInstitucional,
-          cantidadPersonasTerceros: p.cantTerceros,
-          solicitudId,
-        },
-      });
-      createdPlanificaciones.push({ id: cp.id });
-      this.logger.log(
-        `[insertarRelaciones] Planificacion creada OK (id=${cp.id})`,
-      );
-    }
-
+    // C. Las actividades ya existen: son las filas del plan de viaje
     // D. Crear Viáticos
     for (let idx = 0; idx < detalles.viaticosData.length; idx++) {
       const vItem = detalles.viaticosData[idx];
       const spId = presupuestosMap.get(vItem.poaId);
       this.logger.log(
-        `[insertarRelaciones] Creando Viatico ${idx}: poaId=${vItem.poaId}, spId=${spId}, planificacionIndexes=${JSON.stringify(vItem.planificacionIndexes)}, data=${JSON.stringify(vItem.data)}`,
+        `[insertarRelaciones] Creando Viatico ${idx}: poaId=${vItem.poaId}, spId=${spId}, planificacionIds=${JSON.stringify(vItem.planificacionIds)}, data=${JSON.stringify(vItem.data)}`,
       );
       await tx.viatico.create({
         data: {
@@ -436,9 +486,7 @@ export class SolicitudesService {
           solicitudId,
           solicitudPresupuestoId: presupuestosMap.get(vItem.poaId)!,
           planificaciones: {
-            connect: vItem.planificacionIndexes.map((i) => ({
-              id: createdPlanificaciones[i].id,
-            })),
+            connect: vItem.planificacionIds.map((id) => ({ id })),
           },
         },
       });
@@ -505,10 +553,7 @@ export class SolicitudesService {
           nombreCompleto: n.nombreCompleto.trim().toUpperCase(),
           procedenciaInstitucion: n.procedenciaInstitucion.trim().toUpperCase(),
           solicitudId,
-          planificacionId:
-            n.planificacionIndex !== undefined && n.planificacionIndex !== null
-              ? (createdPlanificaciones[n.planificacionIndex]?.id ?? null)
-              : null,
+          planificacionId: n.planificacionId,
         },
       });
     }
@@ -521,15 +566,20 @@ export class SolicitudesService {
     const {
       poaIds,
       descripcion,
-      aprobadorId,
       lugarViaje,
       motivoViaje,
       proyecto,
       chequeANombreDe,
-      tipo,
       urlCuadroComparativo,
       urlCotizaciones,
+      planViajeId,
     } = createSolicitudDto;
+    const tipo = createSolicitudDto.tipo ?? TipoSolicitud.VIAJE;
+
+    // Un viaje nace de su plan (ANEXO 1). El plan no tiene VoBo: el Director
+    // de Programa que revisa la solicitud lo elige el emisor al enviarla.
+    const plan = await this.resolverPlanViaje(tipo, planViajeId, usuarioId);
+    const aprobadorId = createSolicitudDto.aprobadorId;
 
     this.logger.log(
       `[create] INICIO — usuarioId=${usuarioId}, aprobadorId=${aprobadorId}, poaIds=${JSON.stringify(poaIds)}`,
@@ -540,6 +590,15 @@ export class SolicitudesService {
     const esContratoConsultoria = esConsultoria(createSolicitudDto);
 
     if (!esContratoConsultoria) {
+      // Sin id, la búsqueda del aprobador devolvería a cualquier usuario
+      if (aprobadorId === undefined) {
+        throw new BadRequestException(
+          tipo === TipoSolicitud.VIAJE
+            ? 'Elige al Director de Programa que revisará la solicitud'
+            : 'Debes asignar un aprobador a la solicitud',
+        );
+      }
+
       // VALIDACIÓN: Evitar Auto-Aprobación
       if (aprobadorId === usuarioId) {
         throw new BadRequestException(
@@ -557,6 +616,10 @@ export class SolicitudesService {
         );
       }
 
+      if (tipo === TipoSolicitud.VIAJE) {
+        this.validarDirectorPrograma(aprobador);
+      }
+
       this.logger.log(`[create] Aprobador validado OK (id=${aprobadorId})`);
     } else {
       this.logger.log(
@@ -564,36 +627,19 @@ export class SolicitudesService {
       );
     }
 
-    const detalles = await this.prepararInsertAnidado(createSolicitudDto);
+    const detalles = await this.prepararInsertAnidado(createSolicitudDto, plan);
 
     this.logger.log(
-      `[create] prepararInsertAnidado OK — viaticosData=${detalles.viaticosData.length}, gastosData=${detalles.gastosData.length}, hospedajes=${detalles.hospedajes.length}, planificaciones=${detalles.planificaciones.length}`,
+      `[create] prepararInsertAnidado OK — viaticosData=${detalles.viaticosData.length}, gastosData=${detalles.gastosData.length}, hospedajes=${detalles.hospedajes.length}, actividades=${detalles.actividades.length}`,
     );
     this.logger.log(
       `[create] montoTotalPresupuestado=${detalles.montoTotalPresupuestado.toString()}, montoTotalNeto=${detalles.montoTotalNeto.toString()}`,
     );
 
-    // --- CÁLCULO DE FECHAS (Strict Separation) ---
-    let minDate: Date | null = null;
-    let maxDate: Date | null = null;
-
-    if (detalles.planificaciones && detalles.planificaciones.length > 0) {
-      minDate = detalles.planificaciones.reduce(
-        (min, p) => {
-          const current = new Date(p.fechaInicio);
-          return !min || current < min ? current : min;
-        },
-        null as Date | null,
-      );
-
-      maxDate = detalles.planificaciones.reduce(
-        (max, p) => {
-          const current = new Date(p.fechaFin);
-          return !max || current > max ? current : max;
-        },
-        null as Date | null,
-      );
-    }
+    // Las fechas del viaje salen del cronograma del plan
+    const { fechaInicio: minDate, fechaFin: maxDate } = rangoDelPlan(
+      detalles.actividades,
+    );
 
     // 3. TRANSACCIÓN PRISMA
     if (!poaIds || poaIds.length === 0) {
@@ -704,19 +750,24 @@ export class SolicitudesService {
         }
       }
 
+      // Una solicitud eliminada conserva su plan hasta que otra lo toma
+      if (plan) await this.liberarPlanDeEliminadas(tx, plan.id);
+
       // A. Crear Solicitud
       this.logger.log(`[create TX] Creando solicitud...`);
       const solicitud = await tx.solicitud.create({
         data: {
           codigoSolicitud,
-          tipo: tipo ?? TipoSolicitud.VIAJE,
+          tipo,
           descripcion,
           proyecto: proyecto?.trim() || null,
           chequeANombreDe: chequeANombreDe?.trim() || null,
           montoTotalPresupuestado: detalles.montoTotalPresupuestado,
           montoTotalNeto: detalles.montoTotalNeto,
-          lugarViaje: lugarViaje ?? null,
-          motivoViaje: motivoViaje ?? null,
+          // Copiados del plan para que listados y ANEXO 2 no cambien
+          lugarViaje: plan ? plan.lugaresViaje : (lugarViaje ?? null),
+          motivoViaje: plan ? plan.objetivoViaje : (motivoViaje ?? null),
+          ...(plan ? { planViaje: { connect: { id: plan.id } } } : {}),
           urlCuadroComparativo,
           urlCotizaciones: urlCotizaciones ?? [],
           fechaInicio: minDate,
@@ -727,7 +778,11 @@ export class SolicitudesService {
           usuarioEmisor: { connect: { id: usuarioId } },
           ...(esContratoConsultoria
             ? {}
-            : { aprobador: { connect: { id: aprobadorId } } }),
+            : {
+                aprobador: { connect: { id: aprobadorId } },
+                // Quien la recibe primero es el Director de Programa
+                directorPrograma: { connect: { id: aprobadorId } },
+              }),
           usuarioBeneficiado: { connect: { id: usuarioId } },
         },
       });
@@ -758,7 +813,7 @@ export class SolicitudesService {
         );
       }
 
-      // C–F. Insertar relaciones anidadas (planificaciones, viáticos, hospedajes, gastos, nóminas)
+      // C–F. Insertar relaciones anidadas (viáticos, hospedajes, gastos, nóminas)
       this.logger.log(`[create TX] Insertando relaciones anidadas...`);
       await this.insertarRelacionesSolicitud(
         solicitud.id,
@@ -789,7 +844,7 @@ export class SolicitudesService {
       if (!esContratoConsultoria && aprobadorId !== undefined) {
         await this.notificacionesService.crearNotificacion({
           titulo: 'Nueva solicitud asignada',
-          mensaje: `Se ha asignado la solicitud ${result.codigoSolicitud} para tu aprobación`,
+          mensaje: `Se te asignó la solicitud ${result.codigoSolicitud} para tu revisión como Director de Programa`,
           tipo: 'SOLICITUD_ASIGNADA',
           usuarioId: aprobadorId,
           solicitudId: result.id,
@@ -886,11 +941,49 @@ export class SolicitudesService {
     }
   }
 
-  async generatePdf(
+  /**
+   * ANEXO 2 en HTML, generado con la misma plantilla que el PDF para que la
+   * vista de detalle y el documento impreso sean idénticos.
+   */
+  async getAnexo2Html(
     id: number,
     usuario?: { id: number; rol: Rol },
-  ): Promise<Buffer> {
+  ): Promise<string> {
     const solicitud = await this.findOne(id, usuario);
+    if (solicitud.tipo !== TipoSolicitud.VIAJE) {
+      throw new BadRequestException(
+        'El ANEXO 2 solo aplica a solicitudes de viaje',
+      );
+    }
+    return this.pdfService.renderHtml(
+      'anexo2.hbs',
+      await this.armarAnexo2(solicitud),
+    );
+  }
+
+  private async armarAnexo2(
+    solicitud: SolicitudConRelaciones,
+  ): Promise<Anexo2> {
+    const catalogo = await this.prisma.concepto.findMany();
+    const { revisadoPor } = await firmasDireccion(this.prisma);
+    return construirAnexo2(
+      solicitud,
+      catalogo,
+      DESTINATARIO_ANEXOS,
+      revisadoPor,
+    );
+  }
+
+  /** Datos y plantilla del documento: de aquí salen el PDF y la vista. */
+  private async armarDocumento(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<DocumentoPdf> {
+    const solicitud = await this.findOne(id, usuario);
+
+    if (solicitud.tipo === TipoSolicitud.VIAJE) {
+      return documentoPdf('anexo2.hbs', await this.armarAnexo2(solicitud));
+    }
     const cuentaBancaria =
       solicitud.presupuestos?.[0]?.poa?.estructura?.proyecto?.cuentaBancaria;
 
@@ -906,10 +999,7 @@ export class SolicitudesService {
       solicitud.aprobador?.cargo,
     );
 
-    const aprobadorFinal = {
-      nombre: 'Marcos Fernando Terán Valenzuela',
-      cargo: 'Director Ejecutivo',
-    };
+    const aprobadorFinal = DIRECTOR_EJECUTIVO;
 
     const detalle = [
       ...(solicitud.viaticos ?? []).map((viatico) => ({
@@ -967,7 +1057,7 @@ export class SolicitudesService {
           .join(' — ')
       : null;
 
-    return this.pdfService.generatePdf('solicitud.hbs', {
+    return documentoPdf('solicitud.hbs', {
       ...solicitud,
       codigoSolicitud: solicitud.codigoSolicitud,
       fechaSolicitud: this.formatDate(solicitud.fechaSolicitud),
@@ -1008,6 +1098,21 @@ export class SolicitudesService {
         : null,
       detalle,
     });
+  }
+
+  async generatePdf(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<Buffer> {
+    return this.pdfService.pdfDe(await this.armarDocumento(id, usuario));
+  }
+
+  /** El documento en HTML, idéntico al PDF, para verlo en el detalle. */
+  async getDocumentoHtml(
+    id: number,
+    usuario?: { id: number; rol: Rol },
+  ): Promise<string> {
+    return this.pdfService.htmlDe(await this.armarDocumento(id, usuario));
   }
 
   private formatDate(value: Date | string | null | undefined): string {
@@ -1108,14 +1213,13 @@ export class SolicitudesService {
     }
 
     const {
-      aprobadorId,
+      aprobadorId: aprobadorIdDto,
       lugarViaje,
       motivoViaje,
       descripcion,
       urlCuadroComparativo,
       urlCotizaciones,
       poaIds,
-      planificaciones,
       viaticos,
       gastos,
       hospedajes,
@@ -1123,7 +1227,26 @@ export class SolicitudesService {
       gastosCompra,
       proyecto,
       chequeANombreDe,
+      planViajeId,
     } = updateSolicitudDto;
+
+    // El plan se revalida al corregir: pudo haberse editado mientras la
+    // solicitud estaba observada. Se admite cambiarlo por otro plan libre.
+    const plan = await this.resolverPlanViaje(
+      solicitud.tipo,
+      planViajeId ?? solicitud.planViajeId ?? undefined,
+      solicitud.usuarioEmisorId,
+      id,
+    );
+
+    // En un viaje el Director de Programa se designa una sola vez: al subsanar,
+    // la solicitud vuelve a él aunque el cliente envíe otro aprobador. Las
+    // solicitudes anteriores al campo usan el que venga en el DTO.
+    const esViaje = solicitud.tipo === TipoSolicitud.VIAJE;
+    const aprobadorId =
+      esViaje && solicitud.directorProgramaId
+        ? solicitud.directorProgramaId
+        : aprobadorIdDto;
 
     // VALIDACIÓN 2: Mandatory Approver on Subsanación
     if (aprobadorId === undefined) {
@@ -1148,10 +1271,13 @@ export class SolicitudesService {
         `El aprobador con ID ${aprobadorId} no existe o ha sido eliminado del sistema`,
       );
     }
+    if (esViaje) {
+      this.validarDirectorPrograma(aprobadorUpdate);
+    }
 
     const debeReemplazarRelacionesAnidadas =
       poaIds !== undefined ||
-      planificaciones !== undefined ||
+      planViajeId !== undefined ||
       viaticos !== undefined ||
       gastos !== undefined ||
       hospedajes !== undefined ||
@@ -1178,7 +1304,6 @@ export class SolicitudesService {
         const dtoParaReemplazo: UpdateSolicitudDto = {
           ...updateSolicitudDto,
           poaIds: poaIdsActualizados,
-          planificaciones: planificaciones ?? [],
           viaticos: viaticos ?? [],
           gastos: gastos ?? [],
           hospedajes: hospedajes ?? [],
@@ -1187,7 +1312,10 @@ export class SolicitudesService {
         };
 
         // B. Recalcular y re-insertar
-        const detalles = await this.prepararInsertAnidado(dtoParaReemplazo);
+        const detalles = await this.prepararInsertAnidado(
+          dtoParaReemplazo,
+          plan,
+        );
 
         // Validación: todas las referencias por POA deben existir en poaIds
         const poaIdSet = new Set(poaIdsActualizados);
@@ -1223,39 +1351,24 @@ export class SolicitudesService {
           }
         }
 
-        // A. Limpiar existentes (orden: hijos primero por FK)
+        // A. Limpiar existentes (orden: hijos primero por FK). Las
+        // actividades NO se borran: pertenecen al plan de viaje, no a la
+        // solicitud.
         await tx.viatico.deleteMany({ where: { solicitudId: id } });
         await tx.gasto.deleteMany({ where: { solicitudId: id } });
         await tx.hospedaje.deleteMany({ where: { solicitudId: id } });
         await tx.gastoCompra.deleteMany({ where: { solicitudId: id } });
         await tx.personaExterna.deleteMany({ where: { solicitudId: id } });
-        await tx.planificacion.deleteMany({ where: { solicitudId: id } });
         await tx.solicitudPresupuesto.deleteMany({
           where: { solicitudId: id },
         });
         finalMontoTotalPresupuestado = detalles.montoTotalPresupuestado;
         finalMontoTotalNeto = detalles.montoTotalNeto;
 
-        // --- CÁLCULO DE FECHAS (Update - Strict Separation) ---
-        if (detalles.planificaciones && detalles.planificaciones.length > 0) {
-          finalFechaInicio = detalles.planificaciones.reduce(
-            (min, p) => {
-              const current = new Date(p.fechaInicio);
-              return !min || current < min ? current : min;
-            },
-            null as Date | null,
-          );
-
-          finalFechaFin = detalles.planificaciones.reduce(
-            (max, p) => {
-              const current = new Date(p.fechaFin);
-              return !max || current > max ? current : max;
-            },
-            null as Date | null,
-          );
-        } else {
-          finalFechaInicio = null;
-          finalFechaFin = null;
+        // Las fechas del viaje salen del cronograma del plan
+        if (plan) {
+          ({ fechaInicio: finalFechaInicio, fechaFin: finalFechaFin } =
+            rangoDelPlan(detalles.actividades));
         }
 
         // B.5 Recrear SolicitudPresupuesto
@@ -1279,12 +1392,15 @@ export class SolicitudesService {
       // SYNC: Recalcular subtotales de los presupuestos involucrados
       await this.presupuestoService.recalcularTotales(id, tx);
 
+      if (plan) await this.liberarPlanDeEliminadas(tx, plan.id);
+
       // D. Actualizar Cabecera
-      return tx.solicitud.update({
+      const actualizada = await tx.solicitud.update({
         where: { id },
         data: {
-          lugarViaje,
-          motivoViaje,
+          lugarViaje: plan ? plan.lugaresViaje : lugarViaje,
+          motivoViaje: plan ? plan.objetivoViaje : motivoViaje,
+          ...(plan ? { planViaje: { connect: { id: plan.id } } } : {}),
           descripcion,
           proyecto: proyecto !== undefined ? proyecto : undefined,
           chequeANombreDe:
@@ -1307,7 +1423,11 @@ export class SolicitudesService {
           observacion: null,
           ...(esContratoEnEjecucion
             ? {}
-            : { aprobador: { connect: { id: aprobadorId } } }),
+            : {
+                aprobador: { connect: { id: aprobadorId } },
+                // Quien la recibe primero es el Director de Programa
+                directorPrograma: { connect: { id: aprobadorId } },
+              }),
         },
         include: SOLICITUD_INCLUDE,
       });
@@ -1320,7 +1440,9 @@ export class SolicitudesService {
           solicitudId: id,
         },
       });
-      this.logger.log(`[create TX] Historial CORREGIDO registrado`);
+      this.logger.log(`[update TX] Historial CORREGIDO registrado`);
+
+      return actualizada;
     });
 
     try {
@@ -1389,10 +1511,74 @@ export class SolicitudesService {
       throw new NotFoundException(`Solicitud con ID ${id} no encontrada`);
     }
 
+    // Mientras estuvo eliminada, otra solicitud pudo tomar su plan de viaje
+    if (solicitud.tipo === TipoSolicitud.VIAJE && !solicitud.planViajeId) {
+      throw new BadRequestException(
+        'No se puede restaurar: su plan de viaje ya respalda otra solicitud',
+      );
+    }
+
     return this.prisma.solicitud.update({
       where: { id },
       data: { deletedAt: null },
     });
+  }
+
+  /**
+   * Dirección Financiera (rol TESORERO) aprueba los viajes: quien tiene ese rol
+   * no puede además revisarlos como Director de Programa.
+   */
+  private validarDirectorPrograma(usuario: { rol: Rol }): void {
+    if (usuario.rol === Rol.TESORERO) {
+      throw new BadRequestException(
+        'Dirección Financiera aprueba la solicitud: no puede ser designada como Director de Programa',
+      );
+    }
+  }
+
+  /**
+   * Flujo de un viaje: emisor -> Director de Programa -> Dirección Financiera.
+   * Solo el Director de Programa envía, y siempre a un Tesorero; en Dirección
+   * Financiera ya no se deriva: se aprueba (desembolsa) u observa.
+   */
+  private async destinoRevisionDirector(
+    solicitud: { directorProgramaId: number | null },
+    usuarioId: number,
+    solicitado?: number,
+  ): Promise<number> {
+    // Solicitudes anteriores al campo: quien la tiene hace de director
+    const directorId = solicitud.directorProgramaId ?? usuarioId;
+    if (usuarioId !== directorId) {
+      throw new ForbiddenException(
+        'En Dirección Financiera la solicitud solo se aprueba u observa; ya no se deriva',
+      );
+    }
+
+    const tesoreros = await this.prisma.usuario.findMany({
+      where: { rol: Rol.TESORERO, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (solicitado !== undefined) {
+      if (!tesoreros.some((t) => t.id === solicitado)) {
+        throw new BadRequestException(
+          'El Director de Programa solo puede enviar la solicitud a Dirección Financiera',
+        );
+      }
+      return solicitado;
+    }
+
+    if (tesoreros.length === 0) {
+      throw new BadRequestException(
+        'No hay un usuario activo de Dirección Financiera (Tesorero) para recibir la solicitud',
+      );
+    }
+    if (tesoreros.length > 1) {
+      throw new BadRequestException(
+        'Hay más de un usuario de Dirección Financiera: indica a cuál enviar la solicitud',
+      );
+    }
+    return tesoreros[0].id;
   }
 
   async aprobar(
@@ -1414,7 +1600,20 @@ export class SolicitudesService {
       );
     }
 
-    const { nuevoAprobadorId } = aprobarDto;
+    const nuevoAprobadorId =
+      solicitud.tipo === TipoSolicitud.VIAJE
+        ? await this.destinoRevisionDirector(
+            solicitud,
+            usuarioId,
+            aprobarDto.nuevoAprobadorId,
+          )
+        : aprobarDto.nuevoAprobadorId;
+
+    if (nuevoAprobadorId === undefined) {
+      throw new BadRequestException(
+        'El ID del nuevo aprobador es obligatorio para derivar',
+      );
+    }
 
     // Verificar que el nuevo aprobador existe y no está eliminado (soft-delete guard)
     const nuevoAprobador = await this.prisma.usuario.findFirst({
@@ -1451,7 +1650,10 @@ export class SolicitudesService {
       // Crear notificación para el nuevo aprobador
       await this.notificacionesService.crearNotificacion({
         titulo: 'Solicitud derivada',
-        mensaje: `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
+        mensaje:
+          solicitudActualizada.tipo === TipoSolicitud.VIAJE
+            ? `La solicitud ${solicitudActualizada.codigoSolicitud} fue revisada por el Director de Programa y requiere tu aprobación`
+            : `La solicitud ${solicitudActualizada.codigoSolicitud} ha sido derivada para tu aprobación`,
         tipo: 'SOLICITUD_DERIVADA',
         usuarioId: nuevoAprobadorId,
         solicitudId: solicitudActualizada.id,
@@ -1563,6 +1765,22 @@ export class SolicitudesService {
       throw new BadRequestException(
         'La solicitud debe estar en estado PENDIENTE para ser desembolsada',
       );
+    }
+
+    // Un viaje pasa por el Director de Programa antes de Dirección Financiera:
+    // no se desembolsa mientras siga en revisión, y solo lo hace quien la
+    // tiene en su bandeja (o un ADMIN).
+    if (solicitud.tipo === TipoSolicitud.VIAJE) {
+      if (solicitud.aprobador?.rol !== Rol.TESORERO) {
+        throw new BadRequestException(
+          'El Director de Programa aún no envió la solicitud a Dirección Financiera',
+        );
+      }
+      if (usuario.rol !== Rol.ADMIN && solicitud.aprobadorId !== usuario.id) {
+        throw new ForbiddenException(
+          'Solo quien tiene la solicitud en Dirección Financiera puede desembolsarla',
+        );
+      }
     }
 
     const solicitudActualizada = await this.prisma.$transaction(async (tx) => {

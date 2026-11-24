@@ -7,6 +7,7 @@ import { SolicitudPresupuestoModule } from '../solicitudes-presupuestos/solicitu
 import { PoaModule } from '../poa/poa.module';
 import { NotificacionesModule } from '../notificaciones/notificaciones.module';
 import { PdfModule } from '../pdf/pdf.module';
+import { PlanesViajeModule } from '../planes-viaje/planes-viaje.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { PdfModule } from '../pdf/pdf.module';
     SolicitudPresupuestoModule,
     PoaModule,
     NotificacionesModule,
+    PlanesViajeModule,
   ],
   controllers: [SolicitudesController],
   providers: [SolicitudesService],

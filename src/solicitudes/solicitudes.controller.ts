@@ -13,6 +13,7 @@ import {
   Logger,
   Query,
   BadRequestException,
+  Header,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -61,7 +62,7 @@ export class SolicitudesController {
     @Req() req: RequestWithUser,
   ) {
     this.logger.log(
-      `[CREATE] usuarioId=${req.user.userId} | poaIds=${JSON.stringify(createSolicitudDto.poaIds)} | viaticos=${createSolicitudDto.viaticos?.length ?? 0} | gastos=${createSolicitudDto.gastos?.length ?? 0} | hospedajes=${createSolicitudDto.hospedajes?.length ?? 0} | planificaciones=${createSolicitudDto.planificaciones?.length ?? 0}`,
+      `[CREATE] usuarioId=${req.user.userId} | poaIds=${JSON.stringify(createSolicitudDto.poaIds)} | viaticos=${createSolicitudDto.viaticos?.length ?? 0} | gastos=${createSolicitudDto.gastos?.length ?? 0} | hospedajes=${createSolicitudDto.hospedajes?.length ?? 0} | planViajeId=${createSolicitudDto.planViajeId ?? '-'}`,
     );
     this.logger.debug(
       `[CREATE] Body completo: ${JSON.stringify(createSolicitudDto)}`,
@@ -98,6 +99,23 @@ export class SolicitudesController {
   @ApiOperation({ summary: 'Obtener detalle de una solicitud' })
   findOne(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
     return this.solicitudesService.findOne(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  @Get(':id/anexo2')
+  @ApiOperation({
+    summary:
+      'ANEXO 2 de una solicitud de viaje en HTML (misma plantilla que el PDF)',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  getAnexo2(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ): Promise<string> {
+    return this.solicitudesService.getAnexo2Html(id, {
       id: req.user.userId,
       rol: req.user.rol,
     });
@@ -237,6 +255,23 @@ export class SolicitudesController {
     @Req() req: RequestWithUser,
   ) {
     return this.solicitudesService.pagarPago(id, pagoId, req.user.userId);
+  }
+
+  @Get(':id/documento')
+  @ApiOperation({
+    summary:
+      'HTML de la solicitud (ANEXO 2 o ANEXO 3), con la misma plantilla que el PDF',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  getDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ): Promise<string> {
+    return this.solicitudesService.getDocumentoHtml(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
   }
 
   @SkipThrottle()

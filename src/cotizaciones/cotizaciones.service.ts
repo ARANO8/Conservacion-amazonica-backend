@@ -8,7 +8,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCotizacionDto } from './dto/create-cotizacion.dto';
 import { UpdateCotizacionDto } from './dto/update-cotizacion.dto';
 import { Rol, Prisma } from '@prisma/client';
-import { PdfService } from '../pdf/pdf.service';
+import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
 import { COTIZACION_INCLUDE } from './cotizaciones.constants';
 import { montoEnLetrasBolivianos } from './cotizaciones.helper';
 
@@ -206,7 +206,11 @@ export class CotizacionesService {
     return { message: 'Cotización eliminada correctamente' };
   }
 
-  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+  /** Datos y plantilla del documento: de aquí salen el PDF y la vista. */
+  private async armarDocumento(
+    id: number,
+    user?: UsuarioContexto,
+  ): Promise<DocumentoPdf> {
     const cotizacion = await this.findOne(id, user);
     const totalNumero = Number(cotizacion.total ?? 0);
 
@@ -221,7 +225,7 @@ export class CotizacionesService {
     const filasMinimas = Math.max(0, FILAS_TABLA_PDF - lineas.length);
     const filasVacias = Array.from({ length: filasMinimas }, () => ({}));
 
-    return this.pdfService.generatePdf('cotizacion.hbs', {
+    return documentoPdf('cotizacion.hbs', {
       codigoCotizacion: cotizacion.codigoCotizacion,
       fecha: this.formatDate(cotizacion.fecha),
       proveedorNombre: cotizacion.proveedorNombre,
@@ -238,6 +242,15 @@ export class CotizacionesService {
       lineas,
       filasVacias,
     });
+  }
+
+  async generatePdf(id: number, user?: UsuarioContexto): Promise<Buffer> {
+    return this.pdfService.pdfDe(await this.armarDocumento(id, user));
+  }
+
+  /** El documento en HTML, idéntico al PDF, para verlo en el detalle. */
+  async getDocumentoHtml(id: number, user?: UsuarioContexto): Promise<string> {
+    return this.pdfService.htmlDe(await this.armarDocumento(id, user));
   }
 
   private formatDate(value: Date | string | null | undefined): string {

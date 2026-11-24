@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Res,
   Logger,
+  Header,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -200,6 +201,23 @@ export class CuadrosComparativosController {
       { id: req.user.userId, rol: req.user.rol },
       dto.motivo,
     );
+  }
+
+  @Get(':id/documento')
+  @ApiOperation({
+    summary:
+      'HTML de el cuadro comparativo (ANEXO 11), con la misma plantilla que el PDF',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  getDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ): Promise<string> {
+    return this.cuadrosService.getDocumentoHtml(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
   }
 
   @SkipThrottle()

@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Declaración Jurada de Movilidad — {{codigoDeclaracion}}</title>
+    {{> estilos-documento}}
+    <style>
+      .declaro {
+        margin-top: 4mm;
+        text-align: justify;
+      }
+      .grilla tfoot td {
+        background: #d9d9d9;
+        font-weight: bold;
+      }
+      .emision {
+        margin-top: 10mm;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="hoja">
+      {{> encabezado anexo="ANEXO 6" titulo="Declaración Jurada de Movilidad" nota="(Expresado en Bolivianos)" codigo=codigoDeclaracion}}
+
+      <table class="datos no-romper">
+        <tr>
+          <td class="etiqueta">NOMBRE:</td>
+          <td class="valor">{{nombre}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">CARGO:</td>
+          <td class="valor">{{cargo}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">MOTIVO/ACTIVIDAD:</td>
+          <td class="valor">{{motivoActividad}}</td>
+        </tr>
+        <tr>
+          <td class="etiqueta">PROYECTO/PARTIDA PPTAL:</td>
+          <td class="valor">{{proyectoPartida}}</td>
+        </tr>
+      </table>
+
+      <p class="declaro">
+        De conformidad a las instrucciones impartidas por la institución
+        <strong><em>DECLARO BAJO JURAMENTO</em></strong>
+        haber realizado los gastos de movilidad que a continuación detallo:
+      </p>
+
+      <table class="grilla no-romper">
+        <thead>
+          <tr>
+            <th style="width: 16%">FECHA</th>
+            <th style="width: 19%">ORIGEN</th>
+            <th style="width: 19%">DESTINO</th>
+            <th>MOTIVO</th>
+            <th style="width: 17%">MONTO Bs</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each detalles}}
+            <tr>
+              <td class="c">{{this.fecha}}</td>
+              <td>{{this.origen}}</td>
+              <td>{{this.destino}}</td>
+              <td>{{this.motivo}}</td>
+              <td class="r mono">{{this.monto}}</td>
+            </tr>
+          {{/each}}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="4" class="c">TOTAL</td>
+            <td class="r mono">{{totalBruto}}</td>
+          </tr>
+          <tr>
+            <td colspan="4" class="c">Menos retención impositiva por servicios 16%</td>
+            <td class="r mono">{{retencion}}</td>
+          </tr>
+          <tr>
+            <td colspan="4" class="c">TOTAL</td>
+            <td class="r mono">{{totalLiquido}}</td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <table class="emision">
+        <tr>
+          <td class="lugar">{{lugarEmision}}</td>
+          <td class="fecha">{{fechaEmision}}</td>
+        </tr>
+      </table>
+
+      <table class="firmas no-romper">
+        <tr>
+          <td>
+            <div class="firma-linea">Preparado por</div>
+            <div class="firma-nombre">
+              {{nombre}}
+              <div class="firma-cargo">{{cargo}}</div>
+            </div>
+          </td>
+          <td>
+            <div class="firma-linea">Revisado por</div>
+            <div class="firma-nombre">
+              {{firmas.revisadoPor.nombre}}
+              <div class="firma-cargo">{{firmas.revisadoPor.cargo}}</div>
+            </div>
+          </td>
+          <td>
+            <div class="firma-linea">Aprobado por</div>
+            <div class="firma-nombre">
+              {{firmas.aprobadoPor.nombre}}
+              <div class="firma-cargo">{{firmas.aprobadoPor.cargo}}</div>
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+  </body>
+</html>

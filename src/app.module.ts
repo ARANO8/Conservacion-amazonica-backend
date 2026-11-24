@@ -24,8 +24,11 @@ import { PdfModule } from './pdf/pdf.module';
 import { CotizacionesModule } from './cotizaciones/cotizaciones.module';
 import { CuadrosComparativosModule } from './cuadros-comparativos/cuadros-comparativos.module';
 import { OrdenesCompraModule } from './ordenes-compra/ordenes-compra.module';
-import { InformesActividadesModule } from './informes-actividades/informes-actividades.module';
+import { InformesViajeModule } from './informes-viaje/informes-viaje.module';
+import { DeclaracionesMovilidadModule } from './declaraciones-movilidad/declaraciones-movilidad.module';
 import { HealthModule } from './health/health.module';
+import { PlanesViajeModule } from './planes-viaje/planes-viaje.module';
+import { LiquidacionesViaticosModule } from './liquidaciones-viaticos/liquidaciones-viaticos.module';
 
 const DEFAULT_THROTTLE_TTL_MS = 60000;
 const DEFAULT_THROTTLE_LIMIT = 10;
@@ -84,7 +87,10 @@ function getPositiveIntFromEnv(
     CotizacionesModule,
     CuadrosComparativosModule,
     OrdenesCompraModule,
-    InformesActividadesModule,
+    InformesViajeModule,
+    DeclaracionesMovilidadModule,
+    PlanesViajeModule,
+    LiquidacionesViaticosModule,
     HealthModule,
   ],
   providers: [

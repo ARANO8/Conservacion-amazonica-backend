@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   Param,
   ParseIntPipe,
   Patch,
@@ -18,6 +19,7 @@ import {
   ApiOkResponse,
   ApiOperation,
   ApiProduces,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
@@ -33,6 +35,7 @@ import { ObservarRendicionDto } from './dto/observar-rendicion.dto';
 import { UpdateGastoPartidaContableDto } from './dto/update-gasto-partida-contable.dto';
 import { UpdateGastoPartidaPresupuestariaDto } from './dto/update-gasto-partida-presupuestaria.dto';
 import { RendicionesService } from './rendiciones.service';
+import { parseOrdenAnexo4 } from './anexo4.builder';
 
 interface RequestWithUser extends Request {
   user?: {
@@ -151,19 +154,86 @@ export class RendicionesController {
       },
     },
   })
+  @ApiQuery({
+    name: 'orden',
+    required: false,
+    enum: ['partida', 'fecha'],
+    description:
+      'Orden de las filas de gasto. Por defecto, por código de partida',
+  })
   async generatePdf(
     @Param('id', ParseIntPipe) id: number,
     @Req() req: RequestWithUser,
     @Res() res: Response,
+    @Query('orden') orden?: string,
   ): Promise<void> {
-    const buffer = await this.rendicionesService.generatePdf(id, {
-      id: req.user!.userId,
-      rol: req.user!.rol,
-    });
+    const buffer = await this.rendicionesService.generatePdf(
+      id,
+      { id: req.user!.userId, rol: req.user!.rol },
+      parseOrdenAnexo4(orden),
+    );
 
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'inline; filename="rendicion.pdf"',
+    });
+    res.send(buffer);
+  }
+
+  @Get(':id/anexo4')
+  @ApiOperation({
+    summary: 'ANEXO 4 de una rendición en HTML (misma plantilla que el PDF)',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @ApiQuery({
+    name: 'orden',
+    required: false,
+    enum: ['partida', 'fecha'],
+    description:
+      'Orden de las filas de gasto. Por defecto, por código de partida',
+  })
+  getAnexo4(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+    @Query('orden') orden?: string,
+  ): Promise<string> {
+    return this.rendicionesService.getAnexo4Html(
+      id,
+      { id: req.user!.userId, rol: req.user!.rol },
+      parseOrdenAnexo4(orden),
+    );
+  }
+
+  @SkipThrottle()
+  @Get(':id/excel')
+  @ApiOperation({ summary: 'Descargar el ANEXO 4 de una rendición en Excel' })
+  @ApiProduces(
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  )
+  @ApiQuery({
+    name: 'orden',
+    required: false,
+    enum: ['partida', 'fecha'],
+    description:
+      'Orden de las filas de gasto. Por defecto, por código de partida',
+  })
+  async generateExcel(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+    @Res() res: Response,
+    @Query('orden') orden?: string,
+  ): Promise<void> {
+    const { buffer, nombre } = await this.rendicionesService.generateExcel(
+      id,
+      { id: req.user!.userId, rol: req.user!.rol },
+      parseOrdenAnexo4(orden),
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="${nombre}"`,
     });
     res.send(buffer);
   }

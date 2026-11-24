@@ -1,4 +1,4 @@
-import { PrismaClient, Rol, EstadoPoa } from '@prisma/client';
+import { PrismaClient, Rol, EstadoPoa, Moneda, Sede } from '@prisma/client';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
@@ -154,8 +154,15 @@ async function main() {
   // 1. Usuarios
   let userCount = 0;
   await processCSV('Usuario.csv', async (row) => {
-    const [nombre, email, cargo, rolStr] = row;
+    const [nombre, email, cargo, rolStr, ci, sedeStr] = row;
     const rol = (Rol[rolStr as keyof typeof Rol] || Rol.USUARIO) as Rol;
+    // C.I. y sede vienen de la planilla de personal. Vacíos no pisan lo que
+    // un ADMIN haya cargado a mano.
+    const sede = Sede[sedeStr as keyof typeof Sede] as Sede | undefined;
+    const datosPlanilla = {
+      ...(ci ? { ci } : {}),
+      ...(sede ? { sede } : {}),
+    };
 
     const existente = await prisma.usuario.findUnique({ where: { email } });
 
@@ -163,7 +170,7 @@ async function main() {
       // No se reescribe la contraseña de usuarios ya existentes.
       await prisma.usuario.update({
         where: { email },
-        data: { nombreCompleto: nombre, cargo, rol },
+        data: { nombreCompleto: nombre, cargo, rol, ...datosPlanilla },
       });
     } else {
       const plainPassword =
@@ -175,6 +182,7 @@ async function main() {
           nombreCompleto: nombre,
           cargo,
           rol,
+          ...datosPlanilla,
           password: passwordHash,
         },
       });
@@ -204,17 +212,21 @@ async function main() {
   // 2. Conceptos (REAL PRODUCTION DATA)
   console.log('💰 Seeding Conceptos...');
   await processCSV('Concepto.csv', async (row) => {
-    const [nombre, institucional, terceros] = row;
+    const [nombre, institucional, terceros, monedaRaw] = row;
+    // Columna opcional: las tarifas internacionales se expresan en USD
+    const moneda = monedaRaw?.trim() === 'USD' ? Moneda.USD : Moneda.BOB;
     await prisma.concepto.upsert({
       where: { nombre },
       update: {
         precioInstitucional: cleanAmount(institucional),
         precioTerceros: cleanAmount(terceros),
+        moneda,
       },
       create: {
         nombre,
         precioInstitucional: cleanAmount(institucional),
         precioTerceros: cleanAmount(terceros),
+        moneda,
       },
     });
   });

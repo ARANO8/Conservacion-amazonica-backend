@@ -1,12 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  MaxLength,
   IsEmail,
   IsEnum,
   IsOptional,
   IsString,
   MinLength,
 } from 'class-validator';
-import { Rol } from '@prisma/client';
+import { Rol, Sede } from '@prisma/client';
 
 export class CreateUsuarioDto {
   @ApiProperty({
@@ -40,6 +41,27 @@ export class CreateUsuarioDto {
   @IsOptional()
   @IsString()
   cargo?: string;
+
+  @ApiProperty({
+    example: '4876543 LP',
+    description: 'Cédula de identidad; se imprime en el ANEXO 5',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  ci?: string;
+
+  @ApiProperty({
+    enum: Sede,
+    example: Sede.LA_PAZ,
+    description:
+      'Sede de trabajo; propone el lugar de emisión de sus documentos',
+    required: false,
+  })
+  @IsOptional()
+  @IsEnum(Sede, { message: 'La sede proporcionada no es válida' })
+  sede?: Sede;
 
   @ApiProperty({
     enum: Rol,

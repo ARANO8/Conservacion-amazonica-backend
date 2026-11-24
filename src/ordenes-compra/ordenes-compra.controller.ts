@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Res,
   Logger,
+  Header,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -89,6 +90,23 @@ export class OrdenesCompraController {
   @ApiOperation({ summary: 'Eliminar una orden de compra (Soft Delete)' })
   remove(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
     return this.service.remove(id, { id: req.user.userId, rol: req.user.rol });
+  }
+
+  @Get(':id/documento')
+  @ApiOperation({
+    summary:
+      'HTML de la orden de compra (ANEXO 12), con la misma plantilla que el PDF',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  getDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ): Promise<string> {
+    return this.service.getDocumentoHtml(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
   }
 
   @SkipThrottle()

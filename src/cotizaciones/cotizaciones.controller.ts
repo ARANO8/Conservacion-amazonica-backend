@@ -11,6 +11,7 @@ import {
   ParseIntPipe,
   Res,
   Logger,
+  Header,
 } from '@nestjs/common';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
@@ -96,6 +97,22 @@ export class CotizacionesController {
   @ApiOperation({ summary: 'Eliminar una cotización (Soft Delete)' })
   remove(@Param('id', ParseIntPipe) id: number, @Req() req: RequestWithUser) {
     return this.cotizacionesService.remove(id, {
+      id: req.user.userId,
+      rol: req.user.rol,
+    });
+  }
+
+  @Get(':id/documento')
+  @ApiOperation({
+    summary: 'HTML de la cotización, con la misma plantilla que el PDF',
+  })
+  @ApiProduces('text/html')
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  getDocumento(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: RequestWithUser,
+  ): Promise<string> {
+    return this.cotizacionesService.getDocumentoHtml(id, {
       id: req.user.userId,
       rol: req.user.rol,
     });

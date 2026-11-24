@@ -66,6 +66,13 @@ TERCEROS TERCEROS
     
 
 
+        Moneda {
+            BOB BOB
+USD USD
+        }
+    
+
+
         TipoDocumento {
             FACTURA FACTURA
 RECIBO RECIBO
@@ -102,6 +109,38 @@ CUADRO_APROBADO CUADRO_APROBADO
 PAGO_PENDIENTE_APROBACION PAGO_PENDIENTE_APROBACION
 PAGO_OBSERVADO PAGO_OBSERVADO
 PAGO_REALIZADO PAGO_REALIZADO
+INFORME_VIAJE_PENDIENTE INFORME_VIAJE_PENDIENTE
+INFORME_VIAJE_REVISADO INFORME_VIAJE_REVISADO
+INFORME_VIAJE_OBSERVADO INFORME_VIAJE_OBSERVADO
+LIQUIDACION_VIATICOS_PENDIENTE LIQUIDACION_VIATICOS_PENDIENTE
+LIQUIDACION_VIATICOS_REVISADA LIQUIDACION_VIATICOS_REVISADA
+LIQUIDACION_VIATICOS_OBSERVADA LIQUIDACION_VIATICOS_OBSERVADA
+        }
+    
+
+
+        EstadoLiquidacionViaticos {
+            BORRADOR BORRADOR
+ENVIADO ENVIADO
+OBSERVADO OBSERVADO
+REVISADO REVISADO
+        }
+    
+
+
+        EstadoInformeViaje {
+            BORRADOR BORRADOR
+ENVIADO ENVIADO
+OBSERVADO OBSERVADO
+REVISADO REVISADO
+        }
+    
+
+
+        Sede {
+            LA_PAZ LA_PAZ
+TRINIDAD TRINIDAD
+COBIJA COBIJA
         }
     
 
@@ -130,6 +169,8 @@ APROBADO APROBADO
     String nombreCompleto 
     Rol rol 
     String cargo "❓"
+    String ci "❓"
+    Sede sede "❓"
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
@@ -263,23 +304,103 @@ APROBADO APROBADO
     }
   
 
-  "InformeActividades" {
+  "InformeViaje" {
     Int id "🗝️"
     String codigoInforme 
+    String motivoViaje 
+    String lugarViaje 
     DateTime fechaInicio 
     DateTime fechaFin 
+    String lugarEmision 
+    DateTime fechaEmision 
+    EstadoInformeViaje estado 
+    String observacion "❓"
+    DateTime fechaRevision "❓"
     DateTime createdAt 
     DateTime updatedAt 
     DateTime deletedAt "❓"
     }
   
 
-  "ActividadInforme" {
+  "ActividadInformeViaje" {
     Int id "🗝️"
+    Int orden 
     DateTime fecha 
     String lugar 
     String personaInstitucion 
     String actividadesRealizadas 
+    }
+  
+
+  "LiquidacionViaticos" {
+    Int id "🗝️"
+    String codigoLiquidacion 
+    String lugarEmision 
+    DateTime fechaEmision 
+    EstadoLiquidacionViaticos estado 
+    String observacion "❓"
+    DateTime fechaRevision "❓"
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
+  "HojaLiquidacion" {
+    Int id "🗝️"
+    Int orden 
+    String cargo 
+    String ci 
+    String sede 
+    String via 
+    String escala 
+    String motivoViaje 
+    String destino 
+    DateTime fechaSalida 
+    DateTime fechaRetorno 
+    Decimal totalLiquido 
+    Decimal totalBruto 
+    Decimal rcIva 
+    }
+  
+
+  "FilaLiquidacion" {
+    Int id "🗝️"
+    Int orden 
+    Int porcentaje 
+    Decimal dias 
+    Decimal tarifaLiquida 
+    Decimal totalLiquido 
+    Decimal totalBruto 
+    }
+  
+
+  "DeclaracionMovilidad" {
+    Int id "🗝️"
+    String codigoDeclaracion 
+    String cargo 
+    String motivoActividad 
+    String proyectoPartida 
+    String lugarEmision 
+    DateTime fechaEmision 
+    Decimal totalBruto 
+    Decimal retencion 
+    Decimal totalLiquido 
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
+  "DetalleMovilidad" {
+    Int id "🗝️"
+    Int orden 
+    DateTime fecha 
+    String origen 
+    String destino 
+    String motivo 
+    Decimal montoGastado 
+    Decimal monto 
     }
   
 
@@ -315,6 +436,20 @@ APROBADO APROBADO
     }
   
 
+  "PlanViaje" {
+    Int id "🗝️"
+    String codigoPlan 
+    String cargo 
+    String lugaresViaje 
+    String objetivoViaje 
+    String lugarEmision 
+    DateTime fechaEmision 
+    DateTime createdAt 
+    DateTime updatedAt 
+    DateTime deletedAt "❓"
+    }
+  
+
   "Planificacion" {
     Int id "🗝️"
     String actividadProgramada 
@@ -323,6 +458,9 @@ APROBADO APROBADO
     DateTime fechaInicio 
     DateTime fechaFin 
     Decimal diasCalculados 
+    String lugarSalida "❓"
+    String lugarLlegada "❓"
+    Int orden 
     }
   
 
@@ -331,6 +469,7 @@ APROBADO APROBADO
     String nombre 
     Decimal precioInstitucional 
     Decimal precioTerceros 
+    Moneda moneda 
     }
   
 
@@ -418,6 +557,7 @@ APROBADO APROBADO
     Int id "🗝️"
     String region 
     String destino 
+    TipoDestino tipoPersonal 
     TipoDocumento tipoDocumento 
     Int personas 
     Int noches 
@@ -530,6 +670,8 @@ APROBADO APROBADO
     }
   
     "Usuario" |o--|| "Rol" : "enum:rol"
+    "Usuario" |o--|o "Sede" : "enum:sede"
+    "Usuario" o{--}o "Planificacion" : ""
     "Proyecto" }o--|o "CuentaBancaria" : "cuentaBancaria"
     "PartidaContable" |o--|o "PartidaContable" : "parent"
     "EstructuraProgramatica" }o--|| "Proyecto" : "proyecto"
@@ -543,31 +685,56 @@ APROBADO APROBADO
     "Solicitud" |o--|| "TipoSolicitud" : "enum:tipo"
     "Solicitud" }o--|| "Usuario" : "usuarioEmisor"
     "Solicitud" }o--|o "Usuario" : "aprobador"
+    "Solicitud" }o--|o "Usuario" : "directorPrograma"
     "Solicitud" }o--|o "Usuario" : "usuarioBeneficiado"
+    "Solicitud" |o--|o "PlanViaje" : "planViaje"
     "HistorialAprobacion" |o--|| "TipoAccionHistorial" : "enum:accion"
     "HistorialAprobacion" }o--|| "Usuario" : "usuario"
     "HistorialAprobacion" }o--|o "Usuario" : "derivadoA"
     "HistorialAprobacion" }o--|o "Solicitud" : "solicitud"
     "HistorialAprobacion" }o--|o "Rendicion" : "rendicion"
     "HistorialAprobacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
+    "HistorialAprobacion" }o--|o "PlanViaje" : "planViaje"
+    "HistorialAprobacion" }o--|o "InformeViaje" : "informeViaje"
+    "HistorialAprobacion" }o--|o "LiquidacionViaticos" : "liquidacionViaticos"
     "Notificacion" |o--|| "TipoNotificacion" : "enum:tipo"
     "Notificacion" }o--|| "Usuario" : "usuario"
     "Notificacion" }o--|o "Solicitud" : "solicitud"
     "Notificacion" }o--|o "CuadroComparativo" : "cuadroComparativo"
+    "Notificacion" }o--|o "PlanViaje" : "planViaje"
+    "Notificacion" }o--|o "InformeViaje" : "informeViaje"
+    "Notificacion" }o--|o "LiquidacionViaticos" : "liquidacionViaticos"
     "Rendicion" |o--|| "EstadoRendicion" : "enum:estado"
     "Rendicion" |o--|| "Solicitud" : "solicitud"
     "Rendicion" }o--|o "Usuario" : "aprobadorActual"
-    "InformeActividades" }o--|| "Usuario" : "usuario"
-    "ActividadInforme" }o--|| "InformeActividades" : "informe"
+    "InformeViaje" |o--|| "EstadoInformeViaje" : "enum:estado"
+    "InformeViaje" }o--|| "Usuario" : "usuario"
+    "InformeViaje" }o--|o "Usuario" : "directorPrograma"
+    "InformeViaje" |o--|o "Solicitud" : "solicitud"
+    "ActividadInformeViaje" }o--|| "InformeViaje" : "informe"
+    "LiquidacionViaticos" |o--|| "EstadoLiquidacionViaticos" : "enum:estado"
+    "LiquidacionViaticos" }o--|| "Usuario" : "usuario"
+    "LiquidacionViaticos" }o--|o "Usuario" : "directorPrograma"
+    "LiquidacionViaticos" |o--|o "Solicitud" : "solicitud"
+    "HojaLiquidacion" }o--|| "LiquidacionViaticos" : "liquidacion"
+    "HojaLiquidacion" }o--|| "Usuario" : "usuario"
+    "FilaLiquidacion" }o--|| "HojaLiquidacion" : "hoja"
+    "FilaLiquidacion" }o--|| "Concepto" : "concepto"
+    "FilaLiquidacion" }o--|o "SolicitudPresupuesto" : "partida"
+    "DeclaracionMovilidad" }o--|| "Usuario" : "usuario"
+    "DetalleMovilidad" }o--|| "DeclaracionMovilidad" : "declaracion"
     "GastoRendicion" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "GastoRendicion" }o--|| "Rendicion" : "rendicion"
     "GastoRendicion" }o--|o "SolicitudPresupuesto" : "partida"
     "GastoRendicion" }o--|o "PartidaContable" : "partidaContable"
+    "GastoRendicion" }o--|o "HojaLiquidacion" : "hojaLiquidacion"
     "DeclaracionJurada" }o--|| "Rendicion" : "rendicion"
     "SolicitudPresupuesto" }o--|| "Solicitud" : "solicitud"
     "SolicitudPresupuesto" }o--|| "Poa" : "poa"
-    "Planificacion" }o--|| "Solicitud" : "solicitud"
+    "PlanViaje" }o--|| "Usuario" : "usuario"
+    "Planificacion" }o--|| "PlanViaje" : "planViaje"
     "Planificacion" o{--}o "Viatico" : ""
+    "Concepto" |o--|| "Moneda" : "enum:moneda"
     "Viatico" |o--|| "TipoDestino" : "enum:tipoDestino"
     "Viatico" }o--|| "Solicitud" : "solicitud"
     "Viatico" }o--|| "SolicitudPresupuesto" : "solicitudPresupuesto"
@@ -586,6 +753,7 @@ APROBADO APROBADO
     "PagoParcial" }o--|o "Usuario" : "aprobador"
     "PagoParcial" }o--|o "Usuario" : "pagadoPor"
     "PagoParcial" }o--|| "GastoCompra" : "gastoCompra"
+    "Hospedaje" |o--|| "TipoDestino" : "enum:tipoPersonal"
     "Hospedaje" |o--|| "TipoDocumento" : "enum:tipoDocumento"
     "Hospedaje" }o--|| "Solicitud" : "solicitud"
     "Hospedaje" }o--|| "Poa" : "poa"

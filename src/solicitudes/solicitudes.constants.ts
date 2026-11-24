@@ -11,6 +11,7 @@ export const USER_SAFE_SELECT = {
 export const SOLICITUD_INCLUDE = {
   usuarioEmisor: { select: USER_SAFE_SELECT },
   aprobador: { select: USER_SAFE_SELECT },
+  directorPrograma: { select: USER_SAFE_SELECT },
   usuarioBeneficiado: { select: USER_SAFE_SELECT },
   historialAprobaciones: {
     include: {
@@ -72,9 +73,35 @@ export const SOLICITUD_INCLUDE = {
       },
     },
   },
-  planificaciones: true,
+  // ANEXO 1 del que nace la solicitud de viaje; sus actividades son el
+  // cronograma al que se asignan viáticos y nómina de terceros
+  planViaje: {
+    include: {
+      actividades: {
+        orderBy: { orden: 'asc' },
+        include: {
+          participantesInstitucionales: {
+            select: { id: true, nombreCompleto: true, cargo: true },
+          },
+        },
+      },
+    },
+  },
   hospedajes: true,
   personasExternas: true,
+  // ANEXO 7 del viaje: la rendición y el detalle lo muestran o avisan si falta
+  informeViaje: {
+    select: { id: true, codigoInforme: true, estado: true, deletedAt: true },
+  },
+  // ANEXO 5 del viaje: la rendición importa sus hojas como gastos LV
+  liquidacionViaticos: {
+    select: {
+      id: true,
+      codigoLiquidacion: true,
+      estado: true,
+      deletedAt: true,
+    },
+  },
   rendicion: {
     select: {
       id: true,

@@ -75,6 +75,18 @@ services:
     networks:
       - edge
 
+  # Manuales de usuario y tecnico (spec 026): nginx estatico. El proxy `edge`
+  # exige la sesion para /amzdesk/manual/tecnico/ consultando al backend.
+  manual:
+    # Con valor por defecto: si el .env del VPS aun no define MANUAL_IMAGE, el
+    # compose sigue siendo valido y no tumba los despliegues de los demas.
+    image: ${MANUAL_IMAGE:-ghcr.io/arano8/conservacion-amazonica-frontend-manual:latest}
+    container_name: amzdesk_manual
+    restart: unless-stopped
+    mem_limit: 64m
+    networks:
+      - edge
+
 volumes:
   db_data:
 
