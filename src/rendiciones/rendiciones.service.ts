@@ -22,7 +22,7 @@ import { UpdateGastoPartidaContableDto } from './dto/update-gasto-partida-contab
 import { UpdateGastoPartidaPresupuestariaDto } from './dto/update-gasto-partida-presupuestaria.dto';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
-import { Anexo4, construirAnexo4 } from './anexo4.builder';
+import { Anexo4, OrdenAnexo4, construirAnexo4 } from './anexo4.builder';
 import { generarExcelAnexo4 } from './anexo4.excel';
 import { DESTINATARIO_ANEXOS } from '../common/constants/financial.constants';
 import { firmasDireccion } from '../pdf/firmas-direccion';
@@ -264,11 +264,13 @@ export class RendicionesService {
   private async armarAnexo4(
     id: number,
     usuario?: { id: number; rol: Rol },
+    orden?: OrdenAnexo4,
   ): Promise<Anexo4> {
     const rendicion = await this.findOne(id, usuario);
 
     return construirAnexo4(rendicion, {
       destinatario: DESTINATARIO_ANEXOS,
+      orden,
       ...(await firmasDireccion(this.prisma)),
     });
   }
@@ -276,10 +278,11 @@ export class RendicionesService {
   async generatePdf(
     id: number,
     usuario?: { id: number; rol: Rol },
+    orden?: OrdenAnexo4,
   ): Promise<Buffer> {
     return this.pdfService.generatePdf(
       'anexo4.hbs',
-      await this.armarAnexo4(id, usuario),
+      await this.armarAnexo4(id, usuario, orden),
       { landscape: true },
     );
   }
@@ -288,10 +291,11 @@ export class RendicionesService {
   async getAnexo4Html(
     id: number,
     usuario?: { id: number; rol: Rol },
+    orden?: OrdenAnexo4,
   ): Promise<string> {
     return this.pdfService.renderHtml(
       'anexo4.hbs',
-      await this.armarAnexo4(id, usuario),
+      await this.armarAnexo4(id, usuario, orden),
     );
   }
 
@@ -299,8 +303,9 @@ export class RendicionesService {
   async generateExcel(
     id: number,
     usuario?: { id: number; rol: Rol },
+    orden?: OrdenAnexo4,
   ): Promise<{ buffer: Buffer; nombre: string }> {
-    const anexo = await this.armarAnexo4(id, usuario);
+    const anexo = await this.armarAnexo4(id, usuario, orden);
     return {
       buffer: await generarExcelAnexo4(anexo, this.pdfService.leerLogos()),
       nombre: `Rendicion-${anexo.codigoSolicitud}.xlsx`,
@@ -1039,6 +1044,16 @@ export class RendicionesService {
         }
       }
 
+      // Las cuentas que agrupan a otras son encabezados del plan
+      const subcuentas = await this.prisma.partidaContable.count({
+        where: { parentId: partida.id, deletedAt: null },
+      });
+      if (subcuentas > 0) {
+        throw new BadRequestException(
+          `La cuenta ${partida.codigo} es un encabezado del plan de cuentas; elige una de sus subcuentas`,
+        );
+      }
+
       await this.prisma.gastoRendicion.update({
         where: { id: gastoId },
         data: { partidaContableId: partida.id },
@@ -1217,6 +1232,15 @@ export class RendicionesService {
       });
       if (!pc) {
         throw new NotFoundException('Partida contable no encontrada');
+      }
+      // Las cuentas que agrupan a otras son encabezados del plan
+      const subcuentas = await this.prisma.partidaContable.count({
+        where: { parentId: pc.id, deletedAt: null },
+      });
+      if (subcuentas > 0) {
+        throw new BadRequestException(
+          `La cuenta ${pc.codigo} es un encabezado del plan de cuentas; elige una de sus subcuentas`,
+        );
       }
     }
 

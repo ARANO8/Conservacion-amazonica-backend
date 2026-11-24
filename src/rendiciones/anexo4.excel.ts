@@ -435,8 +435,57 @@ export async function generarExcelAnexo4(
     { bold: true, fill: GRIS_CLARO, borde: true, numero: true },
   );
 
+  // --- Resumen partidas presupuestarias, a la derecha del contable ---
+  combinar(`J${rc}:O${rc}`);
+  escribir(`J${rc}`, 'RESUMEN PARTIDAS PRESUPUESTARIAS', {
+    bold: true,
+    fill: GRIS_CLARO,
+    borde: true,
+  });
+  combinar(`J${rc + 1}:M${rc + 1}`);
+  escribir(`J${rc + 1}`, 'PARTIDA PRESUPUESTARIA', {
+    bold: true,
+    fill: GRIS_CLARO,
+    borde: true,
+    alinear: 'center',
+  });
+  combinar(`N${rc + 1}:O${rc + 1}`);
+  escribir(`N${rc + 1}`, 'MONTO', {
+    bold: true,
+    fill: GRIS_CLARO,
+    borde: true,
+    alinear: 'center',
+  });
+  const presupuestarias = anexo.resumenPresupuestario.length
+    ? anexo.resumenPresupuestario
+    : [{ nombre: '', monto: 0 }];
+  presupuestarias.forEach((p, i) => {
+    const r = rc + 2 + i;
+    combinar(`J${r}:M${r}`);
+    escribir(`J${r}`, p.nombre, { borde: true });
+    combinar(`N${r}:O${r}`);
+    escribir(`N${r}`, p.monto, { borde: true, numero: true });
+  });
+  const rpTotal = rc + 2 + presupuestarias.length;
+  combinar(`J${rpTotal}:M${rpTotal}`);
+  escribir(`J${rpTotal}`, 'TOTAL', {
+    bold: true,
+    fill: GRIS_CLARO,
+    borde: true,
+    alinear: 'center',
+  });
+  combinar(`N${rpTotal}:O${rpTotal}`);
+  escribir(
+    `N${rpTotal}`,
+    formula(
+      `SUM(N${rc + 2}:N${rpTotal - 1})`,
+      anexo.resumenPresupuestarioTotal,
+    ),
+    { bold: true, fill: GRIS_CLARO, borde: true, numero: true },
+  );
+
   // --- Firmas ---
-  const fi = rcTotal + 4;
+  const fi = Math.max(rcTotal, rpTotal) + 4;
   const firma = (
     desde: string,
     hasta: string,

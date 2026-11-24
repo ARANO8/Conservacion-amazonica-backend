@@ -5,6 +5,7 @@ import {
   FACTOR_RETENCION_VIATICOS,
   tarifaEnBolivianos,
 } from '../common/constants/financial.constants';
+import { FirmaDocumento } from '../pdf/firmas-direccion';
 
 /**
  * ANEXO 2 — Solicitud de Fondos para Viajes.
@@ -401,6 +402,8 @@ export function construirAnexo2(
   fuente: Anexo2Fuente,
   catalogo: ConceptoCatalogo[],
   destinatario: string,
+  // Revisa siempre la Dirección Financiera, no el Director de Programa
+  revisor: FirmaDocumento,
 ): Anexo2 {
   const institucionales = fuente.viaticos.filter(
     (v) => v.tipoDestino !== TipoDestino.TERCEROS,
@@ -473,8 +476,8 @@ export function construirAnexo2(
     banco,
     solicitadoPor: emisor,
     solicitadoPorCargo: fuente.usuarioEmisor?.cargo ?? '',
-    revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
-    revisadoPorCargo: fuente.directorPrograma?.cargo ?? '',
+    revisadoPor: revisor.nombre,
+    revisadoPorCargo: revisor.cargo,
     aprobadoPor: DESTINATARIO_ANEXOS,
     aprobadoPorCargo: CARGO_DIRECTOR_EJECUTIVO,
     viajeros: viajeros(fuente),

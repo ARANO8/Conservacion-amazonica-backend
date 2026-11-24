@@ -174,8 +174,8 @@ own taxes); only `RECIBO` does.
 | `RECIBO` + `PEAJE` / `AUTO_COMPRA` | `1.00` | none | — |
 | Compra / consultancy contract, `RECIBO` | `0.84` | 16% | RC-IVA 13% + IT 3% |
 | Viático `INSTITUCIONAL` | `0.87` | 13% | all RC-IVA, no IT |
-| Viático `TERCEROS` | `0.84` | 16% | RC-IVA 13% + IT 3% |
-| Movilidad (ANEXO 6) | `FACTOR_MOVILIDAD` = `0.845` | 15.5% | IUE 12.5% + IT 3% |
+| Viático `TERCEROS` | `0.87` | 13% | all RC-IVA, no IT (Instructivo de Viaje y Viáticos, 03/08/2026) |
+| Movilidad (ANEXO 6) | `FACTOR_MOVILIDAD` = `0.84` | 16% | `RETENCION_MOVILIDAD_RATE` |
 
 Grossing up is always `montoPresupuestado = neto / factor`; the tax total is the difference,
 and it is split proportionally (`totalTax * 13/16`, `totalTax * 5/8`, …) with the **last

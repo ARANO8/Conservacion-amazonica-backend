@@ -78,6 +78,9 @@ export interface Anexo4 {
   };
   resumenContable: { nombre: string; codigo: string; monto: number }[];
   resumenContableTotal: number;
+  /** Lo gastado por partida presupuestaria, al monto bruto. */
+  resumenPresupuestario: { nombre: string; monto: number }[];
+  resumenPresupuestarioTotal: number;
   firmas: {
     elaboradoPor: Anexo4Firma;
     revisadoPor: Anexo4Firma;
@@ -165,10 +168,23 @@ function fecha(value: Date | null | undefined): string {
   }).format(date);
 }
 
+/** Orden de las filas de gasto del ANEXO 4. */
+export type OrdenAnexo4 = 'partida' | 'fecha';
+
+export const ORDEN_ANEXO4_DEFECTO: OrdenAnexo4 = 'partida';
+
+export function parseOrdenAnexo4(valor: unknown): OrdenAnexo4 {
+  return valor === 'fecha' || valor === 'partida'
+    ? valor
+    : ORDEN_ANEXO4_DEFECTO;
+}
+
 export function construirAnexo4(
   fuente: Anexo4Fuente,
   opciones: {
     destinatario: string;
+    /** Por defecto, por código de partida. */
+    orden?: OrdenAnexo4;
     revisadoPor: Anexo4Firma;
     aprobadoPor: Anexo4Firma;
   },
@@ -190,7 +206,8 @@ export function construirAnexo4(
         cuando: g.fecha ?? fuente.fechaRendicion,
         nroDocto: g.nroDocumento,
         tipoDocumento: g.tipoDocumento,
-        partida: g.partida?.poa?.estructura?.partida?.nombre ?? '',
+        // Código del plan de cuentas; vacío hasta que se asigna la partida
+        partida: g.partidaContable?.codigo ?? '',
         descripcion: g.concepto || g.detalle,
         bruto: num(g.montoBruto),
         impuestos: num(g.montoImpuestos),
@@ -199,6 +216,7 @@ export function construirAnexo4(
         iue: desglose.iue.toNumber(),
         it: desglose.it.toNumber(),
         contable: g.partidaContable,
+        presupuestaria: g.partida?.poa?.estructura?.partida?.nombre ?? null,
       };
     }),
     ...fuente.declaracionesJuradas.map((dj) => ({
@@ -214,8 +232,26 @@ export function construirAnexo4(
       iue: 0,
       it: 0,
       contable: null as { codigo: string; nombre: string } | null,
+      presupuestaria: null as string | null,
     })),
-  ].sort((a, b) => new Date(a.cuando).getTime() - new Date(b.cuando).getTime());
+  ];
+
+  const porFecha = (a: { cuando: Date }, b: { cuando: Date }) =>
+    new Date(a.cuando).getTime() - new Date(b.cuando).getTime();
+  if ((opciones.orden ?? ORDEN_ANEXO4_DEFECTO) === 'fecha') {
+    movimientos.sort(porFecha);
+  } else {
+    // Por código de partida; las filas sin código van al final y, a igual
+    // código, se mantiene el orden cronológico
+    movimientos.sort((a, b) => {
+      if (a.partida !== b.partida) {
+        if (!a.partida) return 1;
+        if (!b.partida) return -1;
+        return a.partida.localeCompare(b.partida, 'es', { numeric: true });
+      }
+      return porFecha(a, b);
+    });
+  }
 
   const filas: Anexo4Fila[] = [
     {
@@ -251,6 +287,8 @@ export function construirAnexo4(
     string,
     { nombre: string; codigo: string; monto: number }
   >();
+
+  const presupuestario = new Map<string, number>();
 
   for (const m of movimientos) {
     saldo = round2(saldo - m.neto);
@@ -289,6 +327,13 @@ export function construirAnexo4(
     };
     actual.monto = round2(actual.monto + m.bruto);
     contable.set(clave, actual);
+
+    // Resumen presupuestario: por partida presupuestaria, al monto bruto
+    const partida = m.presupuestaria ?? '';
+    presupuestario.set(
+      partida,
+      round2((presupuestario.get(partida) ?? 0) + m.bruto),
+    );
   }
 
   const suma = (sel: (f: Anexo4Fila) => number | null) =>
@@ -311,6 +356,16 @@ export function construirAnexo4(
     ?.estructura?.proyecto?.cuentaBancaria;
 
   const resumenContable = [...contable.values()];
+  // Alfabético, con lo que no tiene partida al final
+  const resumenPresupuestario = [...presupuestario.entries()]
+    .sort(([a], [b]) => {
+      if (!a || !b) return a ? -1 : b ? 1 : 0;
+      return a.localeCompare(b, 'es');
+    })
+    .map(([nombre, monto]) => ({
+      nombre: nombre || 'Sin partida presupuestaria asignada',
+      monto,
+    }));
 
   return {
     codigoSolicitud: solicitud.codigoSolicitud,
@@ -351,6 +406,10 @@ export function construirAnexo4(
       totalCantidad: documentos.facturasCantidad + documentos.recibosCantidad,
       totalMonto: round2(documentos.facturasMonto + documentos.recibosMonto),
     },
+    resumenPresupuestario,
+    resumenPresupuestarioTotal: round2(
+      resumenPresupuestario.reduce((acc, r) => acc + r.monto, 0),
+    ),
     resumenContable,
     resumenContableTotal: round2(
       resumenContable.reduce((acc, r) => acc + r.monto, 0),

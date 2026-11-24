@@ -366,7 +366,15 @@
         </tr>
       </table>
 
-      <table class="bloque borde" style="width: 49%">
+      <table class="bloque">
+        <colgroup>
+          <col style="width: 49%" />
+          <col style="width: 2%" />
+          <col style="width: 49%" />
+        </colgroup>
+        <tr>
+          <td style="vertical-align: top; padding: 0">
+      <table class="borde">
         <tr class="gris-claro b">
           <td colspan="3">RESUMEN CONTABLE</td>
         </tr>
@@ -391,6 +399,36 @@
         <tr class="gris-claro b">
           <td colspan="2" class="c">TOTAL</td>
           <td class="r">{{bs resumenContableTotal}}</td>
+        </tr>
+      </table>
+          </td>
+          <td></td>
+          <td style="vertical-align: top; padding: 0">
+            <table class="borde">
+              <tr class="gris-claro b">
+                <td colspan="2">RESUMEN PARTIDAS PRESUPUESTARIAS</td>
+              </tr>
+              <tr class="gris-claro b">
+                <td class="c">PARTIDA PRESUPUESTARIA</td>
+                <td class="c" style="width: 22%">MONTO</td>
+              </tr>
+              {{#each resumenPresupuestario}}
+                <tr>
+                  <td>{{nombre}}</td>
+                  <td class="r">{{bs monto}}</td>
+                </tr>
+              {{else}}
+                <tr>
+                  <td>&nbsp;</td>
+                  <td></td>
+                </tr>
+              {{/each}}
+              <tr class="gris-claro b">
+                <td class="c">TOTAL</td>
+                <td class="r">{{bs resumenPresupuestarioTotal}}</td>
+              </tr>
+            </table>
+          </td>
         </tr>
       </table>
 

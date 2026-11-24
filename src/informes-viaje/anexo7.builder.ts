@@ -4,6 +4,7 @@ import {
 } from '../common/constants/financial.constants';
 import { MIN_FILAS_ANEXO7, NOTA_ANEXO7 } from './informes-viaje.constants';
 import { formatFechaAnexo } from '../planes-viaje/anexo1.builder';
+import { FirmaDocumento } from '../pdf/firmas-direccion';
 
 /** Lo mínimo del informe que necesita el ANEXO 7 impreso. */
 export interface Anexo7Fuente {
@@ -15,7 +16,6 @@ export interface Anexo7Fuente {
   lugarEmision: string;
   fechaEmision: Date;
   usuario: { nombreCompleto: string; cargo: string | null };
-  directorPrograma: { nombreCompleto: string; cargo: string | null } | null;
   actividades: {
     fecha: Date;
     lugar: string;
@@ -87,6 +87,8 @@ function filaVacia(): Anexo7Fila {
 export function construirAnexo7(
   fuente: Anexo7Fuente,
   destinatario: string,
+  // Revisa siempre la Dirección Financiera, no el Director de Programa
+  revisor: FirmaDocumento,
 ): Anexo7 {
   const filas: Anexo7Fila[] = fuente.actividades.map((a) => ({
     fecha: formatFechaAnexo(a.fecha),
@@ -109,8 +111,8 @@ export function construirAnexo7(
     fechaEmision: fechaEnPalabras(fuente.fechaEmision),
     preparadoPor: fuente.usuario.nombreCompleto,
     preparadoPorCargo: fuente.usuario.cargo ?? '',
-    revisadoPor: fuente.directorPrograma?.nombreCompleto ?? '',
-    revisadoPorCargo: fuente.directorPrograma?.cargo ?? '',
+    revisadoPor: revisor.nombre,
+    revisadoPorCargo: revisor.cargo,
     aprobadoPor: DESTINATARIO_ANEXOS,
     aprobadoPorCargo: CARGO_DIRECTOR_EJECUTIVO,
     notaPie: NOTA_ANEXO7,

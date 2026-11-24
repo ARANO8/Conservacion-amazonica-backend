@@ -9,7 +9,7 @@ import {
   TipoDocumento,
 } from '@prisma/client';
 import { RendicionesService } from './rendiciones.service';
-import type { Anexo4 } from './anexo4.builder';
+import { construirAnexo4, type Anexo4 } from './anexo4.builder';
 import { PrismaService } from '../prisma/prisma.service';
 import { PdfService } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
@@ -414,6 +414,12 @@ describe('RendicionesService', () => {
       expect(anexo.resumenContable).toHaveLength(1);
       expect(anexo.resumenContableTotal).toBe(128.81);
 
+      // El resumen presupuestario reparte el mismo total por partida
+      expect(anexo.resumenPresupuestarioTotal).toBe(128.81);
+      expect(
+        anexo.resumenPresupuestario.reduce((acc, r) => acc + r.monto, 0),
+      ).toBeCloseTo(128.81, 2);
+
       expect(anexo.firmas.revisadoPor.nombre).toBe('Shirley Ramírez');
       expect(anexo.firmas.aprobadoPor.cargo).toBe('DIRECTOR EJECUTIVO');
 
@@ -435,5 +441,72 @@ describe('RendicionesService', () => {
         result: 125,
       });
     });
+  });
+});
+
+describe('construirAnexo4 — orden de las filas', () => {
+  const gasto = (nroDocumento: string, dia: string, codigo: string | null) => ({
+    fecha: new Date(`2026-06-${dia}`),
+    nroDocumento,
+    tipoDocumento: 'FACTURA',
+    tipoRetencion: null,
+    concepto: nroDocumento,
+    detalle: '',
+    montoBruto: 10,
+    montoImpuestos: 0,
+    montoNeto: 10,
+    partida: null,
+    partidaContable: codigo ? { codigo, nombre: codigo } : null,
+  });
+  const fuente = {
+    fechaRendicion: new Date('2026-06-30'),
+    observaciones: null,
+    createdAt: new Date('2026-06-30'),
+    solicitud: {
+      codigoSolicitud: 'SOL-2026-009',
+      codigoDesembolso: null,
+      fechaDesembolso: null,
+      fechaSolicitud: null,
+      montoTotalNeto: 100,
+      chequeANombreDe: null,
+      proyecto: null,
+      usuarioEmisor: null,
+      directorPrograma: null,
+      presupuestos: [],
+    },
+    gastosRendicion: [
+      gasto('A', '05', '5.1.3.4.12'),
+      gasto('B', '01', null),
+      gasto('C', '03', '5.1.2.1.01'),
+      gasto('D', '02', '5.1.3.4.12'),
+    ],
+    declaracionesJuradas: [],
+  };
+  const firma = { nombre: '', cargo: '' };
+  const documentos = (orden?: 'partida' | 'fecha') =>
+    construirAnexo4(fuente, {
+      destinatario: '',
+      revisadoPor: firma,
+      aprobadoPor: firma,
+      orden,
+    })
+      .filas.slice(1)
+      .map((f) => f.nroDocto);
+
+  it('por defecto ordena por código de partida, sin código al final', () => {
+    expect(documentos()).toEqual(['C', 'D', 'A', 'B']);
+  });
+
+  it('ordena por fecha cuando se pide', () => {
+    expect(documentos('fecha')).toEqual(['B', 'D', 'C', 'A']);
+  });
+
+  it('el saldo se acumula en el orden mostrado', () => {
+    const anexo = construirAnexo4(fuente, {
+      destinatario: '',
+      revisadoPor: firma,
+      aprobadoPor: firma,
+    });
+    expect(anexo.filas.map((f) => f.saldo)).toEqual([100, 90, 80, 70, 60]);
   });
 });

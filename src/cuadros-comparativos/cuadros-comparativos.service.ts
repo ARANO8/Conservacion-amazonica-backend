@@ -17,6 +17,7 @@ import {
 import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { CUADRO_INCLUDE } from './cuadros-comparativos.constants';
+import { firmasDireccion } from '../pdf/firmas-direccion';
 
 type UsuarioContexto = { id: number; rol: Rol };
 
@@ -29,10 +30,6 @@ const ESTADOS_EDITABLES: EstadoCuadroComparativo[] = [
   EstadoCuadroComparativo.OBSERVADO,
 ];
 
-const REVISOR = {
-  nombre: 'Shirley Ramirez Teodovich',
-  cargo: 'Director Financiero',
-};
 const APROBADOR = {
   nombre: 'Marcos Teran Valenzuela',
   cargo: 'Director Ejecutivo',
@@ -860,6 +857,7 @@ export class CuadrosComparativosService {
 
     const emisorNombre = cuadro.usuarioEmisor?.nombreCompleto ?? '';
     const emisorCargo = cuadro.usuarioEmisor?.cargo ?? 'Resp. Cotización';
+    const { revisadoPor: revisor } = await firmasDireccion(this.prisma);
 
     return documentoPdf(
       'cuadro-comparativo.hbs',
@@ -873,8 +871,8 @@ export class CuadrosComparativosService {
         items,
         preparadoPor: emisorNombre,
         preparadoCargo: emisorCargo,
-        revisadoPor: REVISOR.nombre,
-        revisadoCargo: REVISOR.cargo,
+        revisadoPor: revisor.nombre,
+        revisadoCargo: revisor.cargo,
         aprobadoPor: APROBADOR.nombre,
         aprobadoCargo: APROBADOR.cargo,
       },

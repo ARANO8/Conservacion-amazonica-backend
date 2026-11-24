@@ -127,10 +127,6 @@ describe('construirAnexo7', () => {
       lugarEmision: 'La Paz',
       fechaEmision: new Date('2026-11-10T00:00:00.000Z'),
       usuario: { nombreCompleto: 'Ana Rojas', cargo: 'TÉCNICO DE CAMPO' },
-      directorPrograma: {
-        nombreCompleto: 'Luis Vaca',
-        cargo: 'DIRECTOR DE PROGRAMA',
-      },
       actividades: [
         {
           fecha: new Date('2026-11-03T00:00:00.000Z'),
@@ -141,6 +137,7 @@ describe('construirAnexo7', () => {
       ],
     },
     'Marcos F. Terán Valenzuela',
+    { nombre: 'Shirley Ramírez', cargo: 'DIRECTOR FINANCIERO' },
   );
 
   it('arma encabezado, rango y firmas', () => {
@@ -152,8 +149,8 @@ describe('construirAnexo7', () => {
       fechaEmision: '10 de noviembre de 2026',
       preparadoPor: 'Ana Rojas',
       preparadoPorCargo: 'TÉCNICO DE CAMPO',
-      revisadoPor: 'Luis Vaca',
-      revisadoPorCargo: 'DIRECTOR DE PROGRAMA',
+      revisadoPor: 'Shirley Ramírez',
+      revisadoPorCargo: 'DIRECTOR FINANCIERO',
       aprobadoPor: 'Marcos F. Terán Valenzuela',
       aprobadoPorCargo: 'DIRECTOR EJECUTIVO',
       notaPie: NOTA_ANEXO7,
