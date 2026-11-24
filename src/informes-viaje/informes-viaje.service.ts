@@ -28,6 +28,7 @@ import {
   InformeViajeCompleto,
 } from './informes-viaje.constants';
 import { construirAnexo7 } from './anexo7.builder';
+import { firmasDireccion } from '../pdf/firmas-direccion';
 
 /** ADMIN y EJECUTIVO ven los informes de todos. */
 const ROLES_VISTA_GLOBAL: Rol[] = [Rol.ADMIN, Rol.EJECUTIVO];
@@ -592,7 +593,11 @@ export class InformesViajeService {
     const informe = await this.findOne(id, user);
     return documentoPdf(
       'anexo7.hbs',
-      construirAnexo7(informe, DESTINATARIO_ANEXOS),
+      construirAnexo7(
+        informe,
+        DESTINATARIO_ANEXOS,
+        (await firmasDireccion(this.prisma)).revisadoPor,
+      ),
     );
   }
 

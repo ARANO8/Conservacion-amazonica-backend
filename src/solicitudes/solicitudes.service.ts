@@ -49,6 +49,7 @@ import { PoaService } from '../poa/poa.service';
 import { NotificacionesService } from '../notificaciones/notificaciones.service';
 import { DocumentoPdf, PdfService, documentoPdf } from '../pdf/pdf.service';
 import { Anexo2, construirAnexo2 } from './anexo2.builder';
+import { firmasDireccion } from '../pdf/firmas-direccion';
 
 /** Aprobador final que firma los PDF de compras. */
 const DIRECTOR_EJECUTIVO = {
@@ -964,7 +965,13 @@ export class SolicitudesService {
     solicitud: SolicitudConRelaciones,
   ): Promise<Anexo2> {
     const catalogo = await this.prisma.concepto.findMany();
-    return construirAnexo2(solicitud, catalogo, DESTINATARIO_ANEXOS);
+    const { revisadoPor } = await firmasDireccion(this.prisma);
+    return construirAnexo2(
+      solicitud,
+      catalogo,
+      DESTINATARIO_ANEXOS,
+      revisadoPor,
+    );
   }
 
   /** Datos y plantilla del documento: de aquí salen el PDF y la vista. */
